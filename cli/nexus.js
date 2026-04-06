@@ -648,6 +648,56 @@ const commands = {
     console.log(`  ${dim('Activity')}   ${data.activity.length} events tracked\n`);
   },
 
+  async intel() {
+    console.log(`\n  ${amber('◈')} ${amber('Fuel Intelligence')}\n`);
+
+    const data = await api('/fuel-intel');
+
+    // Patterns
+    if (data.patterns) {
+      const p = data.patterns;
+      console.log(`  ${dim('Sessions analyzed')}  ${p.totalSessions}`);
+      console.log(`  ${dim('Avg burn rate')}     ${p.avgBurnRate}%/h`);
+      console.log(`  ${dim('Avg duration')}      ${p.avgSessionDuration}h`);
+      console.log(`  ${dim('Avg fuel/session')}  ${p.avgFuelPerSession}%`);
+      console.log(`  ${dim('Trend')}             ${p.trend === 'improving' ? green('improving') : p.trend === 'degrading' ? red('degrading') : dim('stable')}`);
+      console.log('');
+
+      // Time slots
+      console.log(`  ${dim('Best time to work:')}`);
+      const slots = Object.entries(p.timeSlots).filter(([,v]) => v.sessions > 0).sort((a,b) => a[1].avgBurn - b[1].avgBurn);
+      for (const [name, v] of slots) {
+        const val = v;
+        console.log(`    ${name.padEnd(12)} ${val.sessions} sessions, avg ${val.avgBurn}% burned`);
+      }
+      console.log('');
+    }
+
+    // Task costs
+    if (data.taskCosts?.patterns) {
+      const patterns = data.taskCosts.patterns;
+      const sorted = Object.entries(patterns).sort((a,b) => b[1].avgCost - a[1].avgCost);
+      if (sorted.length > 0) {
+        console.log(`  ${dim('Learned task costs:')}`);
+        for (const [cat, v] of sorted) {
+          const val = v;
+          console.log(`    ${cat.padEnd(22)} ~${val.avgCost}% per task  (${val.count} samples)`);
+        }
+        console.log('');
+      }
+    }
+
+    // Weekly plan
+    if (data.weeklyPlan) {
+      const w = data.weeklyPlan;
+      console.log(`  ${amber('Weekly Plan:')}`);
+      console.log(`  ${w.recommendation}`);
+      if (w.optimalTiming) console.log(`  ${w.optimalTiming}`);
+      console.log(`  ${dim('Backlog:')} ${w.backlog?.total || 0} tasks (~${w.backlog?.estimatedSessions || 0} sessions needed)`);
+      console.log('');
+    }
+  },
+
   async fuel() {
     const data = await api('/estimator');
     if (!data.tracked) { console.log('  ◈ No fuel data. Log with: nexus usage <session%> <weekly%>'); return; }
@@ -1080,6 +1130,7 @@ const commands = {
     nexus seek "query"             Semantic-only search
     nexus find "query"             Keyword-only search
     nexus digest [24h|7d|30d]      Activity digest / summary
+    nexus intel                     Fuel intelligence (patterns, costs, weekly plan)
     nexus fuel                     Smart fuel estimate + runway prediction
     nexus workload                 Task capacity planner
     nexus usage                    Show current Claude usage
