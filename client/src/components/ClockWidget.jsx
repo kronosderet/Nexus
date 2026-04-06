@@ -26,9 +26,6 @@ export default function ClockWidget() {
           <span className="text-2xl font-light text-nexus-text font-mono">{clock.time}</span>
         </div>
         <p className="text-xs font-mono text-nexus-text-faint capitalize">{clock.date}</p>
-        <p className="text-[9px] font-mono text-nexus-text-faint mt-0.5">
-          {clock.isWorkHours ? `${clock.hoursLeftToday}h of work hours remaining` : 'Outside work hours'}
-        </p>
       </div>
 
       {/* Week calendar */}
