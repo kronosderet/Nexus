@@ -1015,916 +1015,6 @@
   ],
   "activity": [
     {
-      "id": 22230,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:26.609Z"
-    },
-    {
-      "id": 22231,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:28.162Z"
-    },
-    {
-      "id": 22232,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] 2 files modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:30.606Z"
-    },
-    {
-      "id": 22233,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:32.161Z"
-    },
-    {
-      "id": 22234,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:33.719Z"
-    },
-    {
-      "id": 22235,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:35.466Z"
-    },
-    {
-      "id": 22236,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] 2 files modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:37.020Z"
-    },
-    {
-      "id": 22237,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:38.580Z"
-    },
-    {
-      "id": 22238,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:40.138Z"
-    },
-    {
-      "id": 22239,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:41.695Z"
-    },
-    {
-      "id": 22240,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:43.250Z"
-    },
-    {
-      "id": 22241,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:44.807Z"
-    },
-    {
-      "id": 22242,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:46.357Z"
-    },
-    {
-      "id": 22243,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:47.910Z"
-    },
-    {
-      "id": 22244,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:49.468Z"
-    },
-    {
-      "id": 22245,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:51.028Z"
-    },
-    {
-      "id": 22246,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:52.583Z"
-    },
-    {
-      "id": 22247,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:54.140Z"
-    },
-    {
-      "id": 22248,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:56.431Z"
-    },
-    {
-      "id": 22249,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:57.993Z"
-    },
-    {
-      "id": 22250,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:10:59.548Z"
-    },
-    {
-      "id": 22251,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:01.111Z"
-    },
-    {
-      "id": 22252,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] 2 files modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:03.410Z"
-    },
-    {
-      "id": 22253,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:05.185Z"
-    },
-    {
-      "id": 22254,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:06.968Z"
-    },
-    {
-      "id": 22255,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:08.526Z"
-    },
-    {
-      "id": 22256,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:10.083Z"
-    },
-    {
-      "id": 22257,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:11.639Z"
-    },
-    {
-      "id": 22258,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:13.197Z"
-    },
-    {
-      "id": 22259,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:14.755Z"
-    },
-    {
-      "id": 22260,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:16.311Z"
-    },
-    {
-      "id": 22261,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:17.869Z"
-    },
-    {
-      "id": 22262,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:19.426Z"
-    },
-    {
-      "id": 22263,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:20.986Z"
-    },
-    {
-      "id": 22264,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:22.541Z"
-    },
-    {
-      "id": 22265,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:24.104Z"
-    },
-    {
-      "id": 22266,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:25.664Z"
-    },
-    {
-      "id": 22267,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:27.225Z"
-    },
-    {
-      "id": 22268,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:28.774Z"
-    },
-    {
-      "id": 22269,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:30.663Z"
-    },
-    {
-      "id": 22270,
-      "type": "task_created",
-      "message": "Plotted -- \"Smart Fuel Intelligence: learned task costs + session patterns + weekly optimizer\"",
-      "meta": "{}",
-      "created_at": "2026-04-06T23:11:31.410Z"
-    },
-    {
-      "id": 22271,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] 2 files modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:32.971Z"
-    },
-    {
-      "id": 22272,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:34.518Z"
-    },
-    {
-      "id": 22273,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:36.079Z"
-    },
-    {
-      "id": 22274,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:37.632Z"
-    },
-    {
-      "id": 22275,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:39.181Z"
-    },
-    {
-      "id": 22276,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:40.741Z"
-    },
-    {
-      "id": 22277,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:42.290Z"
-    },
-    {
-      "id": 22278,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:43.842Z"
-    },
-    {
-      "id": 22279,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:45.389Z"
-    },
-    {
-      "id": 22280,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:46.942Z"
-    },
-    {
-      "id": 22281,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:48.484Z"
-    },
-    {
-      "id": 22282,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:50.039Z"
-    },
-    {
-      "id": 22283,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:51.586Z"
-    },
-    {
-      "id": 22284,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:53.145Z"
-    },
-    {
-      "id": 22285,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:54.705Z"
-    },
-    {
-      "id": 22286,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:56.264Z"
-    },
-    {
-      "id": 22287,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:57.819Z"
-    },
-    {
-      "id": 22288,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:11:59.373Z"
-    },
-    {
-      "id": 22289,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:00.935Z"
-    },
-    {
-      "id": 22290,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:02.479Z"
-    },
-    {
-      "id": 22291,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:04.035Z"
-    },
-    {
-      "id": 22292,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:05.595Z"
-    },
-    {
-      "id": 22293,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:07.156Z"
-    },
-    {
-      "id": 22294,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:08.714Z"
-    },
-    {
-      "id": 22295,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:10.272Z"
-    },
-    {
-      "id": 22296,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:11.828Z"
-    },
-    {
-      "id": 22297,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:13.380Z"
-    },
-    {
-      "id": 22298,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:14.928Z"
-    },
-    {
-      "id": 22299,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:16.482Z"
-    },
-    {
-      "id": 22300,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:18.034Z"
-    },
-    {
-      "id": 22301,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:19.583Z"
-    },
-    {
-      "id": 22302,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:21.140Z"
-    },
-    {
-      "id": 22303,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:22.700Z"
-    },
-    {
-      "id": 22304,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:24.245Z"
-    },
-    {
-      "id": 22305,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:25.800Z"
-    },
-    {
-      "id": 22306,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:27.360Z"
-    },
-    {
-      "id": 22307,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:28.913Z"
-    },
-    {
-      "id": 22308,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] 2 files changed",
-      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"server/routes/fuelIntel.ts\",\"path\":\"Nexus/server/routes/fuelIntel.ts\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:30.618Z"
-    },
-    {
-      "id": 22309,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:32.174Z"
-    },
-    {
-      "id": 22310,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:33.718Z"
-    },
-    {
-      "id": 22311,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:35.277Z"
-    },
-    {
-      "id": 22312,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:12:36.834Z"
-    },
-    {
-      "id": 22313,
-      "type": "system",
-      "message": "Nexus is online. Setting course.",
-      "meta": "{}",
-      "created_at": "2026-04-06T23:12:37.959Z"
-    },
-    {
-      "id": 22314,
-      "type": "system",
-      "message": "Nexus is online. Setting course.",
-      "meta": "{}",
-      "created_at": "2026-04-06T23:12:45.603Z"
-    },
-    {
-      "id": 22315,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] cli/nexus.js modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"cli/nexus.js\",\"path\":\"Nexus/cli/nexus.js\"}]}",
-      "created_at": "2026-04-06T23:13:04.071Z"
-    },
-    {
-      "id": 22316,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:05.628Z"
-    },
-    {
-      "id": 22317,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:07.218Z"
-    },
-    {
-      "id": 22318,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:08.776Z"
-    },
-    {
-      "id": 22319,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:10.335Z"
-    },
-    {
-      "id": 22320,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] 2 files modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"cli/nexus.js\",\"path\":\"Nexus/cli/nexus.js\"}]}",
-      "created_at": "2026-04-06T23:13:12.633Z"
-    },
-    {
-      "id": 22321,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:14.220Z"
-    },
-    {
-      "id": 22322,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:15.778Z"
-    },
-    {
-      "id": 22323,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:17.335Z"
-    },
-    {
-      "id": 22324,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:18.895Z"
-    },
-    {
-      "id": 22325,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:20.447Z"
-    },
-    {
-      "id": 22326,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:22.009Z"
-    },
-    {
-      "id": 22327,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:23.574Z"
-    },
-    {
-      "id": 22328,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:25.152Z"
-    },
-    {
-      "id": 22329,
-      "type": "file_change",
-      "message": "Terrain shift -- [.claude] settings.local.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\".claude\",\"file\":\"settings.local.json\",\"path\":\".claude/settings.local.json\"}]}",
-      "created_at": "2026-04-06T23:13:25.154Z"
-    },
-    {
-      "id": 22330,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:26.711Z"
-    },
-    {
-      "id": 22331,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:28.267Z"
-    },
-    {
-      "id": 22332,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:29.826Z"
-    },
-    {
-      "id": 22333,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:31.381Z"
-    },
-    {
-      "id": 22334,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:32.935Z"
-    },
-    {
-      "id": 22335,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:34.496Z"
-    },
-    {
-      "id": 22336,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:36.042Z"
-    },
-    {
-      "id": 22337,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:37.588Z"
-    },
-    {
-      "id": 22338,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] 2 files modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"cli/nexus.js\",\"path\":\"Nexus/cli/nexus.js\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:39.139Z"
-    },
-    {
-      "id": 22339,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:40.693Z"
-    },
-    {
-      "id": 22340,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:42.248Z"
-    },
-    {
-      "id": 22341,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:43.806Z"
-    },
-    {
-      "id": 22342,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:45.351Z"
-    },
-    {
-      "id": 22343,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:47.255Z"
-    },
-    {
-      "id": 22344,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:48.810Z"
-    },
-    {
-      "id": 22345,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:50.412Z"
-    },
-    {
-      "id": 22346,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:51.965Z"
-    },
-    {
-      "id": 22347,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] 2 files modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"cli/nexus.js\",\"path\":\"Nexus/cli/nexus.js\"}]}",
-      "created_at": "2026-04-06T23:13:54.363Z"
-    },
-    {
-      "id": 22348,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:55.916Z"
-    },
-    {
-      "id": 22349,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:57.472Z"
-    },
-    {
-      "id": 22350,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:13:59.028Z"
-    },
-    {
-      "id": 22351,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:14:00.587Z"
-    },
-    {
-      "id": 22352,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:14:02.146Z"
-    },
-    {
-      "id": 22353,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:14:03.706Z"
-    },
-    {
-      "id": 22354,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:14:05.265Z"
-    },
-    {
-      "id": 22355,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:14:06.821Z"
-    },
-    {
-      "id": 22356,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:14:08.378Z"
-    },
-    {
-      "id": 22357,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:14:09.937Z"
-    },
-    {
-      "id": 22358,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:14:11.495Z"
-    },
-    {
-      "id": 22359,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] nexus.json modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
-      "created_at": "2026-04-06T23:14:13.056Z"
-    },
-    {
       "id": 22360,
       "type": "file_change",
       "message": "Terrain shift -- [Nexus] nexus.json modified",
@@ -4513,6 +3603,916 @@
       "message": "Terrain shift -- [Nexus] nexus.json modified",
       "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
       "created_at": "2026-04-06T23:23:52.223Z"
+    },
+    {
+      "id": 22730,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:23:53.785Z"
+    },
+    {
+      "id": 22731,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 12 files changed",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/d8/4fff4c46a68e90e994e7da4e37f170b4639eb7\",\"path\":\"Nexus/.git/objects/d8/4fff4c46a68e90e994e7da4e37f170b4639eb7\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/e7/ac74a89059dfdca7c2083b2c7dc75845b26f98\",\"path\":\"Nexus/.git/objects/e7/ac74a89059dfdca7c2083b2c7dc75845b26f98\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/a5/39af6308a376f09e4bf530ca1357c20028d4e9\",\"path\":\"Nexus/.git/objects/a5/39af6308a376f09e4bf530ca1357c20028d4e9\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/ac/3dc88a5b4a4310944051e8916aad7870201e4e\",\"path\":\"Nexus/.git/objects/ac/3dc88a5b4a4310944051e8916aad7870201e4e\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/c5/5f8caa02dfea7f7d7be0acb77a23e31dac72d6\",\"path\":\"Nexus/.git/objects/c5/5f8caa02dfea7f7d7be0acb77a23e31dac72d6\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/66/f509e5817fdf9bc90c6eae823e7715706ace09\",\"path\":\"Nexus/.git/objects/66/f509e5817fdf9bc90c6eae823e7715706ace09\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/82/90c8e658e8da990a53a5d5404a50e558bd99b6\",\"path\":\"Nexus/.git/objects/82/90c8e658e8da990a53a5d5404a50e558bd99b6\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:23:55.344Z"
+    },
+    {
+      "id": 22732,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:23:56.891Z"
+    },
+    {
+      "id": 22733,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:23:58.447Z"
+    },
+    {
+      "id": 22734,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:00.007Z"
+    },
+    {
+      "id": 22735,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:01.565Z"
+    },
+    {
+      "id": 22736,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:03.127Z"
+    },
+    {
+      "id": 22737,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:04.683Z"
+    },
+    {
+      "id": 22738,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:06.244Z"
+    },
+    {
+      "id": 22739,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:07.801Z"
+    },
+    {
+      "id": 22740,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:09.357Z"
+    },
+    {
+      "id": 22741,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:10.905Z"
+    },
+    {
+      "id": 22742,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:12.462Z"
+    },
+    {
+      "id": 22743,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:14.015Z"
+    },
+    {
+      "id": 22744,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:15.570Z"
+    },
+    {
+      "id": 22745,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:17.126Z"
+    },
+    {
+      "id": 22746,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:18.684Z"
+    },
+    {
+      "id": 22747,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:20.246Z"
+    },
+    {
+      "id": 22748,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:21.805Z"
+    },
+    {
+      "id": 22749,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:23.370Z"
+    },
+    {
+      "id": 22750,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:24.921Z"
+    },
+    {
+      "id": 22751,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:26.470Z"
+    },
+    {
+      "id": 22752,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:28.017Z"
+    },
+    {
+      "id": 22753,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:29.562Z"
+    },
+    {
+      "id": 22754,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:31.116Z"
+    },
+    {
+      "id": 22755,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:32.682Z"
+    },
+    {
+      "id": 22756,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:34.237Z"
+    },
+    {
+      "id": 22757,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:35.792Z"
+    },
+    {
+      "id": 22758,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:37.349Z"
+    },
+    {
+      "id": 22759,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:38.911Z"
+    },
+    {
+      "id": 22760,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:40.468Z"
+    },
+    {
+      "id": 22761,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:42.026Z"
+    },
+    {
+      "id": 22762,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:43.579Z"
+    },
+    {
+      "id": 22763,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:45.134Z"
+    },
+    {
+      "id": 22764,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 2 files modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:47.521Z"
+    },
+    {
+      "id": 22765,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:49.077Z"
+    },
+    {
+      "id": 22766,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:50.634Z"
+    },
+    {
+      "id": 22767,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:52.193Z"
+    },
+    {
+      "id": 22768,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:53.745Z"
+    },
+    {
+      "id": 22769,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:55.303Z"
+    },
+    {
+      "id": 22770,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:56.860Z"
+    },
+    {
+      "id": 22771,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:58.414Z"
+    },
+    {
+      "id": 22772,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:24:59.974Z"
+    },
+    {
+      "id": 22773,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:01.534Z"
+    },
+    {
+      "id": 22774,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:03.087Z"
+    },
+    {
+      "id": 22775,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:04.642Z"
+    },
+    {
+      "id": 22776,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:06.195Z"
+    },
+    {
+      "id": 22777,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:07.750Z"
+    },
+    {
+      "id": 22778,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:09.309Z"
+    },
+    {
+      "id": 22779,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:10.864Z"
+    },
+    {
+      "id": 22780,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:12.408Z"
+    },
+    {
+      "id": 22781,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:13.967Z"
+    },
+    {
+      "id": 22782,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:15.522Z"
+    },
+    {
+      "id": 22783,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:17.078Z"
+    },
+    {
+      "id": 22784,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:18.632Z"
+    },
+    {
+      "id": 22785,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:20.182Z"
+    },
+    {
+      "id": 22786,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:21.728Z"
+    },
+    {
+      "id": 22787,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:23.285Z"
+    },
+    {
+      "id": 22788,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:24.847Z"
+    },
+    {
+      "id": 22789,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:26.404Z"
+    },
+    {
+      "id": 22790,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:27.959Z"
+    },
+    {
+      "id": 22791,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:29.518Z"
+    },
+    {
+      "id": 22792,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:31.073Z"
+    },
+    {
+      "id": 22793,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:32.616Z"
+    },
+    {
+      "id": 22794,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:34.177Z"
+    },
+    {
+      "id": 22795,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 2 files modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:35.736Z"
+    },
+    {
+      "id": 22796,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:37.295Z"
+    },
+    {
+      "id": 22797,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:38.853Z"
+    },
+    {
+      "id": 22798,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:40.406Z"
+    },
+    {
+      "id": 22799,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:41.968Z"
+    },
+    {
+      "id": 22800,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:43.523Z"
+    },
+    {
+      "id": 22801,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:45.083Z"
+    },
+    {
+      "id": 22802,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 2 files modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:47.564Z"
+    },
+    {
+      "id": 22803,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:49.118Z"
+    },
+    {
+      "id": 22804,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:50.676Z"
+    },
+    {
+      "id": 22805,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:52.237Z"
+    },
+    {
+      "id": 22806,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:53.789Z"
+    },
+    {
+      "id": 22807,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:55.345Z"
+    },
+    {
+      "id": 22808,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 2 files modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:57.456Z"
+    },
+    {
+      "id": 22809,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:25:59.012Z"
+    },
+    {
+      "id": 22810,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:00.568Z"
+    },
+    {
+      "id": 22811,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:02.125Z"
+    },
+    {
+      "id": 22812,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:04.241Z"
+    },
+    {
+      "id": 22813,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:05.794Z"
+    },
+    {
+      "id": 22814,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:07.351Z"
+    },
+    {
+      "id": 22815,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:08.913Z"
+    },
+    {
+      "id": 22816,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:10.470Z"
+    },
+    {
+      "id": 22817,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:12.028Z"
+    },
+    {
+      "id": 22818,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:13.585Z"
+    },
+    {
+      "id": 22819,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:15.144Z"
+    },
+    {
+      "id": 22820,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:16.698Z"
+    },
+    {
+      "id": 22821,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:18.251Z"
+    },
+    {
+      "id": 22822,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:19.798Z"
+    },
+    {
+      "id": 22823,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:21.353Z"
+    },
+    {
+      "id": 22824,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:22.912Z"
+    },
+    {
+      "id": 22825,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:24.471Z"
+    },
+    {
+      "id": 22826,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:26.027Z"
+    },
+    {
+      "id": 22827,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:27.581Z"
+    },
+    {
+      "id": 22828,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:29.136Z"
+    },
+    {
+      "id": 22829,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:30.682Z"
+    },
+    {
+      "id": 22830,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:32.242Z"
+    },
+    {
+      "id": 22831,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:33.799Z"
+    },
+    {
+      "id": 22832,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:35.360Z"
+    },
+    {
+      "id": 22833,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:36.915Z"
+    },
+    {
+      "id": 22834,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:38.476Z"
+    },
+    {
+      "id": 22835,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:40.029Z"
+    },
+    {
+      "id": 22836,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:41.590Z"
+    },
+    {
+      "id": 22837,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:43.148Z"
+    },
+    {
+      "id": 22838,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:44.704Z"
+    },
+    {
+      "id": 22839,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:46.251Z"
+    },
+    {
+      "id": 22840,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:47.780Z"
+    },
+    {
+      "id": 22841,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:49.336Z"
+    },
+    {
+      "id": 22842,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:50.889Z"
+    },
+    {
+      "id": 22843,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:52.464Z"
+    },
+    {
+      "id": 22844,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:54.628Z"
+    },
+    {
+      "id": 22845,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:56.184Z"
+    },
+    {
+      "id": 22846,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 2 files modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:26:58.571Z"
+    },
+    {
+      "id": 22847,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:27:00.129Z"
+    },
+    {
+      "id": 22848,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:27:01.687Z"
+    },
+    {
+      "id": 22849,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:27:03.242Z"
+    },
+    {
+      "id": 22850,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:27:05.020Z"
+    },
+    {
+      "id": 22851,
+      "type": "session",
+      "message": "Session logged -- [Projects] v3.0 Vision planned: The Autonomous Architect. Six features ...",
+      "meta": "{}",
+      "created_at": "2026-04-06T23:27:05.873Z"
+    },
+    {
+      "id": 22852,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:27:07.449Z"
+    },
+    {
+      "id": 22853,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:27:09.007Z"
+    },
+    {
+      "id": 22854,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:27:10.560Z"
+    },
+    {
+      "id": 22855,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:27:12.120Z"
+    },
+    {
+      "id": 22856,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:27:13.674Z"
+    },
+    {
+      "id": 22857,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:27:15.237Z"
+    },
+    {
+      "id": 22858,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:27:16.795Z"
+    },
+    {
+      "id": 22859,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-06T23:27:18.350Z"
     }
   ],
   "scratchpads": [
@@ -4521,21 +4521,21 @@
       "name": "Scratchpad",
       "content": "# Scratchpad\n\nGeneral working area for quick notes and calculations.\n",
       "language": "markdown",
-      "updated_at": "2026-04-06T22:33:47.488Z"
+      "updated_at": "2026-04-06T23:26:55.783Z"
     },
     {
       "id": 2,
       "name": "Firewall-Godot",
       "content": "# Firewall-Godot\n\nWorking scratchpad for Firewall-Godot project.\n",
       "language": "markdown",
-      "updated_at": "2026-04-06T22:28:43.838Z"
+      "updated_at": "2026-04-06T23:26:52.420Z"
     },
     {
       "id": 3,
       "name": "Nexus",
       "content": "# Nexus Development Plan\n\n## Current: v2.0 | 43 CLI | 9 modules | 30 TS files | 76 decisions | 129 graph edges | 100% TypeScript\n\n## Completed (Day 1-2)\n- [x] v0.1-v1.0: Full stack (Express, React, Vite, WebSocket, modules, CLI)\n- [x] v1.1: Semantic Embedding Search (nomic-embed 768-dim)\n- [x] v1.2: Smart Fuel Estimator + workload planner\n- [x] v1.3: The Ledger (decision index + auto-extract)\n- [x] v1.4: Hybrid Smart Search (RRF fusion)\n- [x] v1.5: Knowledge Graph (60 nodes, 129 edges, impact analysis)\n- [x] v1.6: Dashboard restructure (Fuel + Graph modules)\n- [x] v1.7: Welcome screen, per-project scratchpads, nexus quick, nexus handoff\n- [x] v1.8-v1.9: TypeScript foundation + batch route conversion + git fleet automation\n- [x] v2.0: 100% TypeScript server (30 files, strict mode, tsx runtime)\n\n## Next Up\n- [ ] Vitest tests (target 30+, test TS routes with supertest)\n- [ ] Graph visualization (force-directed node diagram in dashboard)\n- [ ] Overseer auto-task creation from recommendations\n- [ ] Dashboard loading states for Overseer queries\n- [ ] Convert CLI to TypeScript\n- [ ] index.ts to fully typed Express app (remove 'as any' casts)\n\n## Architecture\n- Server: 100% TypeScript (30 files), tsx runtime, strict mode\n- Client: React 19 + Vite + Tailwind 4 (still JSX)\n- Store: typed JSON file (NexusData interface)\n- AI: Gemma 4 26B via Anthropic endpoint on LM Studio\n- Embeddings: nomic-embed-text-v1.5 (768-dim, cached)\n- Graph: 76 decisions, 129 edges, BFS traversal, impact analysis\n- Fleet: 5 projects, git sync + commit-all, file watcher\n",
       "language": "markdown",
-      "updated_at": "2026-04-06T23:21:42.568Z"
+      "updated_at": "2026-04-06T23:27:05.551Z"
     },
     {
       "id": 5,
@@ -4549,7 +4549,7 @@
       "name": "resonance godot",
       "content": "# resonance godot\n\nWorking scratchpad for resonance godot project.\n",
       "language": "markdown",
-      "updated_at": "2026-04-06T22:17:26.629Z"
+      "updated_at": "2026-04-06T23:27:03.493Z"
     },
     {
       "id": 7,
@@ -5315,6 +5315,26 @@
         "114-tests"
       ],
       "created_at": "2026-04-06T23:23:35.686Z"
+    },
+    {
+      "id": 40,
+      "project": "Projects",
+      "summary": "v3.0 Vision planned: The Autonomous Architect. Six features that interconnect the Knowledge Graph, Overseer, and Fuel Intelligence into one reasoning system. (1) Predictive Task Generation from graph gaps, (2) Decision Impact Forecasting before changes, (3) Autonomous Session Planning combining fuel+graph+overseer, (4) Self-Improving Overseer with accuracy feedback loop, (5) Cross-Project Architecture Mapping from CLAUDE.md parsing, (6) Conversation Memory Compression via embedding clusters. Priority: nexus plan (autonomous session planning) is #1. Written to Nexus scratchpad.",
+      "decisions": [
+        "v3.0 is about interconnection not new features",
+        "nexus plan is the killer feature",
+        "Overseer should reason about itself",
+        "graph should predict not just record"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "v3.0",
+        "vision",
+        "architecture",
+        "planning"
+      ],
+      "created_at": "2026-04-06T23:27:05.871Z"
     }
   ],
   "usage": [
@@ -5521,6 +5541,12 @@
       "weekly_percent": 21,
       "note": "",
       "created_at": "2026-04-06T23:17:36.057Z"
+    },
+    {
+      "session_percent": 6,
+      "weekly_percent": 20,
+      "note": "",
+      "created_at": "2026-04-06T23:25:33.447Z"
     }
   ],
   "gpu_history": [
@@ -11445,11 +11471,38 @@
       "temperature": 57,
       "power": 75.66,
       "created_at": "2026-04-06T23:23:45.997Z"
+    },
+    {
+      "gpu_util": 26,
+      "mem_util": 15,
+      "vram_used": 7852,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 16.64,
+      "created_at": "2026-04-06T23:24:45.984Z"
+    },
+    {
+      "gpu_util": 86,
+      "mem_util": 3,
+      "vram_used": 7887,
+      "vram_total": 8192,
+      "temperature": 59,
+      "power": 115.12,
+      "created_at": "2026-04-06T23:25:46.002Z"
+    },
+    {
+      "gpu_util": 21,
+      "mem_util": 16,
+      "vram_used": 7879,
+      "vram_total": 8192,
+      "temperature": 47,
+      "power": 17.73,
+      "created_at": "2026-04-06T23:26:45.994Z"
     }
   ],
   "_sessionTiming": {
-    "startTime": "2026-04-06T23:17:36.000Z",
-    "resetTime": "2026-04-07T01:00:36.000Z"
+    "startTime": "2026-04-06T23:25:33.000Z",
+    "resetTime": "2026-04-07T01:00:33.000Z"
   },
   "ledger": [
     {
