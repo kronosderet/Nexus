@@ -71,25 +71,36 @@ function buildEstimate(store) {
   const minutesUntilReset = resetTime ? Math.max(0, (resetTime.getTime() - now) / 60000) : null;
 
   // Estimate remaining work capacity
+  // KEY: session and weekly are DIFFERENT SCALES.
+  // Session = per 5h window (~225 msgs on Max 5x). Burns fast per interaction.
+  // Weekly = total across ALL sessions in 7 days. Much larger pool.
+  // For current-session planning, SESSION fuel + session window are the constraints.
+  // Weekly only matters for multi-day planning.
   const sessionMinutesLeft = rates.sessionPerMinute > 0
     ? estimatedSession / rates.sessionPerMinute
     : null;
-  const weeklyMinutesLeft = rates.weeklyPerMinute > 0
-    ? estimatedWeekly / rates.weeklyPerMinute
-    : null;
 
-  // Which runs out first?
-  const effectiveMinutes = [sessionMinutesLeft, weeklyMinutesLeft, minutesUntilReset]
+  // For current session: constraint is session fuel or window timer (NOT weekly)
+  const sessionConstraints = [sessionMinutesLeft, minutesUntilReset]
     .filter(v => v != null && v > 0);
-  const constrainingMinutes = effectiveMinutes.length > 0 ? Math.min(...effectiveMinutes) : null;
+  const constrainingMinutes = sessionConstraints.length > 0 ? Math.min(...sessionConstraints) : null;
+
+  // Weekly is a separate longer-term gauge
+  const weeklyHoursLeft = rates.weeklyPerHour > 0
+    ? estimatedWeekly / rates.weeklyPerHour
+    : null;
 
   let constraint = 'none';
   if (constrainingMinutes === minutesUntilReset) constraint = 'session_window';
   else if (constrainingMinutes === sessionMinutesLeft) constraint = 'session_fuel';
-  else if (constrainingMinutes === weeklyMinutesLeft) constraint = 'weekly_fuel';
 
-  // Work chunks: how many ~15min tasks can we do?
+  // Work chunks: how many ~15min tasks can we do in THIS session?
   const chunksRemaining = constrainingMinutes ? Math.floor(constrainingMinutes / 15) : null;
+
+  // Weekly planning: how many full sessions left this week?
+  // A session typically burns 50-80% fuel, so sessions left ≈ weekly% / avg_session_burn
+  const avgSessionBurn = 3; // ~3% of weekly per session (rough estimate, improves with data)
+  const sessionsLeftThisWeek = estimatedWeekly > 0 ? Math.floor(estimatedWeekly / avgSessionBurn) : 0;
 
   return {
     tracked: true,
@@ -109,16 +120,21 @@ function buildEstimate(store) {
       weeklyPerHour: rates.weeklyPerHour,
       sessionPerMinute: Math.round(rates.sessionPerMinute * 1000) / 1000,
     },
-    runway: {
+    session: {
       constrainingFactor: constraint,
       minutesRemaining: constrainingMinutes ? Math.round(constrainingMinutes) : null,
       hoursRemaining: constrainingMinutes ? Math.round(constrainingMinutes / 60 * 10) / 10 : null,
-      chunksRemaining, // ~15min work units
+      chunksRemaining,
       emptyAt: constrainingMinutes
         ? new Date(now + constrainingMinutes * 60000).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })
         : null,
+      resetWindow: minutesUntilReset ? Math.round(minutesUntilReset) : null,
     },
-    resetWindow: minutesUntilReset ? Math.round(minutesUntilReset) : null,
+    weekly: {
+      remaining: Math.round(estimatedWeekly * 10) / 10,
+      sessionsLeft: sessionsLeftThisWeek,
+      note: `~${sessionsLeftThisWeek} full sessions before Thursday reset`,
+    },
   };
 }
 
@@ -252,13 +268,13 @@ function predictTaskCost(store, taskType, estimate) {
 }
 
 function buildWorkloadPlan(store, estimate) {
-  if (!estimate.tracked || !estimate.runway.minutesRemaining) {
+  if (!estimate.tracked || !estimate.session?.minutesRemaining) {
     return { available: false, reason: 'Insufficient data for workload planning.' };
   }
 
-  const remaining = estimate.runway.minutesRemaining;
+  const remaining = estimate.session.minutesRemaining;
   const fuel = estimate.estimated.session;
-  const constraint = estimate.runway.constrainingFactor;
+  const constraint = estimate.session.constrainingFactor;
 
   // What fits in the remaining runway?
   const fits = {};
@@ -302,10 +318,17 @@ function buildWorkloadPlan(store, estimate) {
   }
 
   return {
-    fuel: Math.round(fuel),
-    constraint,
-    minutesRemaining: Math.round(remaining),
-    taskCapacity: fits,
-    recommendation,
+    currentSession: {
+      fuel: Math.round(fuel),
+      constraint,
+      minutesRemaining: Math.round(remaining),
+      taskCapacity: fits,
+      recommendation,
+    },
+    weeklyOutlook: {
+      remaining: estimate.weekly?.remaining,
+      sessionsLeft: estimate.weekly?.sessionsLeft,
+      note: estimate.weekly?.note,
+    },
   };
 }
