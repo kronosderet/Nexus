@@ -15,7 +15,7 @@ import { createSearchRoutes } from './routes/search.js';
 import { createDigestRoutes } from './routes/digest.js';
 import { createNotifyRoutes } from './routes/notify.js';
 import { createActionRoutes } from './routes/actions.js';
-import { createUsageRoutes } from './routes/usage.js';
+import { createUsageRoutes, buildTimingInfo } from './routes/usage.js';
 import { createHeatmapRoutes } from './routes/heatmap.js';
 import { createGitHubRoutes } from './routes/github.js';
 import { createWebhookRoutes } from './routes/webhooks.js';
@@ -108,7 +108,7 @@ app.use('/api/overseer', createOverseerRoutes(store, broadcast));
 app.use('/api/focus', createFocusRoutes(store));
 app.use('/api/budget', createBudgetRoutes(store));
 app.use('/api/init', createInitRoutes(store));
-app.use('/api/clock', createClockRoutes(store));
+app.use('/api/clock', createClockRoutes(store, buildTimingInfo));
 app.use('/api/remediate', createRemediateRoutes(store, broadcast));
 app.use('/api/embed', createEmbeddingRoutes(store));
 

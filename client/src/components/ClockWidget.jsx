@@ -71,6 +71,12 @@ export default function ClockWidget() {
               </div>
               <MiniBar percent={fuel.weekly} />
             </div>
+            {fuel.sessionReset && (
+              <p className="text-[9px] font-mono text-nexus-text-faint flex items-center gap-1 justify-end">
+                <Clock size={8} />
+                Session: {fuel.sessionReset.countdown}{fuel.sessionReset.elapsed ? ` (${fuel.sessionReset.elapsed} in)` : ''}
+              </p>
+            )}
             {fuel.projection && (
               <p className="text-[9px] font-mono text-nexus-text-faint flex items-center gap-1 justify-end">
                 <TrendingDown size={8} />

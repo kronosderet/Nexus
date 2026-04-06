@@ -10,9 +10,13 @@ const SESSION_WINDOW_HOURS = 5;
 const WEEKLY_RESET_DAY = 4;    // 0=Sun, 4=Thu
 const WEEKLY_RESET_HOUR = 21;
 
-// ── Session tracking ───────────────────────────────────
-let sessionStartTime = null;    // set when first usage is logged or via /session/start
-let sessionResetTime = null;
+// ── Session tracking (persisted in store) ──────────────
+// _sessionTiming is stored in store.data so it survives restarts
+let _store = null;
+
+function getSessionTiming() {
+  return _store?.data?._sessionTiming || {};
+}
 
 function nowInTZ() {
   return new Date(new Date().toLocaleString('en-US', { timeZone: TIMEZONE }));
@@ -20,12 +24,15 @@ function nowInTZ() {
 
 function startSession(resetMinutesFromNow = null) {
   const now = nowInTZ();
-  sessionStartTime = new Date(now);
-  if (resetMinutesFromNow != null) {
-    // User told us exactly when the reset is
-    sessionResetTime = new Date(now.getTime() + resetMinutesFromNow * 60000);
-  } else {
-    sessionResetTime = new Date(now.getTime() + SESSION_WINDOW_HOURS * 3600000);
+  const timing = {
+    startTime: now.toISOString(),
+    resetTime: resetMinutesFromNow != null
+      ? new Date(now.getTime() + resetMinutesFromNow * 60000).toISOString()
+      : new Date(now.getTime() + SESSION_WINDOW_HOURS * 3600000).toISOString(),
+  };
+  if (_store) {
+    _store.data._sessionTiming = timing;
+    _store._flush();
   }
 }
 
@@ -53,10 +60,14 @@ function formatCountdown(ms) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-function buildTimingInfo() {
+export function buildTimingInfo() {
   const now = nowInTZ();
   const nextWeekly = getNextWeeklyReset();
   const weeklyMs = nextWeekly.getTime() - now.getTime();
+
+  const timing = getSessionTiming();
+  const sessionResetTime = timing.resetTime ? new Date(timing.resetTime) : null;
+  const sessionStartTime = timing.startTime ? new Date(timing.startTime) : null;
 
   let sessionInfo;
   if (sessionResetTime) {
@@ -97,6 +108,7 @@ function buildTimingInfo() {
 }
 
 export function createUsageRoutes(store, broadcast) {
+  _store = store; // capture for session timing persistence
   const router = Router();
 
   // Get usage history
@@ -115,8 +127,10 @@ export function createUsageRoutes(store, broadcast) {
     const history = store.getUsage(10);
     let burnRate = null;
     // Only use data points from current session window
-    const sessionHistory = sessionStartTime
-      ? history.filter(h => new Date(h.created_at) >= sessionStartTime)
+    const curTiming = getSessionTiming();
+    const curStart = curTiming.startTime ? new Date(curTiming.startTime) : null;
+    const sessionHistory = curStart
+      ? history.filter(h => new Date(h.created_at) >= curStart)
       : history;
 
     if (sessionHistory.length >= 2) {
@@ -149,7 +163,8 @@ export function createUsageRoutes(store, broadcast) {
     }
 
     // Auto-start session tracking on first log, or if reset_in_minutes is provided
-    if (!sessionStartTime || reset_in_minutes != null) {
+    const existingTiming = getSessionTiming();
+    if (!existingTiming.startTime || reset_in_minutes != null) {
       startSession(reset_in_minutes);
     }
 
