@@ -1,9 +1,15 @@
 import { Router } from 'express';
+import { readdirSync, statSync } from 'fs';
+import { join } from 'path';
+
+const PROJECTS_DIR = 'C:/Projects';
 
 export function createScratchpadRoutes(store) {
   const router = Router();
 
   router.get('/', (req, res) => {
+    // Auto-create project scratchpads if they don't exist
+    ensureProjectPads(store);
     res.json(store.getAllScratchpads());
   });
 
@@ -31,5 +37,41 @@ export function createScratchpadRoutes(store) {
     res.json({ success: true });
   });
 
+  // Get or create a scratchpad by project name
+  router.get('/project/:name', (req, res) => {
+    const name = req.params.name;
+    const pads = store.getAllScratchpads();
+    let pad = pads.find(p => p.name.toLowerCase() === name.toLowerCase());
+    if (!pad) {
+      pad = store.createScratchpad({
+        name,
+        content: `# ${name}\n\nWorking scratchpad for ${name} project.\n`,
+        language: 'markdown',
+      });
+    }
+    res.json(pad);
+  });
+
   return router;
+}
+
+function ensureProjectPads(store) {
+  const existingNames = new Set(store.getAllScratchpads().map(p => p.name.toLowerCase()));
+
+  try {
+    const dirs = readdirSync(PROJECTS_DIR).filter(name => {
+      if (name === 'archive' || name === 'node_modules' || name.startsWith('.')) return false;
+      try { return statSync(join(PROJECTS_DIR, name)).isDirectory(); } catch { return false; }
+    });
+
+    for (const dir of dirs) {
+      if (!existingNames.has(dir.toLowerCase())) {
+        store.createScratchpad({
+          name: dir,
+          content: `# ${dir}\n\nWorking scratchpad for ${dir} project.\n`,
+          language: 'markdown',
+        });
+      }
+    }
+  } catch {}
 }
