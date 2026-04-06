@@ -75,7 +75,6 @@ export default function App() {
         onSelect={setActiveModule}
         connected={ws.connected}
         onSearchClick={() => setSearchOpen(true)}
-        ws={ws}
       />
       <main className="flex-1 overflow-auto p-6">
         <ActiveComponent ws={ws} />

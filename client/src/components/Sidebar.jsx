@@ -1,5 +1,5 @@
 import { Activity, Compass, ScrollText, PenTool, BookOpen, Search, Brain, Terminal, GitBranch, Fuel } from 'lucide-react';
-import UsageGauge from './UsageGauge.jsx';
+// UsageGauge removed -- fuel tracking lives in Fuel module (^2)
 
 const ICON_MAP = {
   activity: Activity,
@@ -13,7 +13,7 @@ const ICON_MAP = {
   'terminal': Terminal,
 };
 
-export default function Sidebar({ modules, active, onSelect, connected, onSearchClick, ws }) {
+export default function Sidebar({ modules, active, onSelect, connected, onSearchClick }) {
   return (
     <aside className="w-56 bg-nexus-surface border-r border-nexus-border flex flex-col">
       {/* Logo */}
@@ -67,9 +67,6 @@ export default function Sidebar({ modules, active, onSelect, connected, onSearch
           );
         })}
       </nav>
-
-      {/* Usage gauge */}
-      <UsageGauge ws={ws} />
 
       {/* Status footer */}
       <div className="p-4 border-t border-nexus-border">
