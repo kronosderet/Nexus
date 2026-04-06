@@ -676,6 +676,27 @@ const commands = {
     console.log('');
   },
 
+  async search(args) {
+    const query = args.join(' ');
+    if (!query) { console.error('  Usage: nexus search "query"'); return; }
+
+    console.log(`  ◈ Searching: "${query}"...`);
+    const data = await api(`/smart-search?q=${encodeURIComponent(query)}`);
+    if (data.error) { console.log(`  ${red('◈')} ${data.error}`); return; }
+    if (data.results.length === 0) { console.log('  ◈ Nothing on the charts.'); return; }
+
+    const methodLabel = data.method === 'hybrid' ? `${green('hybrid')} (keyword + semantic)` : amber('keyword-only');
+    console.log(`\n  ${amber('◈')} ${data.results.length} results via ${methodLabel}\n`);
+
+    const typeColors = { decision: green, session: green, task: blue, activity: dim, scratchpad: amber };
+    for (const r of data.results) {
+      const c = typeColors[r.type] || dim;
+      const methods = r.methods.map(m => m === 'keyword' ? 'K' : 'S').join('+');
+      console.log(`  ${dim(methods.padEnd(3))} ${c(`[${r.type}]`)} ${r.display}`);
+    }
+    console.log(`\n  ${dim(`${data.stats.keywordHits} keyword + ${data.stats.semanticHits} semantic → ${data.stats.fusedTotal} fused`)}\n`);
+  },
+
   async seek(args) {
     const query = args.join(' ');
     if (!query) { console.error('  Usage: nexus seek "semantic search query"'); return; }
@@ -745,8 +766,9 @@ const commands = {
     nexus context [project]        Get prior context for a project
     nexus record "decision"        Record a decision to The Ledger
     nexus decisions [project]      View decision history
-    nexus seek "query"             Semantic search (AI embeddings)
-    nexus find "query"             Keyword search across everything
+    nexus search "query"           Smart search (keyword + semantic)
+    nexus seek "query"             Semantic-only search
+    nexus find "query"             Keyword-only search
     nexus digest [24h|7d|30d]      Activity digest / summary
     nexus fuel                     Smart fuel estimate + runway prediction
     nexus workload                 Task capacity planner
