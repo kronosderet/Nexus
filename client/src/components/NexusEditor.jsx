@@ -18,6 +18,10 @@ const nexusTheme = EditorView.theme({
     color: '#e2e8f0',
     fontSize: '13px',
     fontFamily: "'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace",
+    height: '100%',
+  },
+  '.cm-scroller': {
+    overflow: 'auto',
   },
   '.cm-content': {
     caretColor: '#f59e0b',
@@ -151,7 +155,8 @@ export default function NexusEditor({ value, onChange, language = 'markdown', cl
   return (
     <div
       ref={containerRef}
-      className={`border border-nexus-border rounded-lg overflow-hidden ${className}`}
+      className={`border border-nexus-border rounded-lg overflow-hidden min-h-0 ${className}`}
+      style={{ display: 'flex', flexDirection: 'column' }}
     />
   );
 }
