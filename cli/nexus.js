@@ -561,6 +561,25 @@ const commands = {
     console.log(`\n  ${result.response.replace(/\n/g, '\n  ')}\n`);
   },
 
+  async seek(args) {
+    const query = args.join(' ');
+    if (!query) { console.error('  Usage: nexus seek "semantic search query"'); return; }
+
+    console.log(`  ◈ Seeking: "${query}"...`);
+    const data = await api(`/embed/search?q=${encodeURIComponent(query)}`);
+    if (data.error) { console.log(`  ${red('◈')} ${data.error}`); return; }
+    if (data.results.length === 0) { console.log('  ◈ Nothing on the charts.'); return; }
+
+    console.log(`\n  ${amber('◈')} ${data.results.length} results (semantic):\n`);
+    const typeColors = { session: green, task: blue, activity: dim, scratchpad: amber };
+    for (const r of data.results) {
+      const c = typeColors[r.type] || dim;
+      const score = Math.round(r.score * 100);
+      console.log(`  ${dim(`${score}%`)} ${c(`[${r.type}]`)} ${r.display}`);
+    }
+    console.log('');
+  },
+
   async find(args) {
     const query = args.join(' ');
     if (!query) { console.error('  Usage: nexus find "search query"'); return; }
@@ -609,7 +628,8 @@ const commands = {
     nexus done <id>                Mark a task complete
     nexus session "summary"        Log a session (the memory bridge)
     nexus context [project]        Get prior context for a project
-    nexus find "query"             Search across everything
+    nexus seek "query"             Semantic search (AI embeddings)
+    nexus find "query"             Keyword search across everything
     nexus digest [24h|7d|30d]      Activity digest / summary
     nexus usage                    Show current Claude usage
     nexus usage 75 40              Log session% and weekly% remaining

@@ -11,6 +11,9 @@
     "start": "cd server && node index.js"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.2",
+    "concurrently": "^9.1.2",
+    "typescript": "^6.0.2"
   }
 }
