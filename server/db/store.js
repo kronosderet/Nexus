@@ -22,6 +22,7 @@ export class NexusStore {
     if (!this.data.sessions) this.data.sessions = [];
     if (!this.data.usage) this.data.usage = [];
     if (!this.data.gpu_history) this.data.gpu_history = [];
+    if (!this.data.ledger) this.data.ledger = [];
 
     this._nextId = {
       tasks: Math.max(0, ...this.data.tasks.map(t => t.id)) + 1,
@@ -39,6 +40,7 @@ export class NexusStore {
       sessions: [],
       usage: [],
       gpu_history: [],
+      ledger: [],
       scratchpads: [
         {
           id: 1,
@@ -257,6 +259,30 @@ export class NexusStore {
     return { sessions, activeTasks: tasks };
   }
 
+  // ── Ledger (decision index) ────────────
+  getLedger({ project, tag, limit = 50 } = {}) {
+    let entries = [...this.data.ledger];
+    if (project) entries = entries.filter(e => e.project.toLowerCase() === project.toLowerCase());
+    if (tag) entries = entries.filter(e => (e.tags || []).includes(tag));
+    return entries.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, limit);
+  }
+
+  recordDecision({ decision, context = '', project = 'general', alternatives = [], tags = [] }) {
+    if (!this.data.ledger) this.data.ledger = [];
+    const entry = {
+      id: (this.data.ledger.length > 0 ? Math.max(...this.data.ledger.map(e => e.id)) : 0) + 1,
+      decision,
+      context,
+      project,
+      alternatives,
+      tags,
+      created_at: this._now(),
+    };
+    this.data.ledger.push(entry);
+    this._flush();
+    return entry;
+  }
+
   // ── Search (across everything) ────────
   search(query, limit = 30) {
     const q = query.toLowerCase();
@@ -273,6 +299,13 @@ export class NexusStore {
     for (const a of this.data.activity) {
       if (a.message.toLowerCase().includes(q)) {
         results.push({ type: 'activity', id: a.id, title: a.message, sub: a.type, score: 1, created_at: a.created_at });
+      }
+    }
+
+    // Search ledger
+    for (const l of (this.data.ledger || [])) {
+      if (l.decision.toLowerCase().includes(q) || l.context.toLowerCase().includes(q) || l.project.toLowerCase().includes(q)) {
+        results.push({ type: 'decision', id: l.id, title: `[${l.project}] ${l.decision.slice(0, 80)}`, sub: l.project, score: 3, created_at: l.created_at });
       }
     }
 
