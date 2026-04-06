@@ -80,6 +80,106 @@ const commands = {
     console.log(`  ◈ Nexus is ${green('online')}. ${data.message}`);
   },
 
+  async handoff(args) {
+    const project = args[0] || process.cwd().split(/[/\\]/).pop();
+    const p = project.toLowerCase();
+
+    console.log(`\n  ${amber('◈')} ${amber('SESSION HANDOFF')} — ${green(project)}\n`);
+    console.log(`  ${dim('Generated for the next agent. Copy this into the session start.')}\n`);
+    console.log(`  ${dim('─'.repeat(60))}\n`);
+
+    // 1. Fuel state
+    try {
+      const f = await api('/estimator');
+      if (f.tracked) {
+        console.log(`  ${amber('FUEL STATE')}`);
+        console.log(`  Session: ${f.estimated.session}% | Weekly: ${f.estimated.weekly}%`);
+        if (f.session?.resetWindow) console.log(`  Window resets in: ${f.session.resetWindow}m`);
+        console.log('');
+      }
+    } catch {}
+
+    // 2. Active tasks
+    try {
+      const tasks = await api('/tasks');
+      const active = tasks.filter(t => t.status !== 'done');
+      if (active.length > 0) {
+        console.log(`  ${amber('ACTIVE TASKS')} (${active.length})`);
+        const inProgress = active.filter(t => t.status === 'in_progress');
+        const backlog = active.filter(t => t.status === 'backlog');
+        for (const t of inProgress) console.log(`  ${amber('→')} [IN PROGRESS] ${t.title}`);
+        for (const t of backlog.slice(0, 5)) console.log(`  ${dim('·')} [backlog] ${t.title}`);
+        if (backlog.length > 5) console.log(`  ${dim(`  +${backlog.length - 5} more`)}`);
+        console.log('');
+      }
+    } catch {}
+
+    // 3. Last session summary
+    try {
+      const ctx = await api(`/sessions/context/${encodeURIComponent(project)}`);
+      if (ctx.sessions.length > 0) {
+        const last = ctx.sessions[0];
+        console.log(`  ${amber('LAST SESSION')}`);
+        console.log(`  ${last.summary}`);
+        if (last.decisions?.length) console.log(`  Decisions: ${last.decisions.join(', ')}`);
+        if (last.blockers?.length) console.log(`  ${red('Blockers:')} ${last.blockers.join(', ')}`);
+        console.log('');
+      }
+    } catch {}
+
+    // 4. Recent decisions from Ledger
+    try {
+      const decisions = await api(`/ledger?project=${encodeURIComponent(project)}&limit=5`);
+      if (decisions.length > 0) {
+        console.log(`  ${amber('KEY DECISIONS')}`);
+        for (const d of decisions) console.log(`  · ${d.decision}`);
+        console.log('');
+      }
+    } catch {}
+
+    // 5. Risks
+    try {
+      const r = await api('/overseer/risks');
+      if (r.risks.length > 0) {
+        console.log(`  ${amber('RISKS')}`);
+        for (const risk of r.risks.slice(0, 5)) {
+          const c = risk.level === 'critical' ? red : amber;
+          console.log(`  ${c('!')} ${risk.message}`);
+        }
+        console.log('');
+      }
+    } catch {}
+
+    // 6. Git state for this project
+    try {
+      const repos = await api('/git/repos');
+      const repo = repos.find(r => r.name.toLowerCase() === p);
+      if (repo) {
+        console.log(`  ${amber('GIT STATE')}`);
+        console.log(`  Branch: ${repo.branch} | Uncommitted: ${repo.uncommitted}`);
+        if (repo.lastCommit) console.log(`  Last: ${repo.lastCommit.short} ${repo.lastCommit.message}`);
+        if (repo.ahead > 0) console.log(`  ${green(`↑${repo.ahead} ahead`)}`);
+        if (repo.behind > 0) console.log(`  ${red(`↓${repo.behind} behind`)}`);
+        console.log('');
+      }
+    } catch {}
+
+    // 7. Suggested next steps
+    try {
+      const w = await api('/estimator/workload');
+      const cs = w?.currentSession;
+      if (cs?.recommendation) {
+        console.log(`  ${amber('SUGGESTED NEXT')}`);
+        for (const s of cs.recommendation.suggested) console.log(`  ${amber('›')} ${s}`);
+        console.log('');
+      }
+    } catch {}
+
+    console.log(`  ${dim('─'.repeat(60))}`);
+    console.log(`  ${dim('Start next session with:')} nexus brief ${project}`);
+    console.log(`  ${dim('Quick check:')} nexus quick\n`);
+  },
+
   async quick(args) {
     const project = args[0] || process.cwd().split(/[/\\]/).pop();
 
@@ -906,6 +1006,7 @@ const commands = {
   ${amber('Commands:')}
     nexus quick                     3-line status (fuel + risks + task)
     nexus brief [project]           Full agent briefing (START HERE)
+    nexus handoff [project]         Generate session handoff for next agent
     nexus status                   Check if Nexus is online
     nexus pulse                    Quick system overview
     nexus gpu                      CUDA engine stats + processes
