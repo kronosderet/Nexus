@@ -1,5 +1,8 @@
 import { watch } from 'chokidar';
 import { basename, relative, dirname } from 'path';
+import type { NexusStore } from '../db/store.ts';
+
+type BroadcastFn = (data: any) => void;
 
 const PROJECTS_DIR = 'C:/Projects';
 
@@ -17,7 +20,7 @@ const IGNORED = [
   '**/*.pyc',
 ];
 
-export function startFileWatcher(store, broadcast) {
+export function startFileWatcher(store: NexusStore, broadcast: BroadcastFn) {
   const watcher = watch(PROJECTS_DIR, {
     ignored: IGNORED,
     persistent: true,
@@ -30,17 +33,17 @@ export function startFileWatcher(store, broadcast) {
   });
 
   // Debounce: batch changes within 1s window
-  let pending = [];
-  let flushTimer = null;
+  let pending: { type: string; project: string; file: string; path: string }[] = [];
+  let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
-  function queueChange(type, filePath) {
+  function queueChange(type: string, filePath: string) {
     const rel = relative(PROJECTS_DIR, filePath).replace(/\\/g, '/');
     const project = rel.split('/')[0];
     const file = rel.split('/').slice(1).join('/');
 
     pending.push({ type, project, file, path: rel });
 
-    clearTimeout(flushTimer);
+    if (flushTimer) clearTimeout(flushTimer);
     flushTimer = setTimeout(() => flush(), 1000);
   }
 
@@ -48,7 +51,7 @@ export function startFileWatcher(store, broadcast) {
     if (pending.length === 0) return;
 
     // Group by project
-    const byProject = {};
+    const byProject: Record<string, typeof pending> = {};
     for (const c of pending) {
       if (!byProject[c.project]) byProject[c.project] = [];
       byProject[c.project].push(c);
@@ -59,7 +62,7 @@ export function startFileWatcher(store, broadcast) {
       const types = [...new Set(changes.map(c => c.type))];
       const typeLabel = types.length === 1 ? types[0] : 'changed';
 
-      let message;
+      let message: string;
       if (fileCount === 1) {
         message = `Terrain shift -- [${project}] ${changes[0].file} ${changes[0].type}`;
       } else {
@@ -74,10 +77,10 @@ export function startFileWatcher(store, broadcast) {
   }
 
   watcher
-    .on('add', (p) => queueChange('added', p))
-    .on('change', (p) => queueChange('modified', p))
-    .on('unlink', (p) => queueChange('removed', p))
-    .on('addDir', (p) => {
+    .on('add', (p: string) => queueChange('added', p))
+    .on('change', (p: string) => queueChange('modified', p))
+    .on('unlink', (p: string) => queueChange('removed', p))
+    .on('addDir', (p: string) => {
       // Only log new top-level project dirs
       const rel = relative(PROJECTS_DIR, p).replace(/\\/g, '/');
       if (!rel.includes('/')) {

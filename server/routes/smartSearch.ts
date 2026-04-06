@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
+import type { NexusStore } from '../db/store.ts';
 
 /**
  * Hybrid Smart Search
@@ -18,10 +19,10 @@ const EMBED_MODEL = 'text-embedding-nomic-embed-text-v1.5';
 // RRF constant (standard value from research)
 const RRF_K = 60;
 
-export function createSmartSearchRoutes(store, embedCache) {
+export function createSmartSearchRoutes(store: NexusStore, embedCache: Record<string, any>) {
   const router = Router();
 
-  router.get('/', async (req, res) => {
+  router.get('/', async (req: Request, res: Response) => {
     const { q, limit = 20 } = req.query;
     if (!q) return res.status(400).json({ error: 'Query q required.' });
 
@@ -29,13 +30,13 @@ export function createSmartSearchRoutes(store, embedCache) {
 
     // Run both searches in parallel
     const [keywordResults, semanticResults] = await Promise.all([
-      keywordSearch(corpus, q),
-      semanticSearch(corpus, q, embedCache),
+      keywordSearch(corpus, q as string),
+      semanticSearch(corpus, q as string, embedCache),
     ]);
 
     // Merge via Reciprocal Rank Fusion
     const fused = reciprocalRankFusion(keywordResults, semanticResults);
-    const results = fused.slice(0, parseInt(limit));
+    const results = fused.slice(0, parseInt(limit as string));
 
     res.json({
       query: q,
@@ -52,11 +53,11 @@ export function createSmartSearchRoutes(store, embedCache) {
   return router;
 }
 
-function buildCorpus(store) {
-  const items = [];
+function buildCorpus(store: NexusStore) {
+  const items: any[] = [];
 
   // Ledger decisions (highest priority -- structured knowledge)
-  for (const d of (store.data.ledger || [])) {
+  for (const d of ((store as any).data.ledger || [])) {
     items.push({
       key: `decision-${d.id}`,
       type: 'decision',
@@ -121,11 +122,11 @@ function buildCorpus(store) {
 }
 
 // ── Keyword search (TF-IDF-like scoring) ──────────────
-function keywordSearch(corpus, query) {
+function keywordSearch(corpus: any[], query: string) {
   const terms = query.toLowerCase().split(/\s+/).filter(t => t.length > 1);
   if (terms.length === 0) return [];
 
-  const scored = [];
+  const scored: any[] = [];
   for (const item of corpus) {
     const text = item.text.toLowerCase();
     let score = 0;
@@ -152,11 +153,11 @@ function keywordSearch(corpus, query) {
 }
 
 // ── Semantic search (embedding similarity) ─────────────
-async function semanticSearch(corpus, query, cache) {
+async function semanticSearch(corpus: any[], query: string, cache: Record<string, any>) {
   const queryVec = await getEmbedding(query, cache);
   if (!queryVec) return [];
 
-  const scored = [];
+  const scored: any[] = [];
   for (const item of corpus) {
     const itemVec = await getEmbedding(item.text.slice(0, 500), cache);
     if (!itemVec) continue;
@@ -171,7 +172,7 @@ async function semanticSearch(corpus, query, cache) {
   return scored.sort((a, b) => b.score - a.score);
 }
 
-async function getEmbedding(text, cache) {
+async function getEmbedding(text: string, cache: Record<string, any>): Promise<number[] | null> {
   const key = text.slice(0, 200);
   if (cache?.[key]?.vec) return cache[key].vec;
 
@@ -183,7 +184,7 @@ async function getEmbedding(text, cache) {
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;
-    const data = await res.json();
+    const data: any = await res.json();
     const vec = data.data?.[0]?.embedding;
     if (vec && cache) cache[key] = { vec, ts: Date.now() };
     return vec;
@@ -191,11 +192,11 @@ async function getEmbedding(text, cache) {
 }
 
 // ── Reciprocal Rank Fusion ─────────────────────────────
-function reciprocalRankFusion(keywordResults, semanticResults) {
-  const scores = new Map();
+function reciprocalRankFusion(keywordResults: any[], semanticResults: any[]) {
+  const scores = new Map<string, { item: any; score: number; methods: string[] }>();
 
   // Type boost: structured knowledge > raw activity
-  const typeBoost = { decision: 1.5, session: 1.3, task: 1.1, scratchpad: 1.0, activity: 0.7 };
+  const typeBoost: Record<string, number> = { decision: 1.5, session: 1.3, task: 1.1, scratchpad: 1.0, activity: 0.7 };
 
   // Score from keyword ranking
   keywordResults.forEach((item, rank) => {

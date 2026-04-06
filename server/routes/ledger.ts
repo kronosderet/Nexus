@@ -1,16 +1,19 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
+import type { NexusStore } from '../db/store.ts';
 
-export function createLedgerRoutes(store, broadcast) {
+type BroadcastFn = (data: any) => void;
+
+export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
   const router = Router();
 
   // List decisions
-  router.get('/', (req, res) => {
+  router.get('/', (req: Request, res: Response) => {
     const { project, tag, limit } = req.query;
-    res.json(store.getLedger({ project, tag, limit: parseInt(limit) || 50 }));
+    res.json(store.getLedger({ project: project as string, tag: tag as string, limit: parseInt(limit as string) || 50 }));
   });
 
   // Record a decision
-  router.post('/', (req, res) => {
+  router.post('/', (req: Request, res: Response) => {
     const { decision, context, project, alternatives, tags } = req.body;
     if (!decision) return res.status(400).json({ error: 'Decision text required.' });
 
@@ -28,9 +31,9 @@ export function createLedgerRoutes(store, broadcast) {
   });
 
   // Auto-extract decisions from all sessions
-  router.post('/extract', (req, res) => {
+  router.post('/extract', (req: Request, res: Response) => {
     const sessions = store.getSessions({ limit: 100 });
-    const existing = new Set((store.data.ledger || []).map(l => l.decision.toLowerCase().slice(0, 60)));
+    const existing = new Set(((store as any).data.ledger || []).map((l: any) => l.decision.toLowerCase().slice(0, 60)));
     let added = 0;
 
     for (const s of sessions) {
@@ -49,27 +52,27 @@ export function createLedgerRoutes(store, broadcast) {
       }
     }
 
-    res.json({ extracted: added, total: (store.data.ledger || []).length });
+    res.json({ extracted: added, total: ((store as any).data.ledger || []).length });
   });
 
   // Auto-link: use AI to find relationships between decisions
-  router.post('/auto-link', async (req, res) => {
+  router.post('/auto-link', async (req: Request, res: Response) => {
     const decisions = store.getLedger({ limit: 60 });
     if (decisions.length < 2) return res.json({ linked: 0 });
 
     // Group by project for intra-project linking
-    const byProject = {};
+    const byProject: Record<string, any[]> = {};
     for (const d of decisions) {
       if (!byProject[d.project]) byProject[d.project] = [];
       byProject[d.project].push(d);
     }
 
     let linked = 0;
-    const existingEdges = new Set(store.data.graph_edges.map(e => `${e.from}-${e.to}`));
+    const existingEdges = new Set((store as any).data.graph_edges.map((e: any) => `${e.from}-${e.to}`));
 
     for (const [project, decs] of Object.entries(byProject)) {
       // Link sequential decisions in same project (temporal chain)
-      const sorted = [...decs].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      const sorted = [...decs].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
       for (let i = 0; i < sorted.length - 1; i++) {
         const key = `${sorted[i].id}-${sorted[i+1].id}`;
         const keyRev = `${sorted[i+1].id}-${sorted[i].id}`;
@@ -87,8 +90,8 @@ export function createLedgerRoutes(store, broadcast) {
           const keyRev = `${decs[j].id}-${decs[i].id}`;
           if (existingEdges.has(key) || existingEdges.has(keyRev)) continue;
 
-          const wordsA = new Set(decs[i].decision.toLowerCase().split(/\s+/).filter(w => w.length > 3));
-          const wordsB = new Set(decs[j].decision.toLowerCase().split(/\s+/).filter(w => w.length > 3));
+          const wordsA = new Set(decs[i].decision.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3));
+          const wordsB = new Set(decs[j].decision.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3));
           const overlap = [...wordsA].filter(w => wordsB.has(w)).length;
 
           if (overlap >= 2) {
@@ -101,7 +104,7 @@ export function createLedgerRoutes(store, broadcast) {
     }
 
     // Cross-project: link decisions with same tags
-    const byTag = {};
+    const byTag: Record<string, any[]> = {};
     for (const d of decisions) {
       for (const t of (d.tags || [])) {
         if (!byTag[t]) byTag[t] = [];
@@ -124,13 +127,13 @@ export function createLedgerRoutes(store, broadcast) {
 
     const entry = store.addActivity('graph', `Knowledge Graph: auto-linked ${linked} connections`);
     broadcast({ type: 'activity', payload: entry });
-    res.json({ linked, totalEdges: store.data.graph_edges.length });
+    res.json({ linked, totalEdges: (store as any).data.graph_edges.length });
   });
 
   // ── Knowledge Graph edges ──────────────
 
   // Link two decisions
-  router.post('/link', (req, res) => {
+  router.post('/link', (req: Request, res: Response) => {
     const { from, to, rel = 'related', note = '' } = req.body;
     if (!from || !to) return res.status(400).json({ error: 'from and to decision IDs required.' });
     const edge = store.addEdge(Number(from), Number(to), rel, note);
@@ -138,38 +141,38 @@ export function createLedgerRoutes(store, broadcast) {
   });
 
   // Remove a link
-  router.delete('/link/:id', (req, res) => {
+  router.delete('/link/:id', (req: Request, res: Response) => {
     const removed = store.removeEdge(Number(req.params.id));
     if (!removed) return res.status(404).json({ error: 'Edge not found.' });
     res.json({ success: true });
   });
 
   // Get all connections for a decision
-  router.get('/:id/connections', (req, res) => {
+  router.get('/:id/connections', (req: Request, res: Response) => {
     const id = Number(req.params.id);
-    const decision = store.data.ledger.find(d => d.id === id);
+    const decision = (store as any).data.ledger.find((d: any) => d.id === id);
     if (!decision) return res.status(404).json({ error: 'Decision not found.' });
 
     const edges = store.getEdgesFor(id);
-    const connected = edges.map(e => {
+    const connected = edges.map((e: any) => {
       const otherId = e.from === id ? e.to : e.from;
-      const other = store.data.ledger.find(d => d.id === otherId);
+      const other = (store as any).data.ledger.find((d: any) => d.id === otherId);
       return { edge: e, decision: other };
-    }).filter(c => c.decision);
+    }).filter((c: any) => c.decision);
 
     res.json({ decision, connected });
   });
 
   // Traverse the graph from a starting decision
-  router.get('/:id/traverse', (req, res) => {
+  router.get('/:id/traverse', (req: Request, res: Response) => {
     const id = Number(req.params.id);
-    const depth = parseInt(req.query.depth) || 3;
+    const depth = parseInt(req.query.depth as string) || 3;
     const chain = store.traverse(id, depth);
     res.json({ startId: id, depth, chain });
   });
 
   // Full graph for visualization
-  router.get('/graph/full', (req, res) => {
+  router.get('/graph/full', (req: Request, res: Response) => {
     res.json(store.getGraph());
   });
 

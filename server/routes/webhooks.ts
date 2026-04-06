@@ -1,12 +1,15 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import type { NexusStore } from '../db/store.ts';
+
+type BroadcastFn = (data: any) => void;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HOOKS_PATH = join(__dirname, '..', '..', 'nexus-webhooks.json');
 
-const DEFAULT_CONFIG = {
+const DEFAULT_CONFIG: any = {
   outbound: [],
   // Example:
   // { id: 'discord-nexus', url: 'https://discord.com/api/webhooks/...', events: ['task_done', 'session'], format: 'discord' }
@@ -18,12 +21,12 @@ function loadConfig() {
   return DEFAULT_CONFIG;
 }
 
-function saveConfig(config) {
+function saveConfig(config: any) {
   writeFileSync(HOOKS_PATH, JSON.stringify(config, null, 2));
 }
 
 // Format payload for different targets
-function formatPayload(event, data, format) {
+function formatPayload(event: string, data: any, format: string) {
   const message = `[Nexus] ${event}: ${typeof data === 'string' ? data : data.message || data.title || JSON.stringify(data).slice(0, 200)}`;
 
   switch (format) {
@@ -39,7 +42,7 @@ function formatPayload(event, data, format) {
 }
 
 // Fire outbound webhooks for a given event
-export async function fireWebhooks(event, data) {
+export async function fireWebhooks(event: string, data: any) {
   const config = loadConfig();
   for (const hook of config.outbound) {
     if (hook.events.includes(event) || hook.events.includes('*')) {
@@ -55,16 +58,16 @@ export async function fireWebhooks(event, data) {
   }
 }
 
-export function createWebhookRoutes(store, broadcast) {
+export function createWebhookRoutes(store: NexusStore, broadcast: BroadcastFn) {
   const router = Router();
 
   // List outbound webhooks
-  router.get('/', (req, res) => {
+  router.get('/', (req: Request, res: Response) => {
     res.json(loadConfig());
   });
 
   // Add outbound webhook
-  router.post('/', (req, res) => {
+  router.post('/', (req: Request, res: Response) => {
     const { url, events = ['*'], format = 'json', name = 'unnamed' } = req.body;
     if (!url) return res.status(400).json({ error: 'URL required.' });
 
@@ -78,17 +81,17 @@ export function createWebhookRoutes(store, broadcast) {
   });
 
   // Delete outbound webhook
-  router.delete('/:id', (req, res) => {
+  router.delete('/:id', (req: Request, res: Response) => {
     const config = loadConfig();
-    config.outbound = config.outbound.filter(h => h.id !== req.params.id);
+    config.outbound = config.outbound.filter((h: any) => h.id !== String(req.params.id));
     saveConfig(config);
     res.json({ success: true });
   });
 
   // Test a webhook
-  router.post('/:id/test', async (req, res) => {
+  router.post('/:id/test', async (req: Request, res: Response) => {
     const config = loadConfig();
-    const hook = config.outbound.find(h => h.id === req.params.id);
+    const hook = config.outbound.find((h: any) => h.id === String(req.params.id));
     if (!hook) return res.status(404).json({ error: 'Nothing on the charts.' });
 
     const payload = formatPayload('test', 'Nexus webhook test -- all instruments nominal.', hook.format);
@@ -99,17 +102,17 @@ export function createWebhookRoutes(store, broadcast) {
         body: JSON.stringify(payload),
       });
       res.json({ success: true, payload });
-    } catch (err) {
+    } catch (err: any) {
       res.json({ success: false, error: err.message });
     }
   });
 
   // Inbound webhook receiver (for GitHub, CI/CD, etc.)
-  router.post('/inbound', (req, res) => {
+  router.post('/inbound', (req: Request, res: Response) => {
     const { event, message, project, meta } = req.body;
-    const githubEvent = req.headers['x-github-event'];
+    const githubEvent = req.headers['x-github-event'] as string | undefined;
 
-    let activityMessage;
+    let activityMessage: string | undefined;
     if (githubEvent) {
       // GitHub webhook
       activityMessage = parseGitHubEvent(githubEvent, req.body);
@@ -128,7 +131,7 @@ export function createWebhookRoutes(store, broadcast) {
   return router;
 }
 
-function parseGitHubEvent(event, payload) {
+function parseGitHubEvent(event: string, payload: any): string {
   switch (event) {
     case 'push': {
       const repo = payload.repository?.name || 'unknown';

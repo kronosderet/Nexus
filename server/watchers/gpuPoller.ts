@@ -1,6 +1,7 @@
 import { execSync } from 'child_process';
+import type { NexusStore } from '../db/store.ts';
 
-export function startGpuPoller(store, intervalMs = 60000) {
+export function startGpuPoller(store: NexusStore, intervalMs = 60000) {
   function snapshot() {
     try {
       const csv = execSync(

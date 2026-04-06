@@ -8,33 +8,33 @@ import { dirname, join } from 'path';
 import { NexusStore } from './db/store.ts';
 import { createTaskRoutes } from './routes/tasks.ts';
 import { createActivityRoutes } from './routes/activity.ts';
-import { createPulseRoutes } from './routes/pulse.js';
+import { createPulseRoutes } from './routes/pulse.ts';
 import { createScratchpadRoutes } from './routes/scratchpad.ts';
 import { createSessionRoutes } from './routes/sessions.ts';
 import { createSearchRoutes } from './routes/search.ts';
 import { createDigestRoutes } from './routes/digest.ts';
 import { createNotifyRoutes } from './routes/notify.ts';
-import { createActionRoutes } from './routes/actions.js';
-import { createUsageRoutes, buildTimingInfo } from './routes/usage.js';
+import { createActionRoutes } from './routes/actions.ts';
+import { createUsageRoutes, buildTimingInfo } from './routes/usage.ts';
 import { createHeatmapRoutes } from './routes/heatmap.ts';
-import { createGitHubRoutes } from './routes/github.js';
-import { createWebhookRoutes } from './routes/webhooks.js';
-import { createAIRoutes } from './routes/ai.js';
-import { createOverseerRoutes } from './routes/overseer.js';
+import { createGitHubRoutes } from './routes/github.ts';
+import { createWebhookRoutes } from './routes/webhooks.ts';
+import { createAIRoutes } from './routes/ai.ts';
+import { createOverseerRoutes } from './routes/overseer.ts';
 import { createFocusRoutes } from './routes/focus.ts';
 import { createBudgetRoutes } from './routes/budget.ts';
 import { createInitRoutes } from './routes/init.ts';
 import { createClockRoutes } from './routes/clock.ts';
 import { createRemediateRoutes } from './routes/remediate.ts';
-import { createEmbeddingRoutes } from './routes/embeddings.js';
-import { createSmartSearchRoutes } from './routes/smartSearch.js';
+import { createEmbeddingRoutes } from './routes/embeddings.ts';
+import { createSmartSearchRoutes } from './routes/smartSearch.ts';
 import { readFileSync, existsSync } from 'fs';
-import { createEstimatorRoutes } from './routes/estimator.js';
-import { createLedgerRoutes } from './routes/ledger.js';
-import { createImpactRoutes } from './routes/impact.js';
-import { startFileWatcher } from './watchers/fileWatcher.js';
-import { startGpuPoller } from './watchers/gpuPoller.js';
-import { startOverseerPoller } from './watchers/overseerPoller.js';
+import { createEstimatorRoutes } from './routes/estimator.ts';
+import { createLedgerRoutes } from './routes/ledger.ts';
+import { createImpactRoutes } from './routes/impact.ts';
+import { startFileWatcher } from './watchers/fileWatcher.ts';
+import { startGpuPoller } from './watchers/gpuPoller.ts';
+import { startOverseerPoller } from './watchers/overseerPoller.ts';
 import { attachTerminal } from './routes/terminal.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -78,10 +78,10 @@ wss.on('connection', (ws) => {
   ws.on('close', () => clients.delete(ws));
 });
 
-function broadcast(data) {
+function broadcast(data: any) {
   const msg = JSON.stringify(data);
   for (const ws of clients) {
-    if (ws.readyState === 1) ws.send(msg);
+    if ((ws as any).readyState === 1) (ws as any).send(msg);
   }
 }
 

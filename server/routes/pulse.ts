@@ -1,13 +1,14 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { execSync } from 'child_process';
 import { readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
+import type { NexusStore } from '../db/store.ts';
 
-export function createPulseRoutes(store) {
+export function createPulseRoutes(store: NexusStore) {
   const router = Router();
 
-  router.get('/', (req, res) => {
+  router.get('/', (req: Request, res: Response) => {
     const pulse = {
       system: getSystemInfo(),
       gpu: getGpuInfo(),
@@ -19,20 +20,20 @@ export function createPulseRoutes(store) {
   });
 
   // Dedicated GPU endpoint for detailed/live polling
-  router.get('/gpu', (req, res) => {
+  router.get('/gpu', (req: Request, res: Response) => {
     const gpu = getGpuInfo();
     const processes = getGpuProcesses();
     res.json({ ...gpu, processes });
   });
 
   // GPU history (timeline data)
-  router.get('/gpu/history', (req, res) => {
-    const hours = parseFloat(req.query.hours) || 1;
+  router.get('/gpu/history', (req: Request, res: Response) => {
+    const hours = parseFloat(req.query.hours as string) || 1;
     res.json(store ? store.getGpuHistory(hours) : []);
   });
 
   // Project health cards
-  router.get('/projects', (req, res) => {
+  router.get('/projects', (req: Request, res: Response) => {
     const projects = scanProjects();
     const activity = store ? store.getActivity(200) : [];
     const tasks = store ? store.getAllTasks() : [];
@@ -43,22 +44,22 @@ export function createPulseRoutes(store) {
     const enriched = projects.map(p => {
       const name = p.name.toLowerCase();
       // Count activity per project (by [ProjectName] tag)
-      const projActivity = activity.filter(a => a.message.toLowerCase().includes(`[${name}]`));
-      const activity7d = projActivity.filter(a => now - new Date(a.created_at).getTime() < 7 * DAY).length;
-      const activityToday = projActivity.filter(a => now - new Date(a.created_at).getTime() < DAY).length;
+      const projActivity = activity.filter((a: any) => a.message.toLowerCase().includes(`[${name}]`));
+      const activity7d = projActivity.filter((a: any) => now - new Date(a.created_at).getTime() < 7 * DAY).length;
+      const activityToday = projActivity.filter((a: any) => now - new Date(a.created_at).getTime() < DAY).length;
       const lastActivity = projActivity[0]?.created_at || null;
 
       // Tasks referencing this project
-      const projTasks = tasks.filter(t => t.title.toLowerCase().includes(name));
-      const openTasks = projTasks.filter(t => t.status !== 'done').length;
-      const doneTasks = projTasks.filter(t => t.status === 'done').length;
+      const projTasks = tasks.filter((t: any) => t.title.toLowerCase().includes(name));
+      const openTasks = projTasks.filter((t: any) => t.status !== 'done').length;
+      const doneTasks = projTasks.filter((t: any) => t.status === 'done').length;
 
       // Sessions
-      const projSessions = sessions.filter(s => s.project.toLowerCase() === name);
+      const projSessions = sessions.filter((s: any) => s.project.toLowerCase() === name);
       const lastSession = projSessions[0]?.created_at || null;
 
       // Git info per project
-      let git = { isRepo: false };
+      let git: any = { isRepo: false };
       if (p.hasGit) {
         try {
           const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: p.path, encoding: 'utf-8' }).trim();
@@ -91,7 +92,7 @@ export function createPulseRoutes(store) {
     });
 
     // Sort: hot first, then warm, then cold
-    const heatOrder = { hot: 0, warm: 1, cold: 2 };
+    const heatOrder: Record<string, number> = { hot: 0, warm: 1, cold: 2 };
     enriched.sort((a, b) => heatOrder[a.heat] - heatOrder[b.heat]);
 
     res.json(enriched);

@@ -1,7 +1,8 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import type { NexusStore } from '../db/store.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EMBED_CACHE_PATH = join(__dirname, '..', '..', 'nexus-embeddings.json');
@@ -9,7 +10,7 @@ const EMBED_MODEL = 'text-embedding-nomic-embed-text-v1.5';
 const EMBED_URL = 'http://localhost:1234/v1/embeddings';
 
 // ── Vector math ────────────────────────────────────────
-function cosineSim(a, b) {
+function cosineSim(a: number[], b: number[]) {
   let dot = 0, magA = 0, magB = 0;
   for (let i = 0; i < a.length; i++) {
     dot += a[i] * b[i];
@@ -20,7 +21,7 @@ function cosineSim(a, b) {
 }
 
 // ── Embedding cache (persist to disk) ──────────────────
-let cache = {};
+let cache: Record<string, { vec: number[]; ts: number }> = {};
 if (existsSync(EMBED_CACHE_PATH)) {
   try { cache = JSON.parse(readFileSync(EMBED_CACHE_PATH, 'utf-8')); } catch {}
 }
@@ -35,7 +36,7 @@ function saveCache() {
   writeFileSync(EMBED_CACHE_PATH, JSON.stringify(cache));
 }
 
-async function getEmbedding(text) {
+async function getEmbedding(text: string): Promise<number[] | null> {
   const key = text.slice(0, 200); // cache key
   if (cache[key]?.vec) return cache[key].vec;
 
@@ -47,7 +48,7 @@ async function getEmbedding(text) {
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;
-    const data = await res.json();
+    const data: any = await res.json();
     const vec = data.data?.[0]?.embedding;
     if (vec) {
       cache[key] = { vec, ts: Date.now() };
@@ -60,8 +61,8 @@ async function getEmbedding(text) {
 }
 
 // ── Build searchable corpus from store ─────────────────
-function buildCorpus(store) {
-  const items = [];
+function buildCorpus(store: NexusStore) {
+  const items: any[] = [];
 
   // Sessions (highest value -- decisions, summaries)
   for (const s of store.getSessions({ limit: 100 })) {
@@ -87,21 +88,21 @@ function buildCorpus(store) {
   return items;
 }
 
-export function createEmbeddingRoutes(store) {
+export function createEmbeddingRoutes(store: NexusStore) {
   const router = Router();
 
   // Semantic search
-  router.get('/search', async (req, res) => {
+  router.get('/search', async (req: Request, res: Response) => {
     const { q, limit = 15 } = req.query;
     if (!q) return res.status(400).json({ error: 'Query q required.' });
 
-    const queryVec = await getEmbedding(q);
+    const queryVec = await getEmbedding(q as string);
     if (!queryVec) return res.json({ error: 'Embedding model unavailable.', results: [] });
 
     const corpus = buildCorpus(store);
 
     // Embed all corpus items (uses cache for previously seen items)
-    const scored = [];
+    const scored: any[] = [];
     for (const item of corpus) {
       const itemVec = await getEmbedding(item.text);
       if (!itemVec) continue;
@@ -110,13 +111,13 @@ export function createEmbeddingRoutes(store) {
     }
 
     scored.sort((a, b) => b.score - a.score);
-    const results = scored.slice(0, parseInt(limit)).map(({ text, ...rest }) => rest);
+    const results = scored.slice(0, parseInt(limit as string)).map(({ text, ...rest }) => rest);
 
     res.json({ query: q, results });
   });
 
   // Reindex: pre-embed all current data
-  router.post('/reindex', async (req, res) => {
+  router.post('/reindex', async (req: Request, res: Response) => {
     const corpus = buildCorpus(store);
     let embedded = 0;
     for (const item of corpus) {
@@ -128,7 +129,7 @@ export function createEmbeddingRoutes(store) {
   });
 
   // Cache stats
-  router.get('/stats', (req, res) => {
+  router.get('/stats', (req: Request, res: Response) => {
     res.json({ cacheSize: Object.keys(cache).length, cachePath: EMBED_CACHE_PATH });
   });
 
