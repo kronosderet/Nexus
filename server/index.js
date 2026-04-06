@@ -27,6 +27,8 @@ import { createInitRoutes } from './routes/init.js';
 import { createClockRoutes } from './routes/clock.js';
 import { createRemediateRoutes } from './routes/remediate.js';
 import { createEmbeddingRoutes } from './routes/embeddings.js';
+import { createSmartSearchRoutes } from './routes/smartSearch.js';
+import { readFileSync, existsSync } from 'fs';
 import { createEstimatorRoutes } from './routes/estimator.js';
 import { createLedgerRoutes } from './routes/ledger.js';
 import { startFileWatcher } from './watchers/fileWatcher.js';
@@ -113,6 +115,12 @@ app.use('/api/init', createInitRoutes(store));
 app.use('/api/clock', createClockRoutes(store, buildTimingInfo));
 app.use('/api/remediate', createRemediateRoutes(store, broadcast));
 app.use('/api/embed', createEmbeddingRoutes(store));
+
+// Shared embedding cache for smart search
+const embedCachePath = join(__dirname, '..', 'nexus-embeddings.json');
+let embedCache = {};
+try { if (existsSync(embedCachePath)) embedCache = JSON.parse(readFileSync(embedCachePath, 'utf-8')); } catch {}
+app.use('/api/smart-search', createSmartSearchRoutes(store, embedCache));
 app.use('/api/estimator', createEstimatorRoutes(store));
 app.use('/api/ledger', createLedgerRoutes(store, broadcast));
 
