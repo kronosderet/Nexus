@@ -39,6 +39,31 @@ export function createGitHubRoutes(store, broadcast) {
     res.json(results);
   });
 
+  // Commit all changes in a project
+  router.post('/commit', (req, res) => {
+    const { project, message = 'Nexus auto-commit' } = req.body;
+    if (!project) return res.status(400).json({ error: 'Project name required.' });
+
+    const cwd = join(PROJECTS_DIR, project);
+    try {
+      // Stage all
+      execSync('git add -A', { cwd, encoding: 'utf-8' });
+      // Check if anything staged
+      const status = execSync('git status --porcelain', { cwd, encoding: 'utf-8' }).trim();
+      if (!status) return res.json({ success: true, files: 0, message: 'Nothing to commit' });
+
+      const files = status.split('\n').length;
+      execSync(`git commit -m "${message.replace(/"/g, '\\"')}"`, { cwd, encoding: 'utf-8' });
+
+      const entry = store.addActivity('git_commit', `Fleet commit -- [${project}] ${files} files: ${message.slice(0, 60)}`);
+      broadcast({ type: 'activity', payload: entry });
+
+      res.json({ success: true, files, project });
+    } catch (err) {
+      res.json({ success: false, project, error: err.message?.slice(0, 200) });
+    }
+  });
+
   return router;
 }
 

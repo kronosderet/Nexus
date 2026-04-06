@@ -1,33 +1,31 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
+import type { NexusStore } from '../db/store.ts';
 
-export function createSessionRoutes(store, broadcast) {
+type BroadcastFn = (data: any) => void;
+
+export function createSessionRoutes(store: NexusStore, broadcast: BroadcastFn) {
   const router = Router();
 
-  // List sessions (optional ?project= filter)
-  router.get('/', (req, res) => {
-    const { project, limit } = req.query;
-    res.json(store.getSessions({ project, limit: parseInt(limit) || 20 }));
+  router.get('/', (req: Request, res: Response) => {
+    const project = typeof req.query.project === 'string' ? req.query.project : undefined;
+    const limit = parseInt(req.query.limit as string) || 20;
+    res.json(store.getSessions({ project, limit }));
   });
 
-  // Get session context for a project (designed for agent startup)
-  router.get('/context/:project', (req, res) => {
-    const context = store.getSessionContext(req.params.project);
+  router.get('/context/:project', (req: Request, res: Response) => {
+    const context = store.getSessionContext(String(req.params.project));
     res.json(context);
   });
 
-  // Get single session
-  router.get('/:id', (req, res) => {
+  router.get('/:id', (req: Request, res: Response) => {
     const session = store.getSession(Number(req.params.id));
     if (!session) return res.status(404).json({ error: 'Nothing on the charts.' });
     res.json(session);
   });
 
-  // Create session log
-  router.post('/', (req, res) => {
+  router.post('/', (req: Request, res: Response) => {
     const { project, summary, decisions, blockers, files_touched, tags } = req.body;
-    if (!project || !summary) {
-      return res.status(400).json({ error: 'Project and summary required.' });
-    }
+    if (!project || !summary) return res.status(400).json({ error: 'Project and summary required.' });
 
     const session = store.createSession({ project, summary, decisions, blockers, files_touched, tags });
     const entry = store.addActivity('session', `Session logged -- [${project}] ${summary.slice(0, 60)}${summary.length > 60 ? '...' : ''}`);
@@ -36,8 +34,7 @@ export function createSessionRoutes(store, broadcast) {
     res.status(201).json(session);
   });
 
-  // Update session
-  router.patch('/:id', (req, res) => {
+  router.patch('/:id', (req: Request, res: Response) => {
     const id = Number(req.params.id);
     const session = store.getSession(id);
     if (!session) return res.status(404).json({ error: 'Nothing on the charts.' });
@@ -46,8 +43,7 @@ export function createSessionRoutes(store, broadcast) {
     res.json(session);
   });
 
-  // Delete session
-  router.delete('/:id', (req, res) => {
+  router.delete('/:id', (req: Request, res: Response) => {
     const idx = store.data.sessions.findIndex(s => s.id === Number(req.params.id));
     if (idx === -1) return res.status(404).json({ error: 'Nothing on the charts.' });
     store.data.sessions.splice(idx, 1);
