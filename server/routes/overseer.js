@@ -80,6 +80,7 @@ function gatherContext(store) {
   const sessions = store.getSessions({ limit: 15 });
   const activity = store.getActivity(50);
   const usage = store.getLatestUsage();
+  const ledger = store.getLedger({ limit: 15 });
 
   // Git info per repo
   const repos = [];
@@ -98,7 +99,7 @@ function gatherContext(store) {
     }
   } catch {}
 
-  return { tasks, sessions, activity, usage, repos };
+  return { tasks, sessions, activity, usage, repos, ledger };
 }
 
 function buildContextPrompt(ctx) {
@@ -113,13 +114,20 @@ function buildContextPrompt(ctx) {
     for (const t of open) lines.push(`  - [${t.status}] ${t.title}`);
   }
 
+  // Key decisions from The Ledger
+  if (ctx.ledger && ctx.ledger.length > 0) {
+    lines.push('\nKEY DECISIONS (from The Ledger):');
+    for (const d of ctx.ledger.slice(0, 10)) {
+      lines.push(`  [${d.project}] ${d.decision}${d.alternatives.length ? ` (alternatives: ${d.alternatives.join(', ')})` : ''}`);
+    }
+  }
+
   // Sessions (recent context)
   if (ctx.sessions.length > 0) {
     lines.push('\nRECENT SESSIONS:');
     for (const s of ctx.sessions.slice(0, 8)) {
       lines.push(`  [${s.project}] ${s.summary.slice(0, 120)}`);
       if (s.blockers.length) lines.push(`    BLOCKERS: ${s.blockers.join(', ')}`);
-      if (s.decisions.length) lines.push(`    DECISIONS: ${s.decisions.join(', ')}`);
     }
   }
 
