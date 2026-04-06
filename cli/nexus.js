@@ -152,6 +152,18 @@ const commands = {
       }
     } catch {}
 
+    // Recent decisions from The Ledger
+    try {
+      const decisions = await api(`/ledger?project=${encodeURIComponent(project)}&limit=5`);
+      if (decisions.length > 0) {
+        console.log(`  ${amber('Key decisions')} (${project}):`);
+        for (const d of decisions.slice(0, 5)) {
+          console.log(`    ${dim('›')} ${d.decision}`);
+        }
+        console.log('');
+      }
+    } catch {}
+
     // Quick digest
     try {
       const digest = await api('/digest?range=7d');
