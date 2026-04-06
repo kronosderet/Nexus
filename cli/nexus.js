@@ -697,6 +697,63 @@ const commands = {
     console.log(`\n  ${dim(`${data.stats.keywordHits} keyword + ${data.stats.semanticHits} semantic → ${data.stats.fusedTotal} fused`)}\n`);
   },
 
+  async link(args) {
+    if (args.length < 3) {
+      console.error('  Usage: nexus link <from_id> <rel> <to_id> ["note"]');
+      console.error('  Relations: led_to, replaced, depends_on, contradicts, related');
+      return;
+    }
+    const from = parseInt(args[0]);
+    const rel = args[1];
+    const to = parseInt(args[2]);
+    const note = args.slice(3).join(' ');
+
+    const edge = await api('/ledger/link', { method: 'POST', body: { from, to, rel, note } });
+    console.log(`  ◈ Linked: #${from} --[${amber(rel)}]--> #${to}`);
+  },
+
+  async graph(args) {
+    if (args[0] && !isNaN(args[0])) {
+      // Traverse from a specific decision
+      const id = parseInt(args[0]);
+      const depth = parseInt(args[1]) || 3;
+      const data = await api(`/ledger/${id}/traverse?depth=${depth}`);
+      if (data.chain.length === 0) { console.log('  ◈ Decision not found.'); return; }
+
+      console.log(`\n  ${amber('◈')} ${amber('Decision Graph')} from #${id} (depth ${depth})\n`);
+      for (const node of data.chain) {
+        const indent = '  '.repeat(node.depth);
+        const arrow = node.depth > 0 ? `${dim(node.path[node.path.length-1]?.edge || '')} → ` : '';
+        console.log(`  ${indent}${arrow}${green(`#${node.id}`)} ${node.decision}`);
+        if (node.context) console.log(`  ${indent}  ${dim(node.context.slice(0, 60))}`);
+      }
+      console.log('');
+      return;
+    }
+
+    // Full graph stats
+    const data = await api('/ledger/graph/full');
+    const connected = new Set();
+    for (const e of data.edges) { connected.add(e.from); connected.add(e.to); }
+    const orphans = data.nodes.filter(n => !connected.has(n.id)).length;
+
+    console.log(`\n  ${amber('◈')} ${amber('Knowledge Graph')}\n`);
+    console.log(`  ${dim('Decisions')}    ${data.nodes.length}`);
+    console.log(`  ${dim('Connections')} ${data.edges.length}`);
+    console.log(`  ${dim('Connected')}   ${connected.size} nodes`);
+    console.log(`  ${dim('Orphans')}     ${orphans} (unlinked)`);
+
+    if (data.edges.length > 0) {
+      const relCounts = {};
+      for (const e of data.edges) relCounts[e.rel] = (relCounts[e.rel] || 0) + 1;
+      console.log(`\n  ${dim('Edge types:')}`);
+      for (const [rel, count] of Object.entries(relCounts).sort((a,b) => b[1] - a[1])) {
+        console.log(`    ${amber(rel.padEnd(15))} ${count}`);
+      }
+    }
+    console.log('');
+  },
+
   async seek(args) {
     const query = args.join(' ');
     if (!query) { console.error('  Usage: nexus seek "semantic search query"'); return; }
@@ -766,6 +823,8 @@ const commands = {
     nexus context [project]        Get prior context for a project
     nexus record "decision"        Record a decision to The Ledger
     nexus decisions [project]      View decision history
+    nexus link <from> <rel> <to>   Link two decisions (knowledge graph)
+    nexus graph [id] [depth]       View graph stats or traverse from a node
     nexus search "query"           Smart search (keyword + semantic)
     nexus seek "query"             Semantic-only search
     nexus find "query"             Keyword-only search
