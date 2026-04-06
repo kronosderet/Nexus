@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
+import type { NexusStore } from '../db/store.ts';
 
 /**
  * Smart Fuel Estimator
@@ -11,31 +12,31 @@ import { Router } from 'express';
  * - Historical efficiency patterns
  */
 
-export function createEstimatorRoutes(store) {
+export function createEstimatorRoutes(store: NexusStore) {
   const router = Router();
 
   // Get current estimated fuel + predictions
-  router.get('/', (req, res) => {
+  router.get('/', (req: Request, res: Response) => {
     res.json(buildEstimate(store));
   });
 
   // Log a calibration point (user reports actual usage)
   // This is called automatically by the usage POST route
-  router.get('/history', (req, res) => {
+  router.get('/history', (req: Request, res: Response) => {
     const stats = buildHistoricalStats(store);
     res.json(stats);
   });
 
   // Predict cost of a task type
-  router.get('/predict', (req, res) => {
+  router.get('/predict', (req: Request, res: Response) => {
     const { task_type = 'medium' } = req.query;
     const estimate = buildEstimate(store);
-    const prediction = predictTaskCost(store, task_type, estimate);
+    const prediction = predictTaskCost(store, task_type as string, estimate);
     res.json(prediction);
   });
 
   // Get workload recommendations
-  router.get('/workload', (req, res) => {
+  router.get('/workload', (req: Request, res: Response) => {
     const estimate = buildEstimate(store);
     const workload = buildWorkloadPlan(store, estimate);
     res.json(workload);
@@ -44,7 +45,7 @@ export function createEstimatorRoutes(store) {
   return router;
 }
 
-function buildEstimate(store) {
+function buildEstimate(store: NexusStore) {
   const history = store.getUsage(50);
   if (history.length === 0) return { tracked: false };
 
@@ -57,16 +58,16 @@ function buildEstimate(store) {
   const rates = calculateBurnRates(history);
 
   // Interpolate current fuel
-  let estimatedSession = latest.session_percent;
-  let estimatedWeekly = latest.weekly_percent;
+  let estimatedSession = latest.session_percent ?? 0;
+  let estimatedWeekly = latest.weekly_percent ?? 0;
 
   if (rates.sessionPerMinute > 0 && minutesSinceReport > 1) {
-    estimatedSession = Math.max(0, latest.session_percent - (rates.sessionPerMinute * minutesSinceReport));
-    estimatedWeekly = Math.max(0, latest.weekly_percent - (rates.weeklyPerMinute * minutesSinceReport));
+    estimatedSession = Math.max(0, (latest.session_percent ?? 0) - (rates.sessionPerMinute * minutesSinceReport));
+    estimatedWeekly = Math.max(0, (latest.weekly_percent ?? 0) - (rates.weeklyPerMinute * minutesSinceReport));
   }
 
   // Session timing
-  const timing = store.data._sessionTiming || {};
+  const timing = (store as any).data._sessionTiming || {};
   const resetTime = timing.resetTime ? new Date(timing.resetTime) : null;
   const minutesUntilReset = resetTime ? Math.max(0, (resetTime.getTime() - now) / 60000) : null;
 
@@ -82,7 +83,7 @@ function buildEstimate(store) {
 
   // For current session: constraint is session fuel or window timer (NOT weekly)
   const sessionConstraints = [sessionMinutesLeft, minutesUntilReset]
-    .filter(v => v != null && v > 0);
+    .filter((v): v is number => v != null && v > 0);
   const constrainingMinutes = sessionConstraints.length > 0 ? Math.min(...sessionConstraints) : null;
 
   // Weekly is a separate longer-term gauge
@@ -98,7 +99,7 @@ function buildEstimate(store) {
   const chunksRemaining = constrainingMinutes ? Math.floor(constrainingMinutes / 15) : null;
 
   // Weekly planning: how many full sessions left this week?
-  // A session typically burns 50-80% fuel, so sessions left ≈ weekly% / avg_session_burn
+  // A session typically burns 50-80% fuel, so sessions left = weekly% / avg_session_burn
   const avgSessionBurn = 3; // ~3% of weekly per session (rough estimate, improves with data)
   const sessionsLeftThisWeek = estimatedWeekly > 0 ? Math.floor(estimatedWeekly / avgSessionBurn) : 0;
 
@@ -138,15 +139,15 @@ function buildEstimate(store) {
   };
 }
 
-function calculateBurnRates(history) {
+function calculateBurnRates(history: any[]) {
   // Calculate from consecutive report pairs
-  const sessionRates = [];
-  const weeklyRates = [];
+  const sessionRates: number[] = [];
+  const weeklyRates: number[] = [];
 
   for (let i = 0; i < history.length - 1; i++) {
     const newer = history[i];
     const older = history[i + 1];
-    const minutes = (new Date(newer.created_at) - new Date(older.created_at)) / 60000;
+    const minutes = (new Date(newer.created_at).getTime() - new Date(older.created_at).getTime()) / 60000;
 
     if (minutes < 1 || minutes > 360) continue; // skip weird gaps
 
@@ -172,7 +173,7 @@ function calculateBurnRates(history) {
   };
 }
 
-function weightedAvg(values) {
+function weightedAvg(values: number[]) {
   if (values.length === 0) return 0;
   let sum = 0, weightSum = 0;
   for (let i = 0; i < values.length; i++) {
@@ -183,13 +184,13 @@ function weightedAvg(values) {
   return sum / weightSum;
 }
 
-function buildHistoricalStats(store) {
+function buildHistoricalStats(store: NexusStore) {
   const history = store.getUsage(200);
   if (history.length < 2) return { insufficient: true };
 
   // Group by session windows (detect resets: when session% jumps up)
-  const sessions = [];
-  let currentSession = { reports: [history[0]], startFuel: history[history.length - 1].session_percent };
+  const sessions: any[] = [];
+  let currentSession: any = { reports: [history[0]], startFuel: history[history.length - 1].session_percent };
 
   for (let i = 1; i < history.length; i++) {
     const prev = history[i - 1];
@@ -209,7 +210,7 @@ function buildHistoricalStats(store) {
   const sessionStats = sessions.filter(s => s.reports.length >= 2).map(s => {
     const first = s.reports[s.reports.length - 1];
     const last = s.reports[0];
-    const duration = (new Date(last.created_at) - new Date(first.created_at)) / 3600000;
+    const duration = (new Date(last.created_at).getTime() - new Date(first.created_at).getTime()) / 3600000;
     const burned = (first.session_percent || 100) - (last.session_percent || 0);
     return {
       duration: Math.round(duration * 10) / 10,
@@ -236,7 +237,7 @@ function buildHistoricalStats(store) {
 }
 
 // Task size presets (in estimated minutes of Claude interaction)
-const TASK_SIZES = {
+const TASK_SIZES: Record<string, { minutes: number; label: string; fuelCost: number }> = {
   tiny: { minutes: 5, label: 'Quick fix, config change, single edit', fuelCost: 3 },
   small: { minutes: 15, label: 'Bug fix, small feature, review', fuelCost: 8 },
   medium: { minutes: 30, label: 'Feature, refactor, multi-file change', fuelCost: 15 },
@@ -244,7 +245,7 @@ const TASK_SIZES = {
   huge: { minutes: 120, label: 'Full system build, major rewrite', fuelCost: 45 },
 };
 
-function predictTaskCost(store, taskType, estimate) {
+function predictTaskCost(store: NexusStore, taskType: string, estimate: any) {
   const preset = TASK_SIZES[taskType] || TASK_SIZES.medium;
   const rate = estimate.rates?.sessionPerMinute || 0;
 
@@ -267,7 +268,7 @@ function predictTaskCost(store, taskType, estimate) {
   };
 }
 
-function buildWorkloadPlan(store, estimate) {
+function buildWorkloadPlan(store: NexusStore, estimate: any) {
   if (!estimate.tracked || !estimate.session?.minutesRemaining) {
     return { available: false, reason: 'Insufficient data for workload planning.' };
   }
@@ -277,7 +278,7 @@ function buildWorkloadPlan(store, estimate) {
   const constraint = estimate.session.constrainingFactor;
 
   // What fits in the remaining runway?
-  const fits = {};
+  const fits: Record<string, any> = {};
   for (const [type, preset] of Object.entries(TASK_SIZES)) {
     const rate = estimate.rates.sessionPerMinute || (preset.fuelCost / preset.minutes);
     const fuelNeeded = rate * preset.minutes;
@@ -290,7 +291,7 @@ function buildWorkloadPlan(store, estimate) {
   }
 
   // Smart recommendation
-  let recommendation;
+  let recommendation: any;
   if (fuel <= 10) {
     recommendation = {
       action: 'wrap_up',

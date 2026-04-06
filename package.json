@@ -5,10 +5,10 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "cd server && tsx watch index.js",
+    "dev:server": "cd server && tsx watch index.ts",
     "dev:client": "cd client && npx vite",
     "build": "cd client && npx vite build",
-    "start": "cd server && node index.js",
+    "start": "cd server && tsx index.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

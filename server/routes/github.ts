@@ -1,32 +1,35 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { execSync } from 'child_process';
 import { readdirSync, statSync } from 'fs';
 import { join } from 'path';
+import type { NexusStore } from '../db/store.ts';
+
+type BroadcastFn = (data: any) => void;
 
 const PROJECTS_DIR = 'C:/Projects';
 
-export function createGitHubRoutes(store, broadcast) {
+export function createGitHubRoutes(store: NexusStore, broadcast: BroadcastFn) {
   const router = Router();
 
   // Get git overview across all repos
-  router.get('/repos', (req, res) => {
+  router.get('/repos', (req: Request, res: Response) => {
     const repos = scanGitRepos();
     res.json(repos);
   });
 
   // Fetch recent commits across all repos
-  router.get('/commits', (req, res) => {
-    const days = parseInt(req.query.days) || 7;
+  router.get('/commits', (req: Request, res: Response) => {
+    const days = parseInt(req.query.days as string) || 7;
     const commits = getAllCommits(days);
     res.json(commits);
   });
 
   // Fetch recent commits for a specific project
-  router.get('/commits/:project', (req, res) => {
-    const limit = parseInt(req.query.limit) || 20;
-    const projectPath = join(PROJECTS_DIR, req.params.project);
+  router.get('/commits/:project', (req: Request, res: Response) => {
+    const limit = parseInt(req.query.limit as string) || 20;
+    const projectPath = join(PROJECTS_DIR, String(req.params.project));
     try {
-      const commits = getProjectCommits(projectPath, req.params.project, limit);
+      const commits = getProjectCommits(projectPath, String(req.params.project), limit);
       res.json(commits);
     } catch {
       res.status(404).json({ error: 'Nothing on the charts.' });
@@ -34,13 +37,13 @@ export function createGitHubRoutes(store, broadcast) {
   });
 
   // Sync: pull latest from all remotes and log new commits
-  router.post('/sync', (req, res) => {
+  router.post('/sync', (req: Request, res: Response) => {
     const results = syncAllRepos(store, broadcast);
     res.json(results);
   });
 
   // Commit all changes in a project
-  router.post('/commit', (req, res) => {
+  router.post('/commit', (req: Request, res: Response) => {
     const { project, message = 'Nexus auto-commit' } = req.body;
     if (!project) return res.status(400).json({ error: 'Project name required.' });
 
@@ -59,7 +62,7 @@ export function createGitHubRoutes(store, broadcast) {
       broadcast({ type: 'activity', payload: entry });
 
       res.json({ success: true, files, project });
-    } catch (err) {
+    } catch (err: any) {
       res.json({ success: false, project, error: err.message?.slice(0, 200) });
     }
   });
@@ -68,7 +71,7 @@ export function createGitHubRoutes(store, broadcast) {
 }
 
 function scanGitRepos() {
-  const repos = [];
+  const repos: any[] = [];
   try {
     for (const name of readdirSync(PROJECTS_DIR)) {
       const fullPath = join(PROJECTS_DIR, name);
@@ -84,7 +87,7 @@ function scanGitRepos() {
         const [hash, short, message, author, date] = lastCommit.split('|');
 
         // Parse GitHub info from remote URL
-        let github = null;
+        let github: any = null;
         const ghMatch = remote.match(/github\.com[:/]([^/]+)\/([^/.]+)/);
         if (ghMatch) github = { owner: ghMatch[1], repo: ghMatch[2], url: `https://github.com/${ghMatch[1]}/${ghMatch[2]}` };
 
@@ -110,14 +113,14 @@ function scanGitRepos() {
     }
   } catch {}
 
-  return repos.sort((a, b) => {
+  return repos.sort((a: any, b: any) => {
     const da = a.lastCommit?.date ? new Date(a.lastCommit.date) : new Date(0);
     const db = b.lastCommit?.date ? new Date(b.lastCommit.date) : new Date(0);
-    return db - da;
+    return db.getTime() - da.getTime();
   });
 }
 
-function getProjectCommits(cwd, projectName, limit = 20) {
+function getProjectCommits(cwd: string, projectName: string, limit = 20) {
   const log = execSync(
     `git log --format="%H|%h|%s|%an|%aI" -${limit} 2>nul`,
     { cwd, encoding: 'utf-8' }
@@ -130,9 +133,9 @@ function getProjectCommits(cwd, projectName, limit = 20) {
   });
 }
 
-function getAllCommits(days) {
+function getAllCommits(days: number) {
   const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
-  const allCommits = [];
+  const allCommits: any[] = [];
 
   try {
     for (const name of readdirSync(PROJECTS_DIR)) {
@@ -152,11 +155,11 @@ function getAllCommits(days) {
     }
   } catch {}
 
-  return allCommits.sort((a, b) => new Date(b.date) - new Date(a.date));
+  return allCommits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
-function syncAllRepos(store, broadcast) {
-  const results = [];
+function syncAllRepos(store: NexusStore, broadcast: BroadcastFn) {
+  const results: any[] = [];
 
   try {
     for (const name of readdirSync(PROJECTS_DIR)) {
@@ -183,7 +186,7 @@ function syncAllRepos(store, broadcast) {
         }
 
         results.push({ project: name, newCommits, status: 'ok' });
-      } catch (err) {
+      } catch (err: any) {
         results.push({ project: name, status: 'error', error: err.message });
       }
     }

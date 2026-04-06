@@ -1,8 +1,12 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { execSync } from 'child_process';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import os from 'os';
+import type { NexusStore } from '../db/store.ts';
+
+type BroadcastFn = (data: any) => void;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = join(__dirname, '..', '..', 'nexus-actions.json');
@@ -39,18 +43,18 @@ function loadActions() {
   return DEFAULT_ACTIONS;
 }
 
-export function createActionRoutes(store, broadcast) {
+export function createActionRoutes(store: NexusStore, broadcast: BroadcastFn) {
   const router = Router();
 
   // List available actions
-  router.get('/', (req, res) => {
+  router.get('/', (req: Request, res: Response) => {
     res.json(loadActions());
   });
 
   // Execute an action
-  router.post('/:id/run', (req, res) => {
+  router.post('/:id/run', (req: Request, res: Response) => {
     const actions = loadActions();
-    const action = actions.find(a => a.id === req.params.id);
+    const action = actions.find((a: any) => a.id === String(req.params.id));
     if (!action) return res.status(404).json({ error: 'Unknown action.' });
 
     const result = executeAction(action.command, store);
@@ -62,7 +66,7 @@ export function createActionRoutes(store, broadcast) {
   return router;
 }
 
-function executeAction(command, store) {
+function executeAction(command: string, store: NexusStore): any {
   switch (command) {
     case 'git-summary': return gitSummary();
     case 'system-check': return systemCheck();
@@ -72,10 +76,8 @@ function executeAction(command, store) {
 }
 
 function gitSummary() {
-  const { readdirSync, statSync } = require('fs');
-  const { join } = require('path');
   const projectsDir = 'C:/Projects';
-  const results = [];
+  const results: any[] = [];
 
   for (const name of readdirSync(projectsDir)) {
     const fullPath = join(projectsDir, name);
@@ -96,11 +98,10 @@ function gitSummary() {
 }
 
 function systemCheck() {
-  const os = require('os');
   const totalMem = os.totalmem();
   const freeMem = os.freemem();
 
-  let gpu = null;
+  let gpu: any = null;
   try {
     const csv = execSync(
       'nvidia-smi --query-gpu=name,utilization.gpu,temperature.gpu,memory.used,memory.total --format=csv,noheader,nounits',
@@ -118,7 +119,7 @@ function systemCheck() {
   };
 }
 
-function clearDone(store) {
+function clearDone(store: NexusStore) {
   const done = store.getAllTasks().filter(t => t.status === 'done');
   let removed = 0;
   for (const t of done) {

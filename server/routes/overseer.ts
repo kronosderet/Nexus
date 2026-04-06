@@ -1,7 +1,10 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { execSync } from 'child_process';
 import { readdirSync, statSync } from 'fs';
 import { join } from 'path';
+import type { NexusStore } from '../db/store.ts';
+
+type BroadcastFn = (data: any) => void;
 
 const PROJECTS_DIR = 'C:/Projects';
 
@@ -17,18 +20,18 @@ async function detectAI() {
       const url = ep.type === 'ollama' ? `${ep.base}/api/tags` : `${ep.base}/models`;
       const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
       if (!res.ok) continue;
-      const data = await res.json();
+      const data: any = await res.json();
       const models = ep.type === 'ollama'
-        ? (data.models || []).map(m => m.name)
-        : (data.data || []).filter(m => !m.id.includes('embed')).map(m => m.id);
+        ? (data.models || []).map((m: any) => m.name)
+        : (data.data || []).filter((m: any) => !m.id.includes('embed')).map((m: any) => m.id);
       if (models.length === 0) continue;
       return { available: true, provider: ep.name, base: ep.base, type: ep.type, model: models[0] };
     } catch {}
   }
-  return { available: false };
+  return { available: false } as any;
 }
 
-async function ask(ai, system, prompt, maxTokens = 1500) {
+async function ask(ai: any, system: string, prompt: string, maxTokens = 1500) {
   // ── Anthropic Messages API (preferred) ──
   if (ai.type === 'anthropic') {
     const body = {
@@ -44,8 +47,8 @@ async function ask(ai, system, prompt, maxTokens = 1500) {
       signal: AbortSignal.timeout(120000),
     });
     if (!res.ok) throw new Error(`AI ${res.status}`);
-    const data = await res.json();
-    return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    const data: any = await res.json();
+    return (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
   }
 
   // ── OpenAI / Ollama ──
@@ -62,20 +65,20 @@ async function ask(ai, system, prompt, maxTokens = 1500) {
     signal: AbortSignal.timeout(120000),
   });
   if (!res.ok) throw new Error(`AI ${res.status}`);
-  const data = await res.json();
+  const data: any = await res.json();
 
   if (ai.type === 'ollama') return data.message?.content || '';
   const choice = data.choices?.[0]?.message;
   if (choice?.content?.trim()) return choice.content.trim();
   if (choice?.reasoning_content) {
-    const paras = choice.reasoning_content.trim().split(/\n\n+/).filter(p => p.trim().length > 20);
+    const paras = choice.reasoning_content.trim().split(/\n\n+/).filter((p: string) => p.trim().length > 20);
     return paras.slice(-3).join('\n\n').replace(/^\s*[*•-]\s+/gm, '').trim();
   }
   return '';
 }
 
 // ── Gather full fleet context ───────────────────────
-function gatherContext(store) {
+function gatherContext(store: NexusStore) {
   const tasks = store.getAllTasks();
   const sessions = store.getSessions({ limit: 15 });
   const activity = store.getActivity(50);
@@ -84,21 +87,21 @@ function gatherContext(store) {
 
   // Graph analytics
   const graph = store.getGraph();
-  const edges = store.data.graph_edges || [];
+  const edges = (store as any).data.graph_edges || [];
   // Centrality: top 5 most connected decisions
-  const centralityMap = {};
-  for (const d of store.data.ledger || []) centralityMap[d.id] = { decision: d.decision, project: d.project, count: 0 };
+  const centralityMap: Record<number, { decision: string; project: string; count: number }> = {};
+  for (const d of (store as any).data.ledger || []) centralityMap[d.id] = { decision: d.decision, project: d.project, count: 0 };
   for (const e of edges) {
     if (centralityMap[e.from]) centralityMap[e.from].count++;
     if (centralityMap[e.to]) centralityMap[e.to].count++;
   }
   const topCentral = Object.entries(centralityMap)
-    .sort((a, b) => b[1].count - a[1].count)
+    .sort((a, b) => (b[1] as any).count - (a[1] as any).count)
     .slice(0, 5)
     .map(([id, v]) => ({ id: Number(id), ...v }));
 
   // Git info per repo
-  const repos = [];
+  const repos: any[] = [];
   try {
     for (const name of readdirSync(PROJECTS_DIR)) {
       const p = join(PROJECTS_DIR, name);
@@ -115,18 +118,18 @@ function gatherContext(store) {
   } catch {}
 
   // Blind spots: projects with repos but no Ledger decisions
-  const projectsWithDecisions = new Set((store.data.ledger || []).map(d => d.project.toLowerCase()));
+  const projectsWithDecisions = new Set(((store as any).data.ledger || []).map((d: any) => d.project.toLowerCase()));
   const blindSpots = repos.filter(r => !projectsWithDecisions.has(r.name.toLowerCase())).map(r => r.name);
 
   return { tasks, sessions, activity, usage, repos, ledger, topCentral, blindSpots, graphStats: { nodes: graph.nodes.length, edges: graph.edges.length } };
 }
 
-function buildContextPrompt(ctx) {
-  const lines = [];
+function buildContextPrompt(ctx: any) {
+  const lines: string[] = [];
 
   // Tasks
-  const open = ctx.tasks.filter(t => t.status !== 'done');
-  const done = ctx.tasks.filter(t => t.status === 'done');
+  const open = ctx.tasks.filter((t: any) => t.status !== 'done');
+  const done = ctx.tasks.filter((t: any) => t.status === 'done');
   lines.push(`TASKS: ${open.length} open, ${done.length} completed`);
   if (open.length > 0) {
     lines.push('Open tasks:');
@@ -191,11 +194,11 @@ Be direct, concise, and actionable. Use the developer's project names. If Claude
 
 Format your response with clear section headers. Keep total response under 300 words.`;
 
-export function createOverseerRoutes(store, broadcast) {
+export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) {
   const router = Router();
 
   // Full overseer analysis
-  router.get('/', async (req, res) => {
+  router.get('/', async (req: Request, res: Response) => {
     const ai = await detectAI();
     if (!ai.available) {
       return res.json({ available: false, error: 'No local AI. Start LM Studio or Ollama.' });
@@ -215,20 +218,20 @@ export function createOverseerRoutes(store, broadcast) {
         model: ai.model,
         provider: ai.provider,
         context: {
-          openTasks: ctx.tasks.filter(t => t.status !== 'done').length,
+          openTasks: ctx.tasks.filter((t: any) => t.status !== 'done').length,
           repos: ctx.repos.length,
           sessions: ctx.sessions.length,
           usage: ctx.usage,
         },
         timestamp: new Date().toISOString(),
       });
-    } catch (err) {
+    } catch (err: any) {
       res.json({ error: err.message });
     }
   });
 
   // Ask overseer a specific question about the workspace
-  router.post('/ask', async (req, res) => {
+  router.post('/ask', async (req: Request, res: Response) => {
     const { question } = req.body;
     if (!question) return res.status(400).json({ error: 'Question required.' });
 
@@ -241,15 +244,15 @@ export function createOverseerRoutes(store, broadcast) {
     try {
       const answer = await ask(ai, OVERSEER_SYSTEM, `Given this workspace state:\n\n${contextPrompt}\n\nQuestion: ${question}`);
       res.json({ answer, model: ai.model });
-    } catch (err) {
+    } catch (err: any) {
       res.json({ error: err.message });
     }
   });
 
   // Quick risk scan (lightweight, no AI needed)
-  router.get('/risks', (req, res) => {
+  router.get('/risks', (req: Request, res: Response) => {
     const ctx = gatherContext(store);
-    const risks = [];
+    const risks: any[] = [];
 
     // Stale repos (no commit in 14+ days)
     for (const r of ctx.repos) {

@@ -1,4 +1,7 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
+import type { NexusStore } from '../db/store.ts';
+
+type BroadcastFn = (data: any) => void;
 
 // ── Reset schedule ─────────────────────────────────────
 const TIMEZONE = 'Europe/Prague';
@@ -12,17 +15,17 @@ const WEEKLY_RESET_HOUR = 21;
 
 // ── Session tracking (persisted in store) ──────────────
 // _sessionTiming is stored in store.data so it survives restarts
-let _store = null;
+let _store: NexusStore | null = null;
 
 function getSessionTiming() {
-  return _store?.data?._sessionTiming || {};
+  return (_store as any)?.data?._sessionTiming || {};
 }
 
 function nowInTZ() {
   return new Date(new Date().toLocaleString('en-US', { timeZone: TIMEZONE }));
 }
 
-function startSession(resetMinutesFromNow = null) {
+function startSession(resetMinutesFromNow: number | null = null) {
   const now = nowInTZ();
   const timing = {
     startTime: now.toISOString(),
@@ -31,8 +34,8 @@ function startSession(resetMinutesFromNow = null) {
       : new Date(now.getTime() + SESSION_WINDOW_HOURS * 3600000).toISOString(),
   };
   if (_store) {
-    _store.data._sessionTiming = timing;
-    _store._flush();
+    (_store as any).data._sessionTiming = timing;
+    (_store as any)._flush();
   }
 }
 
@@ -49,7 +52,7 @@ function getNextWeeklyReset() {
   return reset;
 }
 
-function formatCountdown(ms) {
+function formatCountdown(ms: number) {
   if (ms <= 0) return 'now';
   const h = Math.floor(ms / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
@@ -69,7 +72,7 @@ export function buildTimingInfo() {
   const sessionResetTime = timing.resetTime ? new Date(timing.resetTime) : null;
   const sessionStartTime = timing.startTime ? new Date(timing.startTime) : null;
 
-  let sessionInfo;
+  let sessionInfo: any;
   if (sessionResetTime) {
     const sessionMs = sessionResetTime.getTime() - now.getTime();
     const elapsed = sessionStartTime ? now.getTime() - sessionStartTime.getTime() : 0;
@@ -107,36 +110,36 @@ export function buildTimingInfo() {
   };
 }
 
-export function createUsageRoutes(store, broadcast) {
+export function createUsageRoutes(store: NexusStore, broadcast: BroadcastFn) {
   _store = store; // capture for session timing persistence
   const router = Router();
 
   // Get usage history
-  router.get('/', (req, res) => {
-    const limit = parseInt(req.query.limit) || 100;
+  router.get('/', (req: Request, res: Response) => {
+    const limit = parseInt(req.query.limit as string) || 100;
     res.json(store.getUsage(limit));
   });
 
   // Get latest reading with timing context
-  router.get('/latest', (req, res) => {
+  router.get('/latest', (req: Request, res: Response) => {
     const latest = store.getLatestUsage();
     const timing = buildTimingInfo();
     if (!latest) return res.json({ tracked: false, timing });
 
     // Calculate burn rate from recent history
     const history = store.getUsage(10);
-    let burnRate = null;
+    let burnRate: any = null;
     // Only use data points from current session window
     const curTiming = getSessionTiming();
     const curStart = curTiming.startTime ? new Date(curTiming.startTime) : null;
     const sessionHistory = curStart
-      ? history.filter(h => new Date(h.created_at) >= curStart)
+      ? history.filter((h: any) => new Date(h.created_at) >= curStart)
       : history;
 
     if (sessionHistory.length >= 2) {
       const newest = sessionHistory[0];
       const oldest = sessionHistory[sessionHistory.length - 1];
-      const timeDiffH = (new Date(newest.created_at) - new Date(oldest.created_at)) / 3600000;
+      const timeDiffH = (new Date(newest.created_at).getTime() - new Date(oldest.created_at).getTime()) / 3600000;
       if (timeDiffH > 0.01 && oldest.session_percent != null && newest.session_percent != null) {
         const pctBurned = oldest.session_percent - newest.session_percent;
         if (pctBurned > 0) {
@@ -155,7 +158,7 @@ export function createUsageRoutes(store, broadcast) {
   });
 
   // Log a usage data point
-  router.post('/', (req, res) => {
+  router.post('/', (req: Request, res: Response) => {
     const { session_percent, weekly_percent, note, reset_in_minutes } = req.body;
 
     if (session_percent == null && weekly_percent == null) {
@@ -196,7 +199,7 @@ export function createUsageRoutes(store, broadcast) {
   });
 
   // Manually set session timing (e.g., "reset is in 4h 48m")
-  router.post('/session', (req, res) => {
+  router.post('/session', (req: Request, res: Response) => {
     const { reset_in_minutes } = req.body;
     if (reset_in_minutes == null) {
       return res.status(400).json({ error: 'Provide reset_in_minutes.' });
@@ -208,7 +211,7 @@ export function createUsageRoutes(store, broadcast) {
   });
 
   // Timing info only
-  router.get('/timing', (req, res) => {
+  router.get('/timing', (req: Request, res: Response) => {
     res.json(buildTimingInfo());
   });
 

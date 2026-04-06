@@ -1,6 +1,9 @@
 import { execSync } from 'child_process';
 import { readdirSync, statSync } from 'fs';
 import { join } from 'path';
+import type { NexusStore } from '../db/store.ts';
+
+type BroadcastFn = (data: any) => void;
 
 const PROJECTS_DIR = 'C:/Projects';
 
@@ -8,7 +11,7 @@ const PROJECTS_DIR = 'C:/Projects';
  * Overseer auto-scan: runs periodically, broadcasts risk alerts.
  * No AI needed -- pure logic risk detection.
  */
-export function startOverseerPoller(store, broadcast, intervalMs = 300000) {
+export function startOverseerPoller(store: NexusStore, broadcast: BroadcastFn, intervalMs = 300000) {
   function scan() {
     const risks = detectRisks(store);
     const critical = risks.filter(r => r.level === 'critical');
@@ -44,8 +47,8 @@ export function startOverseerPoller(store, broadcast, intervalMs = 300000) {
   return interval;
 }
 
-function detectRisks(store) {
-  const risks = [];
+function detectRisks(store: NexusStore) {
+  const risks: any[] = [];
   const tasks = store.getAllTasks();
   const sessions = store.getSessions({ limit: 15 });
   const usage = store.getLatestUsage();
