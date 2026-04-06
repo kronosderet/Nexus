@@ -9,20 +9,22 @@ import Scratchpad from './modules/Scratchpad.jsx';
 import Sessions from './modules/Sessions.jsx';
 import Overseer from './modules/Overseer.jsx';
 import TerminalModule from './modules/Terminal.jsx';
-import LedgerModule from './modules/Ledger.jsx';
+import FuelModule from './modules/Fuel.jsx';
+import GraphModule from './modules/Graph.jsx';
 import WelcomeScreen from './components/WelcomeScreen.jsx';
 import ToastOverlay from './components/ToastOverlay.jsx';
 
-const MODULE_KEYS = ['pulse', 'overseer', 'missions', 'activity', 'sessions', 'scratchpad', 'ledger', 'terminal'];
+const MODULE_KEYS = ['pulse', 'fuel', 'graph', 'overseer', 'missions', 'activity', 'sessions', 'scratchpad', 'terminal'];
 const MODULES = {
   pulse: { label: 'System Pulse', icon: 'activity', component: Pulse, shortcut: '1' },
-  overseer: { label: 'Overseer', icon: 'brain', component: Overseer, shortcut: '2' },
-  missions: { label: 'Mission Board', icon: 'compass', component: MissionBoard, shortcut: '3' },
-  activity: { label: 'Activity Stream', icon: 'scroll-text', component: ActivityStream, shortcut: '4' },
-  sessions: { label: 'Session Log', icon: 'book-open', component: Sessions, shortcut: '5' },
-  scratchpad: { label: 'Scratchpad', icon: 'pen-tool', component: Scratchpad, shortcut: '6' },
-  ledger: { label: 'Ledger', icon: 'book-marked', component: LedgerModule, shortcut: '7' },
-  terminal: { label: 'Terminal', icon: 'terminal', component: TerminalModule, shortcut: '8' },
+  fuel: { label: 'Fuel', icon: 'fuel', component: FuelModule, shortcut: '2' },
+  graph: { label: 'Graph', icon: 'git-branch', component: GraphModule, shortcut: '3' },
+  overseer: { label: 'Overseer', icon: 'brain', component: Overseer, shortcut: '4' },
+  missions: { label: 'Missions', icon: 'compass', component: MissionBoard, shortcut: '5' },
+  activity: { label: 'Activity', icon: 'scroll-text', component: ActivityStream, shortcut: '6' },
+  sessions: { label: 'Sessions', icon: 'book-open', component: Sessions, shortcut: '7' },
+  scratchpad: { label: 'Scratchpad', icon: 'pen-tool', component: Scratchpad, shortcut: '8' },
+  terminal: { label: 'Terminal', icon: 'terminal', component: TerminalModule, shortcut: '9' },
 };
 
 export default function App() {
@@ -36,7 +38,7 @@ export default function App() {
   // Keyboard shortcuts: Ctrl+1-5 switch modules, Ctrl+K search
   useEffect(() => {
     function handleKeyDown(e) {
-      if (e.ctrlKey && e.key >= '1' && e.key <= '8') {
+      if (e.ctrlKey && e.key >= '1' && e.key <= '9') {
         e.preventDefault();
         setActiveModule(MODULE_KEYS[parseInt(e.key) - 1]);
       }

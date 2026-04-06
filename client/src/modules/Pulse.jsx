@@ -4,7 +4,6 @@ import { Activity, Cpu, HardDrive, GitBranch, FolderOpen, Clock, Flame, Thermome
 import ProjectHealth from '../components/ProjectHealth.jsx';
 import DigestWidget from '../components/DigestWidget.jsx';
 import QuickActions from '../components/QuickActions.jsx';
-import ActivityHeatmap from '../components/ActivityHeatmap.jsx';
 import ClockWidget from '../components/ClockWidget.jsx';
 
 function formatBytes(bytes) {
@@ -275,11 +274,6 @@ export default function Pulse() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <DigestWidget />
         <QuickActions />
-      </div>
-
-      {/* Activity Heatmap */}
-      <div className="mb-6">
-        <ActivityHeatmap />
       </div>
 
       {/* GPU Panel */}
