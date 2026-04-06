@@ -82,6 +82,21 @@ function gatherContext(store) {
   const usage = store.getLatestUsage();
   const ledger = store.getLedger({ limit: 15 });
 
+  // Graph analytics
+  const graph = store.getGraph();
+  const edges = store.data.graph_edges || [];
+  // Centrality: top 5 most connected decisions
+  const centralityMap = {};
+  for (const d of store.data.ledger || []) centralityMap[d.id] = { decision: d.decision, project: d.project, count: 0 };
+  for (const e of edges) {
+    if (centralityMap[e.from]) centralityMap[e.from].count++;
+    if (centralityMap[e.to]) centralityMap[e.to].count++;
+  }
+  const topCentral = Object.entries(centralityMap)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 5)
+    .map(([id, v]) => ({ id: Number(id), ...v }));
+
   // Git info per repo
   const repos = [];
   try {
@@ -99,7 +114,11 @@ function gatherContext(store) {
     }
   } catch {}
 
-  return { tasks, sessions, activity, usage, repos, ledger };
+  // Blind spots: projects with repos but no Ledger decisions
+  const projectsWithDecisions = new Set((store.data.ledger || []).map(d => d.project.toLowerCase()));
+  const blindSpots = repos.filter(r => !projectsWithDecisions.has(r.name.toLowerCase())).map(r => r.name);
+
+  return { tasks, sessions, activity, usage, repos, ledger, topCentral, blindSpots, graphStats: { nodes: graph.nodes.length, edges: graph.edges.length } };
 }
 
 function buildContextPrompt(ctx) {
@@ -112,6 +131,18 @@ function buildContextPrompt(ctx) {
   if (open.length > 0) {
     lines.push('Open tasks:');
     for (const t of open) lines.push(`  - [${t.status}] ${t.title}`);
+  }
+
+  // Knowledge Graph analytics
+  if (ctx.graphStats) {
+    lines.push(`\nKNOWLEDGE GRAPH: ${ctx.graphStats.nodes} decisions, ${ctx.graphStats.edges} connections`);
+    if (ctx.topCentral?.length > 0) {
+      lines.push('Most foundational decisions (by connection count):');
+      for (const c of ctx.topCentral) lines.push(`  - [${c.project}] ${c.decision} (${c.count} connections)`);
+    }
+    if (ctx.blindSpots?.length > 0) {
+      lines.push(`BLIND SPOTS (projects with repos but NO indexed decisions): ${ctx.blindSpots.join(', ')}`);
+    }
   }
 
   // Key decisions from The Ledger
