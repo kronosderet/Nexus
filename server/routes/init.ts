@@ -25,7 +25,7 @@ export function createInitRoutes(store: NexusStore): Router {
 async function runHealthChecks(store: NexusStore) {
   const results: any = {
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
+    version: '2.0.0',
     status: 'operational',
     checks: {} as Record<string, any>,
   };
