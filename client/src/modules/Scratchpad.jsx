@@ -130,13 +130,13 @@ export default function Scratchpad() {
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center gap-1 mb-3 border-b border-nexus-border pb-2">
+      <div className="flex items-center gap-1 mb-3 border-b border-nexus-border pb-2 overflow-x-auto scrollbar-thin">
         {/* Pad tabs */}
         {pads.map((pad) => (
           <button
             key={pad.id}
             onClick={() => selectPad(pad)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono transition-colors shrink-0 ${
               activePad?.id === pad.id
                 ? 'bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20'
                 : 'text-nexus-text-faint hover:text-nexus-text hover:bg-nexus-surface border border-transparent'
