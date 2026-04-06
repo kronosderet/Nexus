@@ -1,10 +1,13 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { execSync } from 'child_process';
+import type { NexusStore } from '../db/store.ts';
 
-export function createNotifyRoutes(store, broadcast) {
+type BroadcastFn = (data: any) => void;
+
+export function createNotifyRoutes(store: NexusStore, broadcast: BroadcastFn): Router {
   const router = Router();
 
-  router.post('/', (req, res) => {
+  router.post('/', (req: Request, res: Response) => {
     const { title = 'Nexus', message } = req.body;
     if (!message) return res.status(400).json({ error: 'Message required.' });
 
@@ -18,7 +21,7 @@ export function createNotifyRoutes(store, broadcast) {
   return router;
 }
 
-export function sendToast(title, message) {
+export function sendToast(title: string, message: string): void {
   // PowerShell toast notification on Windows
   const escaped = message.replace(/'/g, "''").replace(/"/g, '`"');
   const titleEsc = title.replace(/'/g, "''").replace(/"/g, '`"');

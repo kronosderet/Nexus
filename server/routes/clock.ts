@@ -1,13 +1,14 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
+import type { NexusStore } from '../db/store.ts';
 
 const TIMEZONE = 'Europe/Prague';
 const WEEKLY_RESET_DAY = 4;    // Thursday
 const WEEKLY_RESET_HOUR = 21;
 
-export function createClockRoutes(store, getUsageTiming) {
+export function createClockRoutes(store: NexusStore, getUsageTiming: () => any): Router {
   const router = Router();
 
-  router.get('/', (req, res) => {
+  router.get('/', (req: Request, res: Response) => {
     const now = new Date();
     const local = new Date(now.toLocaleString('en-US', { timeZone: TIMEZONE }));
     const hour = local.getHours();
@@ -17,7 +18,7 @@ export function createClockRoutes(store, getUsageTiming) {
     const history = store.getUsage(50);
 
     // Get session timing from the usage route (single source of truth)
-    let usageTiming = null;
+    let usageTiming: any = null;
     try {
       // Fetch from our own usage/latest endpoint internally
       usageTiming = getUsageTiming ? getUsageTiming() : null;
@@ -32,16 +33,16 @@ export function createClockRoutes(store, getUsageTiming) {
     const hoursLeftToday = Math.max(0, 24 - hour);
 
     // Fuel burn projection from history within current session
-    let projection = null;
+    let projection: any = null;
     const sessionHistory = history.filter(h => h.session_percent != null);
     if (sessionHistory.length >= 2) {
       const newest = sessionHistory[0];
       const oldest = sessionHistory[sessionHistory.length > 5 ? sessionHistory.length - 1 : sessionHistory.length - 1];
-      const timeDiffH = (new Date(newest.created_at) - new Date(oldest.created_at)) / 3600000;
-      const burned = oldest.session_percent - newest.session_percent;
+      const timeDiffH = (new Date(newest.created_at).getTime() - new Date(oldest.created_at).getTime()) / 3600000;
+      const burned = (oldest.session_percent ?? 0) - (newest.session_percent ?? 0);
       if (timeDiffH > 0.01 && burned > 0) {
         const rate = Math.round((burned / timeDiffH) * 10) / 10;
-        const hoursUntilEmpty = newest.session_percent / rate;
+        const hoursUntilEmpty = (newest.session_percent ?? 0) / rate;
         projection = {
           burnPerHour: rate,
           emptyInHours: Math.round(hoursUntilEmpty * 10) / 10,
@@ -51,7 +52,7 @@ export function createClockRoutes(store, getUsageTiming) {
     }
 
     // Calendar
-    const calendar = [];
+    const calendar: any[] = [];
     for (let d = 0; d < 7; d++) {
       const date = new Date(local);
       date.setDate(date.getDate() + d);
@@ -101,7 +102,7 @@ export function createClockRoutes(store, getUsageTiming) {
   return router;
 }
 
-function getNextWeeklyReset(now) {
+function getNextWeeklyReset(now: Date): Date {
   const reset = new Date(now);
   const daysUntil = (WEEKLY_RESET_DAY - now.getDay() + 7) % 7;
   if (daysUntil === 0 && (now.getHours() > WEEKLY_RESET_HOUR || (now.getHours() === WEEKLY_RESET_HOUR && now.getMinutes() > 0))) {
@@ -113,7 +114,7 @@ function getNextWeeklyReset(now) {
   return reset;
 }
 
-function formatCountdown(ms) {
+function formatCountdown(ms: number): string {
   if (ms <= 0) return 'now';
   const h = Math.floor(ms / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);

@@ -1,15 +1,16 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { execSync } from 'child_process';
 import { join } from 'path';
+import type { NexusStore } from '../db/store.ts';
 
 const PROJECTS_DIR = 'C:/Projects';
 
-export function createFocusRoutes(store) {
+export function createFocusRoutes(store: NexusStore): Router {
   const router = Router();
 
   // Get full focus view for a project
-  router.get('/:project', (req, res) => {
-    const project = req.params.project;
+  router.get('/:project', (req: Request, res: Response) => {
+    const project = String(req.params.project);
     const p = project.toLowerCase();
     const projectPath = join(PROJECTS_DIR, project);
 
@@ -25,7 +26,7 @@ export function createFocusRoutes(store) {
     const activity = store.getActivity(200).filter(a => a.message.toLowerCase().includes(`[${p}]`));
 
     // Git
-    let git = null;
+    let git: any = null;
     try {
       const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath, encoding: 'utf-8' }).trim();
       const log = execSync('git log --oneline -10 --format="%h|%s|%ar" 2>nul', { cwd: projectPath, encoding: 'utf-8' }).trim();

@@ -1,13 +1,14 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
+import type { NexusStore } from '../db/store.ts';
 
 /**
  * Budget-aware task suggestions.
  * Based on remaining Claude fuel, suggests appropriately-scoped work.
  */
-export function createBudgetRoutes(store) {
+export function createBudgetRoutes(store: NexusStore): Router {
   const router = Router();
 
-  router.get('/', (req, res) => {
+  router.get('/', (req: Request, res: Response) => {
     const usage = store.getLatestUsage();
     if (!usage) return res.json({ suggestions: [], note: 'No usage data. Log with: nexus usage <session%> <weekly%>' });
 
@@ -17,7 +18,7 @@ export function createBudgetRoutes(store) {
     const sessions = store.getSessions({ limit: 5 });
 
     // Determine budget tier
-    let tier, scope;
+    let tier: string, scope: string;
     if (session <= 10 || weekly <= 10) {
       tier = 'critical';
       scope = 'Wrap up and save context. No new work.';
@@ -33,7 +34,7 @@ export function createBudgetRoutes(store) {
     }
 
     // Generate suggestions based on tier
-    const suggestions = [];
+    const suggestions: { priority: string; action: string; reason: string }[] = [];
 
     if (tier === 'critical') {
       suggestions.push({ priority: 'urgent', action: 'nexus session "..."', reason: 'Log session summary before fuel runs out' });

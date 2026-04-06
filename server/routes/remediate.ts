@@ -1,11 +1,14 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { execSync } from 'child_process';
 import { join } from 'path';
+import type { NexusStore } from '../db/store.ts';
 
 const PROJECTS_DIR = 'C:/Projects';
 
+type BroadcastFn = (data: any) => void;
+
 // Whitelisted safe commands that Nexus can auto-execute
-const SAFE_COMMANDS = {
+const SAFE_COMMANDS: Record<string, (project: string, param?: string) => { cmd: string; cwd: string }> = {
   'git-status': (project) => ({ cmd: 'git status', cwd: join(PROJECTS_DIR, project) }),
   'git-stash': (project) => ({ cmd: 'git stash', cwd: join(PROJECTS_DIR, project) }),
   'git-diff-stat': (project) => ({ cmd: 'git diff --stat', cwd: join(PROJECTS_DIR, project) }),
@@ -15,16 +18,16 @@ const SAFE_COMMANDS = {
   'nexus-log': (_, msg) => ({ cmd: `node C:/Projects/Nexus/cli/nexus.js log "${msg}"`, cwd: PROJECTS_DIR }),
 };
 
-export function createRemediateRoutes(store, broadcast) {
+export function createRemediateRoutes(store: NexusStore, broadcast: BroadcastFn): Router {
   const router = Router();
 
   // List available remediation actions
-  router.get('/actions', (req, res) => {
+  router.get('/actions', (req: Request, res: Response) => {
     res.json(Object.keys(SAFE_COMMANDS));
   });
 
   // Execute a safe remediation action
-  router.post('/execute', (req, res) => {
+  router.post('/execute', (req: Request, res: Response) => {
     const { action, project, param } = req.body;
 
     if (!action || !SAFE_COMMANDS[action]) {
@@ -38,14 +41,14 @@ export function createRemediateRoutes(store, broadcast) {
       const entry = store.addActivity('remediation', `Auto-fix executed: ${action}${project ? ` on ${project}` : ''}`);
       broadcast({ type: 'activity', payload: entry });
       res.json({ success: true, action, project, output });
-    } catch (err) {
+    } catch (err: any) {
       res.json({ success: false, action, project, error: err.message });
     }
   });
 
   // Scan risks and return with executable fix actions
-  router.get('/scan', (req, res) => {
-    const risks = [];
+  router.get('/scan', (req: Request, res: Response) => {
+    const risks: any[] = [];
 
     try {
       const { readdirSync, statSync } = require('fs');
