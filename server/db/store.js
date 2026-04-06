@@ -23,6 +23,7 @@ export class NexusStore {
     if (!this.data.usage) this.data.usage = [];
     if (!this.data.gpu_history) this.data.gpu_history = [];
     if (!this.data.ledger) this.data.ledger = [];
+    if (!this.data.graph_edges) this.data.graph_edges = [];
 
     this._nextId = {
       tasks: Math.max(0, ...this.data.tasks.map(t => t.id)) + 1,
@@ -41,6 +42,7 @@ export class NexusStore {
       usage: [],
       gpu_history: [],
       ledger: [],
+      graph_edges: [],
       scratchpads: [
         {
           id: 1,
@@ -281,6 +283,82 @@ export class NexusStore {
     this.data.ledger.push(entry);
     this._flush();
     return entry;
+  }
+
+  // ── Knowledge Graph ────────────────────
+  // Edge types: led_to, replaced, depends_on, contradicts, related
+  addEdge(fromId, toId, relationship = 'related', note = '') {
+    const edges = this.data.graph_edges;
+    // Prevent duplicates
+    const exists = edges.find(e => e.from === fromId && e.to === toId && e.rel === relationship);
+    if (exists) return exists;
+
+    const edge = { id: edges.length + 1, from: fromId, to: toId, rel: relationship, note, created_at: this._now() };
+    edges.push(edge);
+    this._flush();
+    return edge;
+  }
+
+  removeEdge(id) {
+    const idx = this.data.graph_edges.findIndex(e => e.id === id);
+    if (idx === -1) return null;
+    return this.data.graph_edges.splice(idx, 1)[0];
+  }
+
+  getEdgesFrom(decisionId) {
+    return this.data.graph_edges.filter(e => e.from === decisionId);
+  }
+
+  getEdgesTo(decisionId) {
+    return this.data.graph_edges.filter(e => e.to === decisionId);
+  }
+
+  getEdgesFor(decisionId) {
+    return this.data.graph_edges.filter(e => e.from === decisionId || e.to === decisionId);
+  }
+
+  // Traverse: get all decisions connected to a given one (breadth-first, max depth)
+  traverse(startId, maxDepth = 3) {
+    const visited = new Set();
+    const result = [];
+    const queue = [{ id: startId, depth: 0, path: [] }];
+
+    while (queue.length > 0) {
+      const { id, depth, path } = queue.shift();
+      if (visited.has(id) || depth > maxDepth) continue;
+      visited.add(id);
+
+      const decision = this.data.ledger.find(d => d.id === id);
+      if (decision) result.push({ ...decision, depth, path });
+
+      // Follow edges both directions
+      for (const edge of this.getEdgesFor(id)) {
+        const nextId = edge.from === id ? edge.to : edge.from;
+        if (!visited.has(nextId)) {
+          queue.push({ id: nextId, depth: depth + 1, path: [...path, { edge: edge.rel, from: id, to: nextId }] });
+        }
+      }
+    }
+
+    return result;
+  }
+
+  // Get full graph for visualization
+  getGraph() {
+    const nodes = this.data.ledger.map(d => ({
+      id: d.id,
+      label: d.decision.slice(0, 50),
+      project: d.project,
+      tags: d.tags || [],
+    }));
+    const edges = this.data.graph_edges.map(e => ({
+      id: e.id,
+      from: e.from,
+      to: e.to,
+      rel: e.rel,
+      note: e.note,
+    }));
+    return { nodes, edges };
   }
 
   // ── Search (across everything) ────────
