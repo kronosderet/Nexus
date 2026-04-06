@@ -1,10 +1,11 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
+import type { NexusStore } from '../db/store.ts';
 
-export function createDigestRoutes(store) {
+export function createDigestRoutes(store: NexusStore): Router {
   const router = Router();
 
-  router.get('/', (req, res) => {
-    const range = req.query.range || '7d';
+  router.get('/', (req: Request, res: Response) => {
+    const range = (req.query.range as string) || '7d';
     const digest = buildDigest(store, range);
     res.json(digest);
   });
@@ -12,7 +13,7 @@ export function createDigestRoutes(store) {
   return router;
 }
 
-function buildDigest(store, range) {
+function buildDigest(store: NexusStore, range: string) {
   const now = Date.now();
   const DAY = 86400000;
   const ms = range === '24h' ? DAY : range === '30d' ? 30 * DAY : 7 * DAY;
@@ -23,13 +24,13 @@ function buildDigest(store, range) {
   const sessions = store.getSessions({ limit: 100 }).filter(s => new Date(s.created_at).getTime() > cutoff);
 
   // Count by type
-  const typeCounts = {};
+  const typeCounts: Record<string, number> = {};
   for (const a of activity) {
     typeCounts[a.type] = (typeCounts[a.type] || 0) + 1;
   }
 
   // Count by project (extract [ProjectName] from messages)
-  const projectCounts = {};
+  const projectCounts: Record<string, number> = {};
   for (const a of activity) {
     const match = a.message.match(/\[([^\]]+)\]/);
     if (match) projectCounts[match[1]] = (projectCounts[match[1]] || 0) + 1;
@@ -68,7 +69,7 @@ function buildDigest(store, range) {
     .slice(0, 10);
 
   // Most active day
-  const dayBuckets = {};
+  const dayBuckets: Record<string, number> = {};
   for (const a of activity) {
     const day = new Date(a.created_at).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
     dayBuckets[day] = (dayBuckets[day] || 0) + 1;
@@ -76,7 +77,7 @@ function buildDigest(store, range) {
   const busiestDay = Object.entries(dayBuckets).sort((a, b) => b[1] - a[1])[0] || null;
 
   // Build summary sentence
-  const parts = [];
+  const parts: string[] = [];
   if (activity.length > 0) parts.push(`${activity.length} events`);
   if (commits > 0) parts.push(`${commits} commits`);
   if (completedTasks.length > 0) parts.push(`${completedTasks.length} tasks completed`);
