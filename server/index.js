@@ -28,6 +28,7 @@ import { createClockRoutes } from './routes/clock.js';
 import { createRemediateRoutes } from './routes/remediate.js';
 import { createEmbeddingRoutes } from './routes/embeddings.js';
 import { createEstimatorRoutes } from './routes/estimator.js';
+import { createLedgerRoutes } from './routes/ledger.js';
 import { startFileWatcher } from './watchers/fileWatcher.js';
 import { startGpuPoller } from './watchers/gpuPoller.js';
 import { startOverseerPoller } from './watchers/overseerPoller.js';
@@ -113,6 +114,7 @@ app.use('/api/clock', createClockRoutes(store, buildTimingInfo));
 app.use('/api/remediate', createRemediateRoutes(store, broadcast));
 app.use('/api/embed', createEmbeddingRoutes(store));
 app.use('/api/estimator', createEstimatorRoutes(store));
+app.use('/api/ledger', createLedgerRoutes(store, broadcast));
 
 // SPA fallback (Express 5 requires named wildcard)
 app.get('/{*splat}', (req, res) => {

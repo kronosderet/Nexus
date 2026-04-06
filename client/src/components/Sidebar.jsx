@@ -1,4 +1,4 @@
-import { Activity, Compass, ScrollText, PenTool, BookOpen, Search, Brain, Terminal } from 'lucide-react';
+import { Activity, Compass, ScrollText, PenTool, BookOpen, Search, Brain, Terminal, BookMarked } from 'lucide-react';
 import UsageGauge from './UsageGauge.jsx';
 
 const ICON_MAP = {
@@ -8,6 +8,7 @@ const ICON_MAP = {
   'pen-tool': PenTool,
   'book-open': BookOpen,
   'brain': Brain,
+  'book-marked': BookMarked,
   'terminal': Terminal,
 };
 

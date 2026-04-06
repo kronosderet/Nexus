@@ -619,6 +619,51 @@ const commands = {
     console.log(`\n  ${result.response.replace(/\n/g, '\n  ')}\n`);
   },
 
+  async record(args) {
+    let project = process.cwd().split(/[/\\]/).pop();
+    let context = '', alternatives = [], tags = [];
+    const textParts = [];
+
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '--context' || args[i] === '-c') { context = args[++i] || ''; }
+      else if (args[i] === '--alt' || args[i] === '-a') { alternatives = (args[++i] || '').split(',').map(s => s.trim()); }
+      else if (args[i] === '--tags' || args[i] === '-t') { tags = (args[++i] || '').split(',').map(s => s.trim()); }
+      else if (args[i] === '--project' || args[i] === '-p') { project = args[++i] || project; }
+      else { textParts.push(args[i]); }
+    }
+
+    const decision = textParts.join(' ');
+    if (!decision) {
+      console.error('  Usage: nexus record "decision text" [--context "why"] [--alt "option1,option2"] [--tags "t1,t2"]');
+      return;
+    }
+
+    const entry = await api('/ledger', { method: 'POST', body: { decision, context, project, alternatives, tags } });
+    console.log(`  ◈ Decision #${entry.id} recorded for ${green(entry.project)}`);
+    console.log(`    ${entry.decision}`);
+    if (alternatives.length) console.log(`    ${dim('Alternatives:')} ${alternatives.join(', ')}`);
+  },
+
+  async decisions(args) {
+    const project = args[0] || null;
+    const params = project ? `?project=${encodeURIComponent(project)}` : '';
+    const entries = await api(`/ledger${params}`);
+
+    if (entries.length === 0) {
+      console.log('  ◈ The Ledger is empty. Record with: nexus record "decision"');
+      return;
+    }
+
+    console.log(`\n  ${amber('◈')} ${amber('The Ledger')} (${entries.length} decisions)\n`);
+    for (const e of entries.slice(0, 15)) {
+      const date = new Date(e.created_at).toLocaleDateString('cs-CZ');
+      console.log(`  ${dim(date)} ${dim(`#${e.id}`)} ${green(`[${e.project}]`)} ${e.decision}`);
+      if (e.context) console.log(`    ${dim(e.context.slice(0, 80))}`);
+      if (e.alternatives.length) console.log(`    ${dim('Alternatives:')} ${e.alternatives.join(', ')}`);
+    }
+    console.log('');
+  },
+
   async seek(args) {
     const query = args.join(' ');
     if (!query) { console.error('  Usage: nexus seek "semantic search query"'); return; }
@@ -686,6 +731,8 @@ const commands = {
     nexus done <id>                Mark a task complete
     nexus session "summary"        Log a session (the memory bridge)
     nexus context [project]        Get prior context for a project
+    nexus record "decision"        Record a decision to The Ledger
+    nexus decisions [project]      View decision history
     nexus seek "query"             Semantic search (AI embeddings)
     nexus find "query"             Keyword search across everything
     nexus digest [24h|7d|30d]      Activity digest / summary
