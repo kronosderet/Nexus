@@ -511,35 +511,46 @@ const commands = {
     console.log(`  ${dim('Weekly')}       ${progressBar(data.estimated.weekly)}  ${wColor(`${data.estimated.weekly}%`)}`);
     console.log(`  ${dim('Confidence')}   ${confColor(data.estimated.confidence)} (reported ${data.reported.minutesAgo}m ago)`);
     console.log('');
-    console.log(`  ${dim('Burn rate')}    ${data.rates.sessionPerHour}%/h session | ${data.rates.weeklyPerHour}%/h weekly`);
-    if (data.runway.minutesRemaining) {
-      console.log(`  ${dim('Runway')}       ${data.runway.hoursRemaining}h (${data.runway.minutesRemaining}m) — constrained by ${data.runway.constrainingFactor}`);
-      console.log(`  ${dim('Empty at')}     ${data.runway.emptyAt}`);
-      console.log(`  ${dim('Work chunks')}  ~${data.runway.chunksRemaining} tasks of 15min`);
+    console.log(`  ${dim('Burn rate')}    ${data.rates.sessionPerHour}%/h session`);
+    if (data.session?.minutesRemaining) {
+      console.log(`  ${dim('Runway')}       ${data.session.hoursRemaining}h (${data.session.minutesRemaining}m) — ${data.session.constrainingFactor}`);
+      console.log(`  ${dim('Empty at')}     ${data.session.emptyAt}`);
+      console.log(`  ${dim('Work chunks')}  ~${data.session.chunksRemaining} tasks of 15min`);
     }
-    if (data.resetWindow) console.log(`  ${dim('Window resets')} ${data.resetWindow}m`);
+    if (data.session?.resetWindow) console.log(`  ${dim('Window resets')} ${data.session.resetWindow}m`);
+    if (data.weekly) {
+      console.log('');
+      console.log(`  ${dim('Weekly pool')}  ${data.weekly.remaining}% remaining`);
+      console.log(`  ${dim('Sessions')}     ${data.weekly.note}`);
+    }
     console.log('');
   },
 
   async workload() {
     const data = await api('/estimator/workload');
-    if (!data.recommendation) { console.log('  ◈ Insufficient data for workload planning.'); return; }
+    const cs = data.currentSession;
+    if (!cs?.recommendation) { console.log('  ◈ Insufficient data for workload planning.'); return; }
 
     const actionColor = {
       wrap_up: red, small_tasks: amber, medium_tasks: blue, full_capacity: green,
-    }[data.recommendation.action] || dim;
+    }[cs.recommendation.action] || dim;
 
-    console.log(`\n  ${amber('◈')} ${amber('Workload Planner')}  (${data.fuel}% fuel, ${data.minutesRemaining}m runway)\n`);
-    console.log(`  ${actionColor(data.recommendation.message)}\n`);
+    console.log(`\n  ${amber('◈')} ${amber('Workload Planner')}\n`);
+    console.log(`  ${dim('This session:')} ${cs.fuel}% fuel, ${cs.minutesRemaining}m runway (${cs.constraint})`);
+    if (data.weeklyOutlook) {
+      console.log(`  ${dim('This week:')}    ${data.weeklyOutlook.remaining}% weekly, ${data.weeklyOutlook.note}`);
+    }
+    console.log('');
+    console.log(`  ${actionColor(cs.recommendation.message)}\n`);
 
-    console.log(`  ${dim('Task capacity:')}`);
-    for (const [type, info] of Object.entries(data.taskCapacity)) {
+    console.log(`  ${dim('Task capacity (this session):')}`);
+    for (const [type, info] of Object.entries(cs.taskCapacity)) {
       const bar = info.count > 0 ? green(`×${info.count}`) : red('×0');
       console.log(`    ${type.padEnd(8)} ${bar}  ${dim(`(~${info.fuelEach}% each)`)}  ${dim(info.label)}`);
     }
 
     console.log(`\n  ${dim('Suggested work:')}`);
-    for (const s of data.recommendation.suggested) {
+    for (const s of cs.recommendation.suggested) {
       console.log(`    ${amber('›')} ${s}`);
     }
     console.log('');
