@@ -1,0 +1,23 @@
+[
+  {
+    "id": "git-summary",
+    "label": "Git Summary",
+    "icon": "git-branch",
+    "description": "Recent commits across all repos",
+    "command": "git-summary"
+  },
+  {
+    "id": "system-check",
+    "label": "Full Health",
+    "icon": "activity",
+    "description": "Combined pulse + GPU report",
+    "command": "system-check"
+  },
+  {
+    "id": "clear-done",
+    "label": "Archive Done",
+    "icon": "check-circle",
+    "description": "Remove completed tasks from board",
+    "command": "clear-done"
+  }
+]

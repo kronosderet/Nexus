@@ -1,0 +1,9 @@
+{
+  "name": "nexus-cli",
+  "version": "0.1.0",
+  "description": "Nexus CLI -- talk to mission control from any project",
+  "type": "module",
+  "bin": {
+    "nexus": "./nexus.js"
+  }
+}
