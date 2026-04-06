@@ -260,14 +260,10 @@ const commands = {
     const text = args.join(' ');
     if (!text) { console.error('  Usage: nexus note "your note"'); return; }
 
-    const pads = await api('/scratchpads');
-    const log = pads.find(p => p.name === "Captain's Log") || pads[0];
-    if (!log) { console.error('  No scratchpad found.'); return; }
-
-    const timestamp = new Date().toLocaleString();
-    const newContent = `${log.content}\n**${timestamp}** -- ${text}\n`;
-    await api(`/scratchpads/${log.id}`, { method: 'PATCH', body: { content: newContent } });
-    console.log(`  ◈ Marked on the map.`);
+    // Log as a quick session note (not scratchpad -- scratchpad is for working scratch)
+    const project = process.cwd().split(/[/\\]/).pop();
+    await api('/sessions', { method: 'POST', body: { project, summary: text, tags: ['note'] } });
+    console.log(`  ◈ Noted for ${green(project)}.`);
   },
 
   async session(args) {

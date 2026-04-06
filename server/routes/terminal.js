@@ -6,10 +6,7 @@ import { spawn } from 'child_process';
  * Each WebSocket connection gets its own shell process.
  */
 export function attachTerminal(wss) {
-  wss.on('connection', (ws, req) => {
-    // Only handle terminal connections
-    if (!req.url?.startsWith('/ws/terminal')) return;
-
+  wss.on('connection', (ws) => {
     const shell = spawn('powershell.exe', ['-NoLogo', '-NoProfile'], {
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: false,
