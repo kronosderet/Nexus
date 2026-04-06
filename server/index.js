@@ -5,7 +5,7 @@ import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-import { NexusStore } from './db/store.js';
+import { NexusStore } from './db/store.ts';
 import { createTaskRoutes } from './routes/tasks.js';
 import { createActivityRoutes } from './routes/activity.js';
 import { createPulseRoutes } from './routes/pulse.js';
