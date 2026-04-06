@@ -697,6 +697,62 @@ const commands = {
     console.log(`\n  ${dim(`${data.stats.keywordHits} keyword + ${data.stats.semanticHits} semantic → ${data.stats.fusedTotal} fused`)}\n`);
   },
 
+  async impact(args) {
+    if (args[0] === 'blast' && args[1]) {
+      const id = parseInt(args[1]);
+      const data = await api(`/impact/blast/${id}`);
+      console.log(`\n  ${amber('◈')} ${amber('Blast Radius')} for #${id}: ${data.decision.decision}\n`);
+      console.log(`  ${data.blastRadius > 5 ? red(data.warning) : data.blastRadius > 0 ? amber(data.warning) : green(data.warning)}\n`);
+      if (data.affected.length > 0) {
+        console.log(`  ${dim('Downstream impact:')}`);
+        for (const a of data.affected) console.log(`    ${'  '.repeat(a.depth-1)}${dim('→')} ${green(`#${a.id}`)} ${a.decision} ${dim(`[${a.project}]`)}`);
+      }
+      if (data.related.length > 0) {
+        console.log(`  ${dim('Also related:')}`);
+        for (const r of data.related) console.log(`    ${dim('~')} ${green(`#${r.id}`)} ${r.decision}`);
+      }
+      console.log('');
+      return;
+    }
+
+    if (args[0] === 'contradictions') {
+      const data = await api('/impact/contradictions');
+      if (data.total === 0) { console.log(`  ${green('◈')} No contradictions detected.`); return; }
+      console.log(`\n  ${amber('◈')} ${data.total} potential contradiction${data.total !== 1 ? 's' : ''}:\n`);
+      for (const c of data.contradictions) console.log(`  ${red('!')} ${c.message}`);
+      console.log('');
+      return;
+    }
+
+    if (args[0] === 'centrality') {
+      const data = await api('/impact/centrality');
+      console.log(`\n  ${amber('◈')} ${amber('Decision Centrality')} (avg ${data.averageConnections} connections)\n`);
+      for (const c of data.centrality.slice(0, 10)) {
+        const bar = progressBar(Math.min(100, c.total * 5), 10);
+        console.log(`  ${dim(`#${c.id}`.padEnd(5))} ${bar} ${dim(`${c.total}`.padStart(3))} ${c.decision.slice(0, 50)} ${dim(`[${c.project}]`)}`);
+      }
+      console.log('');
+      return;
+    }
+
+    if (args[0] === 'holes') {
+      const data = await api('/impact/holes');
+      console.log(`\n  ${amber('◈')} ${amber('Structural Holes')}\n`);
+      if (data.holes.length === 0) { console.log(`  ${green('All projects well-connected.')}`); }
+      else {
+        for (const h of data.holes) console.log(`  ${amber('!')} ${h.pair}: ${h.note}`);
+      }
+      console.log(`\n  ${dim('Cross-project links:')}`);
+      for (const [pair, count] of Object.entries(data.crossLinks)) {
+        console.log(`    ${pair.padEnd(30)} ${count}`);
+      }
+      console.log('');
+      return;
+    }
+
+    console.log('  Usage: nexus impact blast <id> | contradictions | centrality | holes');
+  },
+
   async link(args) {
     if (args.length < 3) {
       console.error('  Usage: nexus link <from_id> <rel> <to_id> ["note"]');
@@ -823,6 +879,10 @@ const commands = {
     nexus context [project]        Get prior context for a project
     nexus record "decision"        Record a decision to The Ledger
     nexus decisions [project]      View decision history
+    nexus impact blast <id>         Blast radius: what breaks if this changes?
+    nexus impact contradictions    Find conflicting decisions
+    nexus impact centrality        Most foundational decisions
+    nexus impact holes             Weak cross-project connections
     nexus link <from> <rel> <to>   Link two decisions (knowledge graph)
     nexus graph [id] [depth]       View graph stats or traverse from a node
     nexus search "query"           Smart search (keyword + semantic)

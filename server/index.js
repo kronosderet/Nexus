@@ -31,6 +31,7 @@ import { createSmartSearchRoutes } from './routes/smartSearch.js';
 import { readFileSync, existsSync } from 'fs';
 import { createEstimatorRoutes } from './routes/estimator.js';
 import { createLedgerRoutes } from './routes/ledger.js';
+import { createImpactRoutes } from './routes/impact.js';
 import { startFileWatcher } from './watchers/fileWatcher.js';
 import { startGpuPoller } from './watchers/gpuPoller.js';
 import { startOverseerPoller } from './watchers/overseerPoller.js';
@@ -123,6 +124,7 @@ try { if (existsSync(embedCachePath)) embedCache = JSON.parse(readFileSync(embed
 app.use('/api/smart-search', createSmartSearchRoutes(store, embedCache));
 app.use('/api/estimator', createEstimatorRoutes(store));
 app.use('/api/ledger', createLedgerRoutes(store, broadcast));
+app.use('/api/impact', createImpactRoutes(store));
 
 // SPA fallback (Express 5 requires named wildcard)
 app.get('/{*splat}', (req, res) => {
