@@ -41,8 +41,10 @@ async function runHealthChecks(store) {
   // 2. Database
   try {
     const tasks = store.getAllTasks();
-    const sessions = store.getSessions({ limit: 1 });
-    results.checks.database = { ok: true, tasks: tasks.length, sessions: sessions.length };
+    const allSessions = store.getSessions({ limit: 200 });
+    const decisions = store.data.ledger?.length || 0;
+    const graphEdges = store.data.graph_edges?.length || 0;
+    results.checks.database = { ok: true, tasks: tasks.length, sessions: allSessions.length, decisions, graphEdges };
   } catch (err) {
     results.checks.database = { ok: false, error: err.message };
   }
