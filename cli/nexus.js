@@ -498,6 +498,53 @@ const commands = {
     console.log(`  ${dim('Activity')}   ${data.activity.length} events tracked\n`);
   },
 
+  async fuel() {
+    const data = await api('/estimator');
+    if (!data.tracked) { console.log('  ◈ No fuel data. Log with: nexus usage <session%> <weekly%>'); return; }
+
+    const sColor = data.estimated.session <= 15 ? red : data.estimated.session <= 40 ? amber : green;
+    const wColor = data.estimated.weekly <= 10 ? red : data.estimated.weekly <= 30 ? amber : green;
+    const confColor = data.estimated.confidence === 'high' ? green : data.estimated.confidence === 'medium' ? amber : red;
+
+    console.log(`\n  ${amber('◈')} ${amber('Fuel Estimator')}\n`);
+    console.log(`  ${dim('Session')}      ${progressBar(data.estimated.session)}  ${sColor(`${data.estimated.session}%`)}`);
+    console.log(`  ${dim('Weekly')}       ${progressBar(data.estimated.weekly)}  ${wColor(`${data.estimated.weekly}%`)}`);
+    console.log(`  ${dim('Confidence')}   ${confColor(data.estimated.confidence)} (reported ${data.reported.minutesAgo}m ago)`);
+    console.log('');
+    console.log(`  ${dim('Burn rate')}    ${data.rates.sessionPerHour}%/h session | ${data.rates.weeklyPerHour}%/h weekly`);
+    if (data.runway.minutesRemaining) {
+      console.log(`  ${dim('Runway')}       ${data.runway.hoursRemaining}h (${data.runway.minutesRemaining}m) — constrained by ${data.runway.constrainingFactor}`);
+      console.log(`  ${dim('Empty at')}     ${data.runway.emptyAt}`);
+      console.log(`  ${dim('Work chunks')}  ~${data.runway.chunksRemaining} tasks of 15min`);
+    }
+    if (data.resetWindow) console.log(`  ${dim('Window resets')} ${data.resetWindow}m`);
+    console.log('');
+  },
+
+  async workload() {
+    const data = await api('/estimator/workload');
+    if (!data.recommendation) { console.log('  ◈ Insufficient data for workload planning.'); return; }
+
+    const actionColor = {
+      wrap_up: red, small_tasks: amber, medium_tasks: blue, full_capacity: green,
+    }[data.recommendation.action] || dim;
+
+    console.log(`\n  ${amber('◈')} ${amber('Workload Planner')}  (${data.fuel}% fuel, ${data.minutesRemaining}m runway)\n`);
+    console.log(`  ${actionColor(data.recommendation.message)}\n`);
+
+    console.log(`  ${dim('Task capacity:')}`);
+    for (const [type, info] of Object.entries(data.taskCapacity)) {
+      const bar = info.count > 0 ? green(`×${info.count}`) : red('×0');
+      console.log(`    ${type.padEnd(8)} ${bar}  ${dim(`(~${info.fuelEach}% each)`)}  ${dim(info.label)}`);
+    }
+
+    console.log(`\n  ${dim('Suggested work:')}`);
+    for (const s of data.recommendation.suggested) {
+      console.log(`    ${amber('›')} ${s}`);
+    }
+    console.log('');
+  },
+
   async budget() {
     const data = await api('/budget');
     const tierColor = { critical: red, low: amber, moderate: blue, healthy: green }[data.tier] || dim;
@@ -631,6 +678,8 @@ const commands = {
     nexus seek "query"             Semantic search (AI embeddings)
     nexus find "query"             Keyword search across everything
     nexus digest [24h|7d|30d]      Activity digest / summary
+    nexus fuel                     Smart fuel estimate + runway prediction
+    nexus workload                 Task capacity planner
     nexus usage                    Show current Claude usage
     nexus usage 75 40              Log session% and weekly% remaining
     nexus overseer                 AI strategic analysis of all projects
