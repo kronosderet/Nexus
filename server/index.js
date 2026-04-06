@@ -6,12 +6,12 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 import { NexusStore } from './db/store.ts';
-import { createTaskRoutes } from './routes/tasks.js';
-import { createActivityRoutes } from './routes/activity.js';
+import { createTaskRoutes } from './routes/tasks.ts';
+import { createActivityRoutes } from './routes/activity.ts';
 import { createPulseRoutes } from './routes/pulse.js';
 import { createScratchpadRoutes } from './routes/scratchpad.js';
-import { createSessionRoutes } from './routes/sessions.js';
-import { createSearchRoutes } from './routes/search.js';
+import { createSessionRoutes } from './routes/sessions.ts';
+import { createSearchRoutes } from './routes/search.ts';
 import { createDigestRoutes } from './routes/digest.js';
 import { createNotifyRoutes } from './routes/notify.js';
 import { createActionRoutes } from './routes/actions.js';

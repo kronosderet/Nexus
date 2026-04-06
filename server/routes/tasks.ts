@@ -1,13 +1,16 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
+import type { NexusStore } from '../db/store.ts';
 
-export function createTaskRoutes(store, broadcast) {
+type BroadcastFn = (data: any) => void;
+
+export function createTaskRoutes(store: NexusStore, broadcast: BroadcastFn) {
   const router = Router();
 
-  router.get('/', (req, res) => {
+  router.get('/', (_req: Request, res: Response) => {
     res.json(store.getAllTasks());
   });
 
-  router.post('/', (req, res) => {
+  router.post('/', (req: Request, res: Response) => {
     const { title, description, status, priority } = req.body;
     const task = store.createTask({ title, description, status, priority });
     const entry = store.addActivity('task_created', `Plotted -- "${title}"`);
@@ -16,7 +19,7 @@ export function createTaskRoutes(store, broadcast) {
     res.status(201).json(task);
   });
 
-  router.patch('/:id', (req, res) => {
+  router.patch('/:id', (req: Request, res: Response) => {
     const id = Number(req.params.id);
     const result = store.updateTask(id, req.body);
     if (!result) return res.status(404).json({ error: 'Nothing on the charts.' });
@@ -34,7 +37,7 @@ export function createTaskRoutes(store, broadcast) {
     res.json(task);
   });
 
-  router.delete('/:id', (req, res) => {
+  router.delete('/:id', (req: Request, res: Response) => {
     const task = store.deleteTask(Number(req.params.id));
     if (!task) return res.status(404).json({ error: 'Nothing on the charts.' });
     const entry = store.addActivity('task_deleted', `Removed from charts -- "${task.title}"`);
