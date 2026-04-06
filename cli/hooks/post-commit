@@ -1,0 +1,15 @@
+#!/bin/sh
+# Nexus post-commit hook -- logs commits to your activity stream.
+# Install: copy this to .git/hooks/post-commit in any project
+# Or run:  nexus hook install  (from within a git repo)
+
+COMMIT_MSG=$(git log -1 --format='%s')
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+HASH=$(git log -1 --format='%h')
+PROJECT=$(basename "$(git rev-parse --show-toplevel)")
+
+# Fire and forget -- don't block commits if Nexus is offline
+curl -s -X POST http://localhost:3001/api/activity \
+  -H "Content-Type: application/json" \
+  -d "{\"type\":\"git_commit\",\"message\":\"[$PROJECT/$BRANCH] $HASH -- $COMMIT_MSG\"}" \
+  > /dev/null 2>&1 &
