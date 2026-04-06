@@ -80,6 +80,73 @@ const commands = {
     console.log(`  ◈ Nexus is ${green('online')}. ${data.message}`);
   },
 
+  async onboard(args) {
+    const project = args[0] || process.cwd().split(/[/\\]/).pop();
+
+    console.log(`
+## Nexus Integration for ${project}
+
+### What is Nexus?
+Local AI-powered mission control. Tracks tasks, sessions, decisions, fuel usage,
+and git state across all projects. Has an AI Overseer (Gemma 4 26B local) and
+a Knowledge Graph of architectural decisions.
+
+### Session Workflow (FOLLOW THIS)
+
+**START of session:**
+\`\`\`bash
+nexus brief ${project}     # Full context: fuel, tasks, risks, sessions, decisions
+# OR for quick glance:
+nexus quick                 # 3-line status
+\`\`\`
+
+**DURING work — report fuel when user gives numbers:**
+\`\`\`bash
+nexus usage <session_remaining%> <weekly_remaining%> --reset <minutes_until_reset>
+# Example: user says "35% used, resets in 4h" → nexus usage 65 30 --reset 240
+\`\`\`
+
+**DURING work — track what you're doing:**
+\`\`\`bash
+nexus task -s in_progress "Description of current work"
+nexus log "Notable event or finding"
+nexus record "Architectural decision" --context "why" --alt "alternatives"
+nexus done <task_id>
+\`\`\`
+
+**BEFORE big decisions — check impact:**
+\`\`\`bash
+nexus impact blast <decision_id>    # What breaks if this changes?
+nexus overseer "Should we do X?"     # Ask the AI for strategic advice
+nexus search "relevant topic"        # Hybrid keyword+semantic search
+\`\`\`
+
+**END of session:**
+\`\`\`bash
+nexus session "Summary of what was done" --decisions "d1,d2" --blockers "b1" --tags "t1,t2"
+nexus handoff ${project}             # Generate context for next agent
+\`\`\`
+
+### Key Commands Reference
+\`\`\`
+CONTEXT:    nexus brief | quick | handoff | context
+FUEL:       nexus usage | fuel | intel | workload
+TASKS:      nexus task | tasks | done
+MEMORY:     nexus session | log | note | record | decisions
+SEARCH:     nexus search | seek | find
+INTEL:      nexus overseer | impact blast|centrality|holes | graph
+GIT:        nexus sync | commit-all | repos | focus
+TOOLS:      nexus ai | notify | digest | gpu
+\`\`\`
+
+### Important Rules
+- Session fuel is a ROLLING 5-HOUR WINDOW, not daily
+- Weekly resets Thursday 21:00 CET (Europe/Prague)
+- Weekly limit is MUCH LARGER than session — they're different scales
+- Always log a \`nexus session\` before ending — it's the memory bridge
+`);
+  },
+
   async handoff(args) {
     const project = args[0] || process.cwd().split(/[/\\]/).pop();
     const p = project.toLowerCase();
@@ -1105,6 +1172,7 @@ const commands = {
   ${dim('The Cartographer -- talk to mission control from anywhere.')}
 
   ${amber('Commands:')}
+    nexus onboard [project]          How to use Nexus (for new agents)
     nexus quick                     3-line status (fuel + risks + task)
     nexus brief [project]           Full agent briefing (START HERE)
     nexus handoff [project]         Generate session handoff for next agent
