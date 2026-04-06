@@ -47,9 +47,20 @@ app.use(express.static(join(__dirname, '..', 'client', 'dist')));
 
 // ── WebSocket ─────────────────────────────────────────────
 const server = createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws' });
-const termWss = new WebSocketServer({ server, path: '/ws/terminal' });
+const wss = new WebSocketServer({ noServer: true });
+const termWss = new WebSocketServer({ noServer: true });
 attachTerminal(termWss);
+
+// Route WebSocket upgrades by path
+server.on('upgrade', (req, socket, head) => {
+  if (req.url === '/ws/terminal') {
+    termWss.handleUpgrade(req, socket, head, (ws) => termWss.emit('connection', ws, req));
+  } else if (req.url === '/ws') {
+    wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+  } else {
+    socket.destroy();
+  }
+});
 
 const clients = new Set();
 wss.on('connection', (ws) => {

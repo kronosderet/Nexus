@@ -8,6 +8,10 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': 'http://localhost:3001',
+      '/ws/terminal': {
+        target: 'ws://localhost:3001',
+        ws: true,
+      },
       '/ws': {
         target: 'ws://localhost:3001',
         ws: true,
