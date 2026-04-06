@@ -80,6 +80,44 @@ const commands = {
     console.log(`  ◈ Nexus is ${green('online')}. ${data.message}`);
   },
 
+  async quick(args) {
+    const project = args[0] || process.cwd().split(/[/\\]/).pop();
+
+    // Fuel
+    try {
+      const f = await api('/estimator');
+      if (f.tracked) {
+        const sC = f.estimated.session <= 15 ? red : f.estimated.session <= 40 ? amber : green;
+        const wC = f.estimated.weekly <= 15 ? red : f.estimated.weekly <= 40 ? amber : green;
+        const runway = f.session?.minutesRemaining ? `${f.session.minutesRemaining}m runway` : '';
+        const chunks = f.session?.chunksRemaining != null ? `${f.session.chunksRemaining} chunks` : '';
+        console.log(`  ${amber('◈')} ${sC(`S:${f.estimated.session}%`)} ${wC(`W:${f.estimated.weekly}%`)} ${dim(runway)} ${dim(chunks)}`);
+      }
+    } catch {}
+
+    // Risks (count only)
+    try {
+      const r = await api('/overseer/risks');
+      if (r.risks.length > 0) {
+        const critical = r.risks.filter(x => x.level === 'critical').length;
+        const warnings = r.risks.filter(x => x.level === 'warning').length;
+        console.log(`  ${critical > 0 ? red(`${critical} critical`) : ''} ${warnings > 0 ? amber(`${warnings} warnings`) : ''} ${r.risks.length === 0 ? green('clear') : ''}`.trim());
+      } else {
+        console.log(`  ${green('◈ All clear')}`);
+      }
+    } catch {}
+
+    // Top task
+    try {
+      const tasks = await api('/tasks');
+      const inProgress = tasks.find(t => t.status === 'in_progress');
+      const backlog = tasks.filter(t => t.status === 'backlog');
+      if (inProgress) console.log(`  ${amber('→')} ${inProgress.title}`);
+      else if (backlog.length > 0) console.log(`  ${dim('→')} ${backlog[0].title} ${dim(`(+${backlog.length - 1} backlog)`)}`);
+      else console.log(`  ${dim('Calm waters.')}`);
+    } catch {}
+  },
+
   async brief(args) {
     const project = args[0] || process.cwd().split(/[/\\]/).pop();
     const p = project.toLowerCase();
@@ -866,6 +904,7 @@ const commands = {
   ${dim('The Cartographer -- talk to mission control from anywhere.')}
 
   ${amber('Commands:')}
+    nexus quick                     3-line status (fuel + risks + task)
     nexus brief [project]           Full agent briefing (START HERE)
     nexus status                   Check if Nexus is online
     nexus pulse                    Quick system overview
