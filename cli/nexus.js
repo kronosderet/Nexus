@@ -149,6 +149,152 @@ const commands = {
     console.log('');
   },
 
+  async think(args) {
+    // nexus think "text"            — push a thought onto the stack
+    // nexus think --pop              — pop the most recent active thought
+    // nexus think --pop <id>         — pop a specific thought
+    // nexus think --list             — list active thoughts
+    // nexus think --abandon <id>     — abandon a thought
+    if (args[0] === '--list' || args[0] === '-l') {
+      const thoughts = await api('/thoughts');
+      if (thoughts.length === 0) {
+        console.log(`  ${dim('No active thoughts on the stack.')}`);
+        return;
+      }
+      console.log(`\n  ${amber('◈')} ${amber('Thought Stack')} (${thoughts.length} active, LIFO)\n`);
+      for (const t of thoughts) {
+        const age = Math.round((Date.now() - new Date(t.pushed_at).getTime()) / 60000);
+        console.log(`  ${dim(`#${t.id}`)} ${amber(t.text)}`);
+        if (t.context) console.log(`      ${dim(t.context)}`);
+        console.log(`      ${dim(`[${t.project}]`)} ${dim(`${age}m ago`)}`);
+      }
+      console.log('');
+      console.log(`  ${dim('Pop top:')} nexus think --pop`);
+      console.log(`  ${dim('Pop specific:')} nexus think --pop <id>`);
+      console.log('');
+      return;
+    }
+
+    if (args[0] === '--pop' || args[0] === '-p') {
+      const id = args[1] ? parseInt(args[1]) : undefined;
+      const result = await api('/thoughts/pop', { method: 'POST', body: id ? { id } : {} });
+      if (result.error) {
+        console.log(`  ${dim('Stack is empty.')}`);
+        return;
+      }
+      const age = Math.round((Date.now() - new Date(result.pushed_at).getTime()) / 60000);
+      console.log(`\n  ${green('◈')} Popped #${result.id} (was on stack ${age}m)\n`);
+      console.log(`  ${amber(result.text)}`);
+      if (result.context) console.log(`  ${dim(result.context)}`);
+      console.log('');
+      return;
+    }
+
+    if (args[0] === '--abandon' || args[0] === '-a') {
+      const id = parseInt(args[1]);
+      const reason = args.slice(2).join(' ');
+      if (!id) {
+        console.error('  Usage: nexus think --abandon <id> [reason]');
+        return;
+      }
+      const result = await api(`/thoughts/${id}/abandon`, { method: 'PATCH', body: { reason } });
+      if (result.error) { console.log(`  ${red('◈')} ${result.error}`); return; }
+      console.log(`  ${dim('✗ Abandoned thought #')}${result.id}`);
+      return;
+    }
+
+    // Default: push a new thought
+    const text = args.join(' ');
+    if (!text) {
+      console.error('  Usage:');
+      console.error('    nexus think "what I was about to do"   — push thought');
+      console.error('    nexus think --list                       — show stack');
+      console.error('    nexus think --pop [id]                   — pop thought');
+      console.error('    nexus think --abandon <id> [reason]      — abandon');
+      return;
+    }
+    const project = process.cwd().split(/[/\\]/).pop();
+    const thought = await api('/thoughts', { method: 'POST', body: { text, project } });
+    console.log(`  ${green('◈')} Stashed thought #${thought.id} for ${green(project)}`);
+    console.log(`  ${dim(text)}`);
+  },
+
+  async critique() {
+    const data = await api('/critique');
+    console.log(`\n  ${amber('◈')} ${amber('Self-Critique')}\n`);
+
+    for (const insight of data.insights) {
+      console.log(`  ${dim('›')} ${insight}`);
+    }
+    console.log('');
+
+    if (data.stuckTasks?.length > 0) {
+      console.log(`  ${red('STUCK')} (in_progress >24h):`);
+      for (const t of data.stuckTasks) {
+        console.log(`    ${red('!')} ${dim(`#${t.id}`)} ${t.title} ${dim(`(${t.ageHours}h old)`)}`);
+      }
+      console.log('');
+    }
+
+    if (data.slowTasks?.length > 0) {
+      console.log(`  ${amber('SLOWEST')} completed:`);
+      for (const t of data.slowTasks.slice(0, 5)) {
+        console.log(`    ${dim(`#${t.id}`)} ${dim(`${t.minutes}m`.padStart(6))} ${t.title}`);
+      }
+      console.log('');
+    }
+
+    if (data.fastTasks?.length > 0) {
+      console.log(`  ${green('FASTEST')} completed:`);
+      for (const t of data.fastTasks.slice(0, 3)) {
+        console.log(`    ${dim(`#${t.id}`)} ${dim(`${t.minutes}m`.padStart(6))} ${t.title}`);
+      }
+      console.log('');
+    }
+  },
+
+  async guard(args) {
+    const title = args.join(' ');
+    if (!title) {
+      console.error('  Usage: nexus guard "task title to check"');
+      return;
+    }
+    const data = await api(`/guard?title=${encodeURIComponent(title)}`);
+
+    if (data.warning) {
+      const color = data.warning.startsWith('Very similar') ? red : amber;
+      console.log(`\n  ${color('◈')} ${color(data.warning)}\n`);
+    } else {
+      console.log(`\n  ${green('◈')} No redundancy detected. Safe to create.\n`);
+    }
+
+    if (data.similarTasks?.length > 0) {
+      console.log(`  ${dim('Similar tasks:')}`);
+      for (const t of data.similarTasks) {
+        const sim = Math.round(t.similarity * 100);
+        const c = t.status === 'done' ? dim : t.status === 'in_progress' ? amber : green;
+        console.log(`    ${dim(`${sim}%`.padStart(4))} ${c(`[${t.status}]`)} ${dim(`#${t.id}`)} ${t.title}`);
+      }
+      console.log('');
+    }
+
+    if (data.relatedDecisions?.length > 0) {
+      console.log(`  ${dim('Related decisions in The Ledger:')}`);
+      for (const d of data.relatedDecisions) {
+        console.log(`    ${dim(`#${d.id}`)} ${green(`[${d.project}]`)} ${d.decision}`);
+      }
+      console.log('');
+    }
+
+    if (data.pastSessions?.length > 0) {
+      console.log(`  ${dim('Past sessions on this topic:')}`);
+      for (const s of data.pastSessions) {
+        console.log(`    ${dim(`#${s.id}`)} ${green(`[${s.project}]`)} ${s.summary.slice(0, 80)}${s.summary.length > 80 ? '...' : ''}`);
+      }
+      console.log('');
+    }
+  },
+
   async advice(args) {
     // Subcommands: recent (default), patterns, verdict <id> <worked|partial|wrong|reject> [notes]
     const sub = args[0] || 'recent';
@@ -1500,6 +1646,12 @@ TOOLS:      nexus ai | notify | digest | gpu | bookmarks
     nexus advice                    Recent Overseer recommendations
     nexus advice patterns           Accuracy + acceptance rate stats
     nexus advice verdict <id> <worked|partial|wrong|reject> [notes]
+    nexus think "thought"           Push thought onto interrupt-recovery stack
+    nexus think --list              Show active thoughts (LIFO)
+    nexus think --pop [id]          Pop a thought (return to it)
+    nexus think --abandon <id>      Abandon a thought
+    nexus critique                  Self-critique: slow tasks, stuck items, patterns
+    nexus guard "task title"        Check for redundant work before creating
     nexus predict                   Detect graph gaps (dry run)
     nexus predict --generate        Auto-create tasks for detected gaps
     nexus onboard [project]          How to use Nexus (for new agents)

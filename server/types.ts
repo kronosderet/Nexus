@@ -88,6 +88,17 @@ export interface Bookmark {
   created_at: string;
 }
 
+export interface Thought {
+  id: number;
+  text: string;            // what was I thinking / about to do
+  context: string;         // what was happening when I got interrupted
+  project: string;
+  pushed_at: string;       // when stashed
+  popped_at: string | null; // when returned to (null = still on stack)
+  status: 'active' | 'resolved' | 'abandoned';
+  related_task_id: number | null; // optional link to a task
+}
+
 export interface AdviceEntry {
   id: number;
   created_at: string;
@@ -122,6 +133,7 @@ export interface NexusData {
   ledger: Decision[];
   graph_edges: GraphEdge[];
   advice: AdviceEntry[];
+  thoughts: Thought[];
   _sessionTiming?: SessionTiming;
 }
 
