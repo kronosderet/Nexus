@@ -102,21 +102,42 @@ Rules:
 export function createPlanRoutes(store: NexusStore) {
   const router = Router();
 
-  router.get('/', async (_req: Request, res: Response) => {
-    const plan = await buildSessionPlan(store);
+  router.get('/', async (req: Request, res: Response) => {
+    const project = typeof req.query.project === 'string' ? req.query.project : undefined;
+    const plan = await buildSessionPlan(store, project);
     res.json(plan);
   });
 
   return router;
 }
 
-async function buildSessionPlan(store: NexusStore) {
+async function buildSessionPlan(store: NexusStore, projectFilter?: string) {
   // ── 1. Gather current state ─────────────────────────
   const usage = store.getLatestUsage();
   const tasks = store.getAllTasks();
   const activeTasks = tasks.filter(t => t.status !== 'done');
-  const inProgress = activeTasks.filter(t => t.status === 'in_progress');
-  const backlog = activeTasks.filter(t => t.status === 'backlog');
+
+  // Filter by project if specified
+  // For "Nexus": includes tasks that explicitly mention Nexus OR don't mention any OTHER project name
+  // For any other project: exact title match
+  const KNOWN_PROJECTS = ['nexus', 'firewall-godot', 'noosphere', 'resonance godot', 'resonance-godot', 'shadowrun'];
+  const filtered = projectFilter
+    ? activeTasks.filter(t => {
+        const title = t.title.toLowerCase();
+        const filter = projectFilter.toLowerCase();
+        if (title.includes(filter)) return true;
+        if (filter === 'nexus') {
+          // Nexus = anything that doesn't explicitly belong to another known project
+          const belongsToOther = KNOWN_PROJECTS
+            .filter(p => p !== 'nexus')
+            .some(p => title.includes(p));
+          return !belongsToOther;
+        }
+        return false;
+      })
+    : activeTasks;
+  const inProgress = filtered.filter(t => t.status === 'in_progress');
+  const backlog = filtered.filter(t => t.status === 'backlog');
 
   // ── 2. Calculate fuel constraints ───────────────────
   const sessionFuel = usage?.session_percent ?? 100;
@@ -152,7 +173,9 @@ async function buildSessionPlan(store: NexusStore) {
     : fuelMinutes;
 
   // ── 3. Recent blockers from sessions ────────────────
-  const recentSessions = store.getSessions({ limit: 5 });
+  const recentSessions = projectFilter
+    ? store.getSessions({ project: projectFilter, limit: 5 })
+    : store.getSessions({ limit: 5 });
   const activeBlockers: string[] = [];
   for (const s of recentSessions) {
     for (const b of (s.blockers || [])) activeBlockers.push(`[${s.project}] ${b}`);
