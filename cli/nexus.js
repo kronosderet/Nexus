@@ -80,11 +80,88 @@ const commands = {
     console.log(`  ◈ Nexus is ${green('online')}. ${data.message}`);
   },
 
+  async predict(args) {
+    const execute = args.includes('--generate') || args.includes('-g');
+
+    if (execute) {
+      const categories = [];
+      const catIdx = args.indexOf('--category');
+      if (catIdx !== -1 && args[catIdx + 1]) categories.push(args[catIdx + 1]);
+
+      console.log(`  ${amber('◈')} Generating tasks from graph gaps...`);
+      const result = await api('/predict/generate', {
+        method: 'POST',
+        body: categories.length > 0 ? { categories } : {},
+      });
+      if (result.created.length === 0) {
+        console.log(`  ${dim('No new tasks created.')} ${result.totalDetected} gaps detected but all already tracked.`);
+        return;
+      }
+      console.log(`\n  ${green('◈')} Created ${result.created.length} task${result.created.length !== 1 ? 's' : ''}:\n`);
+      for (const t of result.created) {
+        console.log(`  ${green(`#${t.id}`)} ${dim(`[${t.category}]`)} ${t.title}`);
+      }
+      console.log('');
+      return;
+    }
+
+    // Dry run: just show suggestions
+    const data = await api('/predict');
+    const s = data.stats;
+
+    console.log(`\n  ${amber('◈')} ${amber('Predictive Task Generation')}\n`);
+    console.log(`  ${dim('Gaps detected:')} ${s.total} total`);
+    console.log(`  ${dim('By priority:')}    ${red(s.byPriority.high + ' high')} ${amber(s.byPriority.normal + ' normal')} ${dim(s.byPriority.low + ' low')}`);
+    console.log(`  ${dim('By category:')}    ${Object.entries(s.byCategory).map(([k, v]) => `${k}:${v}`).join(' | ')}`);
+    console.log('');
+
+    if (data.suggestions.length === 0) {
+      console.log(`  ${green('All clear. No gaps detected.')}`);
+      return;
+    }
+
+    const byCategory = {};
+    for (const sg of data.suggestions) {
+      if (!byCategory[sg.category]) byCategory[sg.category] = [];
+      byCategory[sg.category].push(sg);
+    }
+
+    const categoryLabels = {
+      blind_spot: red('BLIND SPOTS'),
+      blocker: red('UNRESOLVED BLOCKERS'),
+      drift: amber('UNCOMMITTED DRIFT'),
+      unvalidated: amber('UNVALIDATED CRITICAL PATHS'),
+      orphan: dim('ORPHAN DECISIONS'),
+      stale: dim('STALE DECISIONS'),
+    };
+
+    for (const [cat, items] of Object.entries(byCategory)) {
+      console.log(`  ${categoryLabels[cat] || cat.toUpperCase()}`);
+      for (const item of items) {
+        console.log(`    ${dim('›')} ${item.title}`);
+        console.log(`      ${dim(item.reason.slice(0, 100))}${item.reason.length > 100 ? dim('...') : ''}`);
+      }
+      console.log('');
+    }
+
+    console.log(`  ${dim('Generate these tasks:')} nexus predict --generate`);
+    console.log(`  ${dim('Filter category:')}      nexus predict --generate --category blind_spot`);
+    console.log('');
+  },
+
   async plan(args) {
-    console.log(`\n  ${amber('◈')} ${amber('Autonomous Session Plan')}\n`);
+    // Parse --project flag
+    let project = null;
+    const pIdx = args.indexOf('--project');
+    if (pIdx !== -1 && args[pIdx + 1]) project = args[pIdx + 1];
+    else if (args[0] && !args[0].startsWith('-')) project = args[0];
+
+    const header = project ? `Autonomous Session Plan — ${project}` : 'Autonomous Session Plan';
+    console.log(`\n  ${amber('◈')} ${amber(header)}\n`);
     console.log(`  ${dim('The Overseer is planning...')}\n`);
 
-    const data = await api('/plan');
+    const url = project ? `/plan?project=${encodeURIComponent(project)}` : '/plan';
+    const data = await api(url);
     const f = data.fuelState;
     const ctx = data.context;
 
@@ -1217,6 +1294,8 @@ TOOLS:      nexus ai | notify | digest | gpu
 
   ${amber('Commands:')}
     nexus plan                      Autonomous session plan (AI-generated)
+    nexus predict                   Detect graph gaps (dry run)
+    nexus predict --generate        Auto-create tasks for detected gaps
     nexus onboard [project]          How to use Nexus (for new agents)
     nexus quick                     3-line status (fuel + risks + task)
     nexus brief [project]           Full agent briefing (START HERE)
