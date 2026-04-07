@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Nexus MCP Server — v3.1
+ * Nexus MCP Server — v3.2.1
  *
  * Exposes the Nexus metabrain as Model Context Protocol tools so every
  * Claude Code instance can call native `mcp__nexus__*` tools instead of
@@ -11,6 +11,14 @@
  * tool calls into HTTP requests against that server. If the Nexus server
  * isn't running, tool calls return a clear error telling the user to
  * start it.
+ *
+ * v3.2.1: Progress notifications for slow tools. When the client sends a
+ * progressToken in the request _meta, slow tools (ask_overseer,
+ * bridge_session) periodically send `notifications/progress` messages to
+ * keep the request alive past the client's default tool-call timeout
+ * (which is typically ~60s and hard to override from the server side).
+ * Without this, a 65s local-AI inference would trigger -32001 even though
+ * the backend completed fine. The progress ping resets the client clock.
  *
  * v2 toolset (18 tools):
  *
@@ -54,7 +62,21 @@ import {
 // ── Configuration ────────────────────────────────────────
 const NEXUS_BASE = process.env.NEXUS_BASE_URL || 'http://localhost:3001';
 const SERVER_NAME = 'nexus';
-const SERVER_VERSION = '3.2.0';
+const SERVER_VERSION = '3.2.1';
+
+// ── Slow tools — need progress notifications to survive client timeouts ─
+// Tools in this set send periodic progress pings to the client during
+// execution, so a slow local-AI inference doesn't hit the MCP tool-call
+// timeout (which is client-enforced, typically ~60s, and not overridable
+// from the server side). Each progress notification resets the client's
+// inactivity timer per the MCP spec ("progress notifications SHOULD keep
+// the request alive, delaying any timeout").
+const SLOW_TOOLS = new Set<string>([
+  'nexus_ask_overseer',
+  'nexus_bridge_session',
+]);
+
+const HEARTBEAT_INTERVAL_MS = 8000; // ping every 8s — well under typical 60s timeouts
 
 // ── HTTP helper ──────────────────────────────────────────
 async function nexusFetch(
@@ -1034,8 +1056,49 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: TOOLS,
 }));
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
   const { name, arguments: args } = request.params;
+
+  // If this is a slow tool and the client requested progress notifications,
+  // start a heartbeat that pings `notifications/progress` every few seconds
+  // until the tool returns. This is the ONLY reliable way to prevent the
+  // MCP client (e.g. Claude Desktop) from timing out a ~60s local-AI call.
+  //
+  // The MCP spec says clients SHOULD treat each progress notification as
+  // activity that delays timeout. If the client didn't request progress
+  // (no progressToken), we skip the heartbeat — there's nothing we can do
+  // from the server side to extend the timeout in that case, but the tool
+  // will still run to completion; we just won't hear back if it overruns.
+  const progressToken = request.params._meta?.progressToken;
+  let heartbeat: NodeJS.Timeout | null = null;
+  let heartbeatCount = 0;
+
+  if (progressToken != null && SLOW_TOOLS.has(name)) {
+    // Send an immediate "starting" progress ping so the client sees work
+    // begin right away. Failures are non-fatal — swallow them.
+    extra.sendNotification({
+      method: 'notifications/progress',
+      params: {
+        progressToken,
+        progress: 0,
+        message: `${name} started (may take 30-120s for local AI inference)`,
+      },
+    }).catch(() => {});
+
+    heartbeat = setInterval(() => {
+      heartbeatCount += 1;
+      const elapsedSec = heartbeatCount * (HEARTBEAT_INTERVAL_MS / 1000);
+      extra.sendNotification({
+        method: 'notifications/progress',
+        params: {
+          progressToken,
+          progress: heartbeatCount,
+          message: `${name} still running... (${elapsedSec}s elapsed)`,
+        },
+      }).catch(() => {});
+    }, HEARTBEAT_INTERVAL_MS);
+  }
+
   try {
     const text = await handleTool(name, args);
     return {
@@ -1051,6 +1114,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       ],
       isError: true,
     };
+  } finally {
+    if (heartbeat) clearInterval(heartbeat);
   }
 });
 
