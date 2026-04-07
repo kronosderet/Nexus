@@ -20829,7 +20829,12 @@ var StdioServerTransport = class {
 // server/mcp/index.ts
 var NEXUS_BASE = process.env.NEXUS_BASE_URL || "http://localhost:3001";
 var SERVER_NAME = "nexus";
-var SERVER_VERSION = "3.2.0";
+var SERVER_VERSION = "3.2.1";
+var SLOW_TOOLS = /* @__PURE__ */ new Set([
+  "nexus_ask_overseer",
+  "nexus_bridge_session"
+]);
+var HEARTBEAT_INTERVAL_MS = 8e3;
 async function nexusFetch(path, init = {}) {
   let res;
   try {
@@ -21671,8 +21676,35 @@ var server = new Server(
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: TOOLS
 }));
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
   const { name, arguments: args } = request.params;
+  const progressToken = request.params._meta?.progressToken;
+  let heartbeat = null;
+  let heartbeatCount = 0;
+  if (progressToken != null && SLOW_TOOLS.has(name)) {
+    extra.sendNotification({
+      method: "notifications/progress",
+      params: {
+        progressToken,
+        progress: 0,
+        message: `${name} started (may take 30-120s for local AI inference)`
+      }
+    }).catch(() => {
+    });
+    heartbeat = setInterval(() => {
+      heartbeatCount += 1;
+      const elapsedSec = heartbeatCount * (HEARTBEAT_INTERVAL_MS / 1e3);
+      extra.sendNotification({
+        method: "notifications/progress",
+        params: {
+          progressToken,
+          progress: heartbeatCount,
+          message: `${name} still running... (${elapsedSec}s elapsed)`
+        }
+      }).catch(() => {
+      });
+    }, HEARTBEAT_INTERVAL_MS);
+  }
   try {
     const text = await handleTool(name, args);
     return {
@@ -21688,6 +21720,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       ],
       isError: true
     };
+  } finally {
+    if (heartbeat) clearInterval(heartbeat);
   }
 });
 async function main() {
