@@ -236,26 +236,141 @@ function ContradictionsView({ data }) {
 }
 
 function HolesView({ data }) {
+  if (!data) return null;
+  const fragmented = data.fragmented || [];
+  const healthy = (data.projectAnalysis || []).filter((p) => !p.isFragmented);
+  const crossLinks = Object.entries(data.crossLinks || {});
+
   return (
-    <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
-      {data?.holes?.length === 0 ? (
-        <p className="text-xs font-mono text-nexus-green">All projects well-connected.</p>
+    <div className="space-y-4">
+      {/* Headline summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-nexus-surface border border-nexus-border rounded-xl p-4">
+          <span className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider">Fragmented projects</span>
+          <p className={`text-2xl font-light mt-1 ${data.totalFragmented > 0 ? 'text-nexus-amber' : 'text-nexus-green'}`}>
+            {data.totalFragmented || 0}
+          </p>
+          <p className="text-[10px] font-mono text-nexus-text-faint mt-1">
+            {data.totalFragmented > 0 ? 'have disconnected sub-clusters' : 'all decision graphs connected'}
+          </p>
+        </div>
+        <div className="bg-nexus-surface border border-nexus-border rounded-xl p-4">
+          <span className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider">Orphan decisions</span>
+          <p className={`text-2xl font-light mt-1 ${data.totalOrphans > 0 ? 'text-nexus-amber' : 'text-nexus-green'}`}>
+            {data.totalOrphans || 0}
+          </p>
+          <p className="text-[10px] font-mono text-nexus-text-faint mt-1">
+            isolated, no edges
+          </p>
+        </div>
+        <div className="bg-nexus-surface border border-nexus-border rounded-xl p-4">
+          <span className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider">Healthy projects</span>
+          <p className="text-2xl font-light text-nexus-green mt-1">{healthy.length}</p>
+          <p className="text-[10px] font-mono text-nexus-text-faint mt-1">
+            single connected graph
+          </p>
+        </div>
+      </div>
+
+      {/* Fragmented projects detail */}
+      {fragmented.length > 0 ? (
+        <div>
+          <h3 className="text-[10px] font-mono text-nexus-amber uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
+            <AlertTriangle size={11} /> Fragmented decision graphs
+          </h3>
+          <div className="space-y-3">
+            {fragmented.map((p) => (
+              <div key={p.project} className="bg-nexus-surface border border-nexus-amber/20 rounded-xl p-4">
+                <div className="flex items-baseline justify-between mb-3">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm text-nexus-text font-medium">{p.project}</span>
+                    <span className="text-[10px] font-mono text-nexus-text-faint">
+                      {p.decisions} decisions · {p.edges} internal edges
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-nexus-amber">
+                    {p.components} clusters · {p.orphans} orphan{p.orphans !== 1 ? 's' : ''}
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {p.clusters.slice(0, 5).map((c, i) => (
+                    <div
+                      key={i}
+                      className={`flex items-start gap-2 px-2 py-1.5 rounded ${
+                        c.size === 1 ? 'bg-nexus-bg/40 border border-nexus-border' : 'bg-nexus-amber/5 border border-nexus-amber/10'
+                      }`}
+                    >
+                      <span className="text-[10px] font-mono text-nexus-text-faint w-12 shrink-0 mt-0.5">
+                        {c.size === 1 ? 'orphan' : `×${c.size}`}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        {c.sampleTitles.map((title, j) => (
+                          <p key={j} className="text-xs text-nexus-text-dim truncate">
+                            {title}
+                          </p>
+                        ))}
+                        {c.size > c.sampleTitles.length && (
+                          <p className="text-[10px] font-mono text-nexus-text-faint">
+                            +{c.size - c.sampleTitles.length} more
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {p.clusters.length > 5 && (
+                    <p className="text-[10px] font-mono text-nexus-text-faint pl-2">
+                      +{p.clusters.length - 5} more clusters
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : (
-        <div className="space-y-2 mb-4">
-          {data?.holes?.map((h, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs"><AlertTriangle size={10} className="text-nexus-amber" /><span className="text-nexus-text-dim">{h.pair}: {h.note}</span></div>
-          ))}
+        <div className="bg-nexus-green/5 border border-nexus-green/20 rounded-xl p-6 text-center">
+          <p className="text-xs font-mono text-nexus-green">
+            All decision graphs are fully connected. No structural holes detected.
+          </p>
         </div>
       )}
-      <span className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider">Cross-project links</span>
-      <div className="mt-2 space-y-1">
-        {Object.entries(data?.crossLinks || {}).map(([pair, count]) => (
-          <div key={pair} className="flex items-center justify-between text-xs font-mono">
-            <span className="text-nexus-text-dim">{pair}</span>
-            <span className="text-nexus-text-faint">{count}</span>
+
+      {/* Healthy projects summary */}
+      {healthy.length > 0 && (
+        <div>
+          <h3 className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-[0.2em] mb-2">
+            Healthy projects
+          </h3>
+          <div className="flex flex-wrap gap-1.5">
+            {healthy.map((p) => (
+              <div
+                key={p.project}
+                className="px-2 py-1 rounded-full text-[10px] font-mono bg-nexus-green/5 text-nexus-green border border-nexus-green/20"
+              >
+                {p.project} <span className="opacity-60">×{p.decisions}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      )}
+
+      {/* Cross-project links (supplementary, not flagged as holes) */}
+      {crossLinks.length > 0 && (
+        <div>
+          <h3 className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-[0.2em] mb-2">
+            Cross-project links ({crossLinks.length})
+          </h3>
+          <div className="bg-nexus-surface border border-nexus-border rounded-xl p-3 space-y-1">
+            {crossLinks.map(([pair, count]) => (
+              <div key={pair} className="flex items-center justify-between text-xs font-mono">
+                <span className="text-nexus-text-dim">{pair}</span>
+                <span className="text-nexus-text-faint">{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
