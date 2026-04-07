@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import type {
   NexusData, Task, ActivityEntry, Session, Scratchpad,
   UsageEntry, GpuSnapshot, Decision, GraphEdge, GraphData, SessionTiming,
-  Bookmark,
+  Bookmark, AdviceEntry,
 } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,6 +30,7 @@ export class NexusStore {
     if (!this.data.ledger) this.data.ledger = [];
     if (!this.data.graph_edges) this.data.graph_edges = [];
     if (!this.data.bookmarks) this.data.bookmarks = [];
+    if (!this.data.advice) this.data.advice = [];
 
     this._nextId = {
       tasks: Math.max(0, ...this.data.tasks.map(t => t.id)) + 1,
@@ -43,7 +44,7 @@ export class NexusStore {
   private _seed(): NexusData {
     return {
       tasks: [], activity: [], sessions: [], usage: [], gpu_history: [],
-      ledger: [], graph_edges: [],
+      ledger: [], graph_edges: [], advice: [],
       scratchpads: [{
         id: 1, name: "Scratchpad",
         content: "# Scratchpad\n\nWorking area.\n",
@@ -346,5 +347,115 @@ export class NexusStore {
     }
 
     return results.sort((a, b) => b.score - a.score || new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, limit);
+  }
+
+  // ── Advice Journal ─────────────────────────────────────
+  recordAdvice(opts: {
+    source: AdviceEntry['source'];
+    question: string;
+    recommendation: string;
+    context_snapshot?: AdviceEntry['context_snapshot'];
+  }): AdviceEntry | null {
+    if (!this.data.advice) this.data.advice = [];
+
+    // Dedup: if identical recommendation was logged within the last hour, skip
+    const hash = opts.recommendation.slice(0, 100).toLowerCase().replace(/\s+/g, ' ').trim();
+    const oneHourAgo = Date.now() - 3600000;
+    const recentDuplicate = this.data.advice.find(a =>
+      a.recommendation_hash === hash && new Date(a.created_at).getTime() > oneHourAgo
+    );
+    if (recentDuplicate) return null;
+
+    const snapshot = opts.context_snapshot ?? {
+      session_fuel: this.getLatestUsage()?.session_percent ?? null,
+      weekly_fuel: this.getLatestUsage()?.weekly_percent ?? null,
+      open_tasks: this.data.tasks.filter(t => t.status !== 'done').length,
+      in_progress_tasks: this.data.tasks.filter(t => t.status === 'in_progress').length,
+      recent_decisions: this.data.ledger.filter(d =>
+        Date.now() - new Date(d.created_at).getTime() < 86400000
+      ).length,
+    };
+
+    const entry: AdviceEntry = {
+      id: (this.data.advice.length > 0 ? Math.max(...this.data.advice.map(a => a.id)) : 0) + 1,
+      created_at: this._now(),
+      source: opts.source,
+      question: opts.question,
+      recommendation: opts.recommendation,
+      recommendation_hash: hash,
+      context_snapshot: snapshot,
+      accepted: null,
+      outcome: null,
+      notes: '',
+      measured_fuel_cost: null,
+    };
+    this.data.advice.push(entry);
+
+    // Keep bounded to last 500 advice entries
+    if (this.data.advice.length > 500) {
+      this.data.advice = this.data.advice.slice(-500);
+    }
+
+    this._flush();
+    return entry;
+  }
+
+  getAdvice(opts: { limit?: number; source?: string; onlyUnjudged?: boolean } = {}): AdviceEntry[] {
+    let entries = [...(this.data.advice || [])];
+    if (opts.source) entries = entries.filter(e => e.source === opts.source);
+    if (opts.onlyUnjudged) entries = entries.filter(e => e.accepted === null);
+    return entries
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, opts.limit ?? 20);
+  }
+
+  updateAdviceVerdict(id: number, updates: {
+    accepted?: boolean;
+    outcome?: AdviceEntry['outcome'];
+    notes?: string;
+    measured_fuel_cost?: number | null;
+  }): AdviceEntry | null {
+    const idx = (this.data.advice || []).findIndex(a => a.id === id);
+    if (idx === -1) return null;
+    this.data.advice[idx] = { ...this.data.advice[idx], ...updates };
+    this._flush();
+    return this.data.advice[idx];
+  }
+
+  // Aggregate patterns: how often was Overseer right?
+  getAdvicePatterns() {
+    const all = this.data.advice || [];
+    const judged = all.filter(a => a.accepted !== null);
+    const accepted = all.filter(a => a.accepted === true);
+    const rejected = all.filter(a => a.accepted === false);
+
+    const bySource: Record<string, { total: number; accepted: number; worked: number; wrong: number }> = {};
+    for (const a of all) {
+      if (!bySource[a.source]) bySource[a.source] = { total: 0, accepted: 0, worked: 0, wrong: 0 };
+      bySource[a.source].total++;
+      if (a.accepted === true) bySource[a.source].accepted++;
+      if (a.outcome === 'worked') bySource[a.source].worked++;
+      if (a.outcome === 'wrong') bySource[a.source].wrong++;
+    }
+
+    const outcomes = {
+      worked: all.filter(a => a.outcome === 'worked').length,
+      partial: all.filter(a => a.outcome === 'partial').length,
+      wrong: all.filter(a => a.outcome === 'wrong').length,
+    };
+
+    return {
+      total: all.length,
+      judged: judged.length,
+      unjudged: all.length - judged.length,
+      acceptanceRate: judged.length > 0 ? Math.round((accepted.length / judged.length) * 100) : null,
+      accepted: accepted.length,
+      rejected: rejected.length,
+      outcomes,
+      accuracyRate: (outcomes.worked + outcomes.partial + outcomes.wrong) > 0
+        ? Math.round((outcomes.worked / (outcomes.worked + outcomes.partial + outcomes.wrong)) * 100)
+        : null,
+      bySource,
+    };
   }
 }

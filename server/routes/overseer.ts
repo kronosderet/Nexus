@@ -121,7 +121,18 @@ function gatherContext(store: NexusStore) {
   const projectsWithDecisions = new Set(((store as any).data.ledger || []).map((d: any) => d.project.toLowerCase()));
   const blindSpots = repos.filter(r => !projectsWithDecisions.has(r.name.toLowerCase())).map(r => r.name);
 
-  return { tasks, sessions, activity, usage, repos, ledger, topCentral, blindSpots, graphStats: { nodes: graph.nodes.length, edges: graph.edges.length } };
+  // Advice journal: past recommendations + their outcomes (the learning loop)
+  const allAdvice = store.getAdvice({ limit: 50 });
+  const judgedAdvice = allAdvice.filter(a => a.accepted !== null).slice(0, 10);
+  const advicePatterns = store.getAdvicePatterns();
+
+  return {
+    tasks, sessions, activity, usage, repos, ledger,
+    topCentral, blindSpots,
+    graphStats: { nodes: graph.nodes.length, edges: graph.edges.length },
+    judgedAdvice,
+    advicePatterns,
+  };
 }
 
 function buildContextPrompt(ctx: any) {
@@ -154,6 +165,27 @@ function buildContextPrompt(ctx: any) {
     for (const d of ctx.ledger.slice(0, 10)) {
       lines.push(`  [${d.project}] ${d.decision}${d.alternatives.length ? ` (alternatives: ${d.alternatives.join(', ')})` : ''}`);
     }
+  }
+
+  // Advice Journal: your own track record (the learning loop)
+  if (ctx.advicePatterns && ctx.advicePatterns.judged > 0) {
+    const p = ctx.advicePatterns;
+    lines.push(`\nYOUR OWN TRACK RECORD (${p.total} recommendations made, ${p.judged} judged):`);
+    if (p.acceptanceRate !== null) lines.push(`  Acceptance rate: ${p.acceptanceRate}%`);
+    if (p.accuracyRate !== null) lines.push(`  Accuracy rate: ${p.accuracyRate}% (when accepted, ratio that worked)`);
+    lines.push(`  Outcomes: ${p.outcomes.worked} worked, ${p.outcomes.partial} partial, ${p.outcomes.wrong} wrong`);
+  }
+
+  if (ctx.judgedAdvice && ctx.judgedAdvice.length > 0) {
+    lines.push('\nPAST ADVICE WITH VERDICTS (learn from these):');
+    for (const a of ctx.judgedAdvice.slice(0, 5)) {
+      const verdict = a.accepted
+        ? (a.outcome === 'worked' ? '✓ WORKED' : a.outcome === 'partial' ? '~ PARTIAL' : a.outcome === 'wrong' ? '✗ WRONG' : '? NO OUTCOME')
+        : '✗ REJECTED';
+      lines.push(`  [${verdict}] ${a.recommendation.slice(0, 120)}${a.recommendation.length > 120 ? '...' : ''}`);
+      if (a.notes) lines.push(`    Note: ${a.notes}`);
+    }
+    lines.push('\nUse this track record to adjust your confidence. Avoid patterns that failed before.');
   }
 
   // Sessions (recent context)
@@ -213,8 +245,16 @@ export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) 
       const entry = store.addActivity('overseer', 'Overseer analysis completed');
       broadcast({ type: 'activity', payload: entry });
 
+      // Auto-log advice to the Advice Journal
+      const advice = store.recordAdvice({
+        source: 'overseer',
+        question: '',
+        recommendation: analysis,
+      });
+
       res.json({
         analysis,
+        adviceId: advice?.id ?? null,
         model: ai.model,
         provider: ai.provider,
         context: {
@@ -243,7 +283,15 @@ export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) 
 
     try {
       const answer = await ask(ai, OVERSEER_SYSTEM, `Given this workspace state:\n\n${contextPrompt}\n\nQuestion: ${question}`);
-      res.json({ answer, model: ai.model });
+
+      // Auto-log advice
+      const advice = store.recordAdvice({
+        source: 'ask',
+        question,
+        recommendation: answer,
+      });
+
+      res.json({ answer, adviceId: advice?.id ?? null, model: ai.model });
     } catch (err: any) {
       res.json({ error: err.message });
     }
