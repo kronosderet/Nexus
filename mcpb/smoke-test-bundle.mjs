@@ -88,6 +88,22 @@ async function main() {
   console.log(`✓ nexus_check_guard works`);
   console.log(guard.result.content[0].text.split('\n').slice(0, 6).join('\n'));
 
+  // New in v3.1.1: log_usage round-trip
+  const logUsage = await send('tools/call', {
+    name: 'nexus_log_usage',
+    arguments: {
+      session_percent: 76,
+      weekly_percent: 6,
+      note: 'smoke test',
+    },
+  });
+  if (logUsage.result.isError) {
+    console.error('✗ nexus_log_usage returned error:', logUsage.result.content[0].text);
+    process.exit(1);
+  }
+  console.log(`\n✓ nexus_log_usage works`);
+  console.log(logUsage.result.content[0].text);
+
   console.log('\n=== BUNDLED SERVER WORKS AS STANDALONE NODE PROCESS ===');
   child.kill();
   process.exit(0);

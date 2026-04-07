@@ -12,13 +12,14 @@
  * isn't running, tool calls return a clear error telling the user to
  * start it.
  *
- * v1 toolset (6 tools):
+ * v1.1 toolset (7 tools):
  *   - nexus_brief             — current state for a given project
  *   - nexus_get_plan          — AI-generated session plan with fuel context
  *   - nexus_check_guard       — redundancy check before starting work
  *   - nexus_record_decision   — write a strategic decision into the Ledger
  *   - nexus_push_thought      — push a thought onto the interrupt-recovery stack
  *   - nexus_pop_thought       — pop the top thought (recover from interruption)
+ *   - nexus_log_usage         — log session/weekly fuel readings (closes the last bash gap)
  *
  * Run via: `npx tsx server/mcp/index.ts`
  * Or use the `nexus mcp` CLI subcommand which prints the Claude Code
@@ -36,7 +37,7 @@ import {
 // ── Configuration ────────────────────────────────────────
 const NEXUS_BASE = process.env.NEXUS_BASE_URL || 'http://localhost:3001';
 const SERVER_NAME = 'nexus';
-const SERVER_VERSION = '3.1.0';
+const SERVER_VERSION = '3.1.1';
 
 // ── HTTP helper ──────────────────────────────────────────
 async function nexusFetch(
@@ -297,6 +298,38 @@ const TOOLS: Tool[] = [
       },
     },
   },
+  {
+    name: 'nexus_log_usage',
+    description:
+      'Log a Claude fuel reading — session percent remaining and/or weekly percent remaining. ' +
+      'Values are PERCENTAGES REMAINING (higher = more fuel left), not percent used. ' +
+      'Example: user says "17% session used" → pass session_percent: 83. ' +
+      'Optionally pass reset_in_minutes to (re)start the session timing window (use this when the user ' +
+      'tells you how long until their session resets, e.g. "resets in 3h 43m" → 223). ' +
+      'This feeds the Fuel Intelligence module, burn-rate estimation, workload advisor, and the Overseer ' +
+      'risk scanner. Call it whenever the user reports a new fuel reading.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        session_percent: {
+          type: 'number',
+          description: 'Session fuel REMAINING (0-100). If the user says "17% used", pass 83.',
+        },
+        weekly_percent: {
+          type: 'number',
+          description: 'Weekly fuel REMAINING (0-100). If the user says "94% used", pass 6.',
+        },
+        reset_in_minutes: {
+          type: 'number',
+          description: 'Optional: minutes until the session window resets. If provided, (re)starts the session timing window. Example: "resets in 3h 43m" → 223.',
+        },
+        note: {
+          type: 'string',
+          description: 'Optional free-text note attached to this reading (e.g. "before starting MCP tool work").',
+        },
+      },
+    },
+  },
 ];
 
 // ── Tool handlers ────────────────────────────────────────
@@ -415,6 +448,50 @@ async function handleTool(name: string, args: any): Promise<string> {
         }
         throw err;
       }
+    }
+
+    case 'nexus_log_usage': {
+      if (args?.session_percent == null && args?.weekly_percent == null) {
+        throw new Error(
+          'Provide session_percent and/or weekly_percent (percentages REMAINING, not used).'
+        );
+      }
+      const body: any = {};
+      if (args.session_percent != null) body.session_percent = Number(args.session_percent);
+      if (args.weekly_percent != null) body.weekly_percent = Number(args.weekly_percent);
+      if (args.reset_in_minutes != null) body.reset_in_minutes = Number(args.reset_in_minutes);
+      if (args.note) body.note = String(args.note);
+
+      const result = await nexusFetch('/api/usage', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+
+      const parts: string[] = ['◈ Fuel logged'];
+      if (result.session_percent != null) parts.push(`session ${result.session_percent}%`);
+      if (result.weekly_percent != null) parts.push(`weekly ${result.weekly_percent}%`);
+
+      const lines: string[] = [parts.join(' · ')];
+      if (result.timing?.session?.countdown) {
+        lines.push(`  Session resets in ${result.timing.session.countdown}`);
+      }
+      if (result.timing?.weekly?.countdown) {
+        lines.push(`  Weekly resets ${result.timing.weekly.countdown}`);
+      }
+      // Surface low-fuel warnings so the caller notices immediately
+      if (
+        result.session_percent != null &&
+        result.session_percent <= 15
+      ) {
+        lines.push(`  ⚠ Session fuel LOW (${result.session_percent}%) — consider wrapping up.`);
+      }
+      if (
+        result.weekly_percent != null &&
+        result.weekly_percent <= 10
+      ) {
+        lines.push(`  ⚠ Weekly fuel CRITICAL (${result.weekly_percent}%) — ration carefully.`);
+      }
+      return lines.join('\n');
     }
 
     default:
