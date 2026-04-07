@@ -10,12 +10,17 @@
     "build": "cd client && npx vite build",
     "start": "cd server && tsx index.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "mcpb:bundle": "esbuild server/mcp/index.ts --bundle --platform=node --target=node18 --format=esm --outfile=mcpb/server/index.js --external:fsevents",
+    "mcpb:pack": "npm run mcpb:bundle && mcpb pack mcpb mcpb/nexus.mcpb",
+    "mcpb:test": "node mcpb/smoke-test-bundle.mjs"
   },
   "devDependencies": {
+    "@anthropic-ai/mcpb": "^2.1.2",
     "@types/express": "^5.0.6",
     "@types/node": "^25.5.2",
     "concurrently": "^9.1.2",
+    "esbuild": "^0.28.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vitest": "^4.1.2"
