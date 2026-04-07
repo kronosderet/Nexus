@@ -5,16 +5,16 @@ import SearchModal from './components/SearchModal.jsx';
 import Pulse from './modules/Pulse.jsx';
 import MissionBoard from './modules/MissionBoard.jsx';
 import ActivityStream from './modules/ActivityStream.jsx';
-import Scratchpad from './modules/Scratchpad.jsx';
 import Sessions from './modules/Sessions.jsx';
 import Overseer from './modules/Overseer.jsx';
 import TerminalModule from './modules/Terminal.jsx';
 import FuelModule from './modules/Fuel.jsx';
 import GraphModule from './modules/Graph.jsx';
+import BookmarksModule from './modules/Bookmarks.jsx';
 import WelcomeScreen from './components/WelcomeScreen.jsx';
 import ToastOverlay from './components/ToastOverlay.jsx';
 
-const MODULE_KEYS = ['pulse', 'fuel', 'graph', 'overseer', 'missions', 'activity', 'sessions', 'scratchpad', 'terminal'];
+const MODULE_KEYS = ['pulse', 'fuel', 'graph', 'overseer', 'missions', 'activity', 'sessions', 'bookmarks', 'terminal'];
 const MODULES = {
   pulse: { label: 'System Pulse', icon: 'activity', component: Pulse, shortcut: '1' },
   fuel: { label: 'Fuel', icon: 'fuel', component: FuelModule, shortcut: '2' },
@@ -23,7 +23,7 @@ const MODULES = {
   missions: { label: 'Missions', icon: 'compass', component: MissionBoard, shortcut: '5' },
   activity: { label: 'Activity', icon: 'scroll-text', component: ActivityStream, shortcut: '6' },
   sessions: { label: 'Sessions', icon: 'book-open', component: Sessions, shortcut: '7' },
-  scratchpad: { label: 'Scratchpad', icon: 'pen-tool', component: Scratchpad, shortcut: '8' },
+  bookmarks: { label: 'Bookmarks', icon: 'bookmark', component: BookmarksModule, shortcut: '8' },
   terminal: { label: 'Terminal', icon: 'terminal', component: TerminalModule, shortcut: '9' },
 };
 

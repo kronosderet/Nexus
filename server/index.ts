@@ -33,8 +33,10 @@ import { createEstimatorRoutes } from './routes/estimator.ts';
 import { createFuelIntelRoutes } from './routes/fuelIntel.ts';
 import { createPlanRoutes } from './routes/plan.ts';
 import { createPredictRoutes } from './routes/predict.ts';
+import { createAutoSummaryRoutes } from './routes/autoSummary.ts';
 import { createLedgerRoutes } from './routes/ledger.ts';
 import { createImpactRoutes } from './routes/impact.ts';
+import { createBookmarkRoutes } from './routes/bookmarks.ts';
 import { startFileWatcher } from './watchers/fileWatcher.ts';
 import { startGpuPoller } from './watchers/gpuPoller.ts';
 import { startOverseerPoller } from './watchers/overseerPoller.ts';
@@ -129,8 +131,10 @@ app.use('/api/estimator', createEstimatorRoutes(store));
 app.use('/api/fuel-intel', createFuelIntelRoutes(store));
 app.use('/api/plan', createPlanRoutes(store));
 app.use('/api/predict', createPredictRoutes(store, broadcast));
+app.use('/api/auto-summary', createAutoSummaryRoutes(store, broadcast));
 app.use('/api/ledger', createLedgerRoutes(store, broadcast));
 app.use('/api/impact', createImpactRoutes(store));
+app.use('/api/bookmarks', createBookmarkRoutes(store));
 
 // SPA fallback (Express 5 requires named wildcard)
 app.get('/{*splat}', (req, res) => {
