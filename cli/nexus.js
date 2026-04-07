@@ -351,23 +351,30 @@ const commands = {
 ## Nexus Integration for ${project}
 
 ### What is Nexus?
-Local AI-powered mission control. Tracks tasks, sessions, decisions, fuel usage,
-and git state across all projects. Has an AI Overseer (Gemma 4 26B local) and
-a Knowledge Graph of architectural decisions.
+Local AI-powered mission control (v3.0-alpha4). Tracks tasks, sessions, decisions,
+fuel usage, and git state across all projects. Features:
+  • Knowledge Graph of architectural decisions (76+ nodes, typed edges)
+  • Local AI Overseer (Gemma 4 26B via LM Studio) with self-improving feedback loop
+  • Smart Fuel Intelligence with autonomous session planning
+  • Predictive Task Generation from graph gaps
+  • Impact Forecasting with AI-narrated migration plans
+  • 100% TypeScript server, 114 Vitest tests
 
 ### Session Workflow (FOLLOW THIS)
 
 **START of session:**
 \`\`\`bash
-nexus brief ${project}     # Full context: fuel, tasks, risks, sessions, decisions
-# OR for quick glance:
-nexus quick                 # 3-line status
+nexus brief ${project}      # Full context: fuel, tasks, risks, sessions, decisions
+nexus quick                  # OR: 3-line glance (fuel + risks + active task)
+nexus plan ${project}        # OR: AI-generated session plan tailored to current fuel
 \`\`\`
 
 **DURING work — report fuel when user gives numbers:**
 \`\`\`bash
 nexus usage <session_remaining%> <weekly_remaining%> --reset <minutes_until_reset>
 # Example: user says "35% used, resets in 4h" → nexus usage 65 30 --reset 240
+nexus fuel                   # Smart estimate with runway prediction
+nexus workload               # Task capacity for current fuel level
 \`\`\`
 
 **DURING work — track what you're doing:**
@@ -380,34 +387,59 @@ nexus done <task_id>
 
 **BEFORE big decisions — check impact:**
 \`\`\`bash
-nexus impact blast <decision_id>    # What breaks if this changes?
-nexus overseer "Should we do X?"     # Ask the AI for strategic advice
-nexus search "relevant topic"        # Hybrid keyword+semantic search
+nexus impact blast <decision_id>      # What breaks if this changes?
+nexus impact forecast <decision_id>   # AI-narrated migration assessment
+nexus overseer "Should we do X?"       # Strategic advice (auto-logged to journal)
+nexus search "relevant topic"          # Hybrid keyword+semantic search
+nexus predict                          # Detect graph gaps + suggest missing tasks
+\`\`\`
+
+**TRACK Overseer accuracy (the learning loop):**
+\`\`\`bash
+nexus advice                           # Recent recommendations awaiting verdict
+nexus advice verdict <id> worked       # Mark how the advice turned out
+nexus advice patterns                  # Acceptance + accuracy aggregates
 \`\`\`
 
 **END of session:**
 \`\`\`bash
-nexus session "Summary of what was done" --decisions "d1,d2" --blockers "b1" --tags "t1,t2"
-nexus handoff ${project}             # Generate context for next agent
+nexus session "Summary" --decisions "d1,d2" --blockers "b1" --tags "t1,t2"
+# OR let the Overseer write it for you:
+nexus summarize ${project} --commit    # AI generates + saves session log
+nexus handoff ${project}               # Generate context capsule for next agent
 \`\`\`
 
-### Key Commands Reference
+### Key Commands Reference (51 total)
 \`\`\`
-CONTEXT:    nexus brief | quick | handoff | context
-FUEL:       nexus usage | fuel | intel | workload
-TASKS:      nexus task | tasks | done
-MEMORY:     nexus session | log | note | record | decisions
+CONTEXT:    nexus brief | quick | handoff | context | onboard
+FUEL:       nexus usage | fuel | intel | workload | plan
+TASKS:      nexus task | tasks | done | predict
+MEMORY:     nexus session | summarize | log | note | record | decisions
 SEARCH:     nexus search | seek | find
-INTEL:      nexus overseer | impact blast|centrality|holes | graph
+INTEL:      nexus overseer | advice | impact blast|forecast|centrality|holes | graph
 GIT:        nexus sync | commit-all | repos | focus
-TOOLS:      nexus ai | notify | digest | gpu
+TOOLS:      nexus ai | notify | digest | gpu | bookmarks
 \`\`\`
+
+### Dashboard Modules (http://localhost:5173)
+1. Pulse (^1) — system overview, GPU, project health
+2. Fuel (^2) — usage gauges, burn rate, workload planner
+3. Graph (^3) — knowledge graph with blast/centrality/visual
+4. Overseer (^4) — AI strategic analysis, Q&A
+5. Missions (^5) — Kanban board
+6. Activity (^6) — event stream
+7. Sessions (^7) — voyage log
+8. Bookmarks (^8) — curated links
+9. Terminal (^9) — embedded shell
++ Search (^K) — global hybrid search
 
 ### Important Rules
 - Session fuel is a ROLLING 5-HOUR WINDOW, not daily
 - Weekly resets Thursday 21:00 CET (Europe/Prague)
-- Weekly limit is MUCH LARGER than session — they're different scales
-- Always log a \`nexus session\` before ending — it's the memory bridge
+- Weekly limit is MUCH LARGER than session — different scales, plan accordingly
+- ALWAYS log a session at the end (or use \`nexus summarize -c\`) — it's the memory bridge
+- Overseer recommendations auto-log to /api/advice — mark verdicts to make it smarter
+- Knowledge Graph decisions feed Overseer context — record big choices with \`nexus record\`
 `);
   },
 
