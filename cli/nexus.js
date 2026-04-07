@@ -149,6 +149,91 @@ const commands = {
     console.log('');
   },
 
+  async advice(args) {
+    // Subcommands: recent (default), patterns, verdict <id> <worked|partial|wrong|reject> [notes]
+    const sub = args[0] || 'recent';
+
+    if (sub === 'patterns') {
+      const p = await api('/advice/patterns');
+      console.log(`\n  ${amber('◈')} ${amber('Advice Journal Patterns')}\n`);
+      console.log(`  ${dim('Total recommendations:')}  ${p.total}`);
+      console.log(`  ${dim('Judged:')}                ${p.judged} (${p.unjudged} unjudged)`);
+      if (p.acceptanceRate !== null) {
+        const ac = p.acceptanceRate >= 70 ? green : p.acceptanceRate >= 40 ? amber : red;
+        console.log(`  ${dim('Acceptance rate:')}       ${ac(`${p.acceptanceRate}%`)}`);
+      }
+      if (p.accuracyRate !== null) {
+        const ar = p.accuracyRate >= 70 ? green : p.accuracyRate >= 40 ? amber : red;
+        console.log(`  ${dim('Accuracy (when accepted):')} ${ar(`${p.accuracyRate}%`)}`);
+      }
+      console.log('');
+      console.log(`  ${dim('Outcomes:')} ${green(`${p.outcomes.worked} worked`)}  ${amber(`${p.outcomes.partial} partial`)}  ${red(`${p.outcomes.wrong} wrong`)}`);
+      if (p.bySource && Object.keys(p.bySource).length > 0) {
+        console.log(`\n  ${dim('By source:')}`);
+        for (const [src, s] of Object.entries(p.bySource)) {
+          console.log(`    ${src.padEnd(12)} total:${s.total}  accepted:${s.accepted}  worked:${s.worked}  wrong:${s.wrong}`);
+        }
+      }
+      console.log('');
+      return;
+    }
+
+    if (sub === 'verdict') {
+      // nexus advice verdict <id> <worked|partial|wrong|reject> [notes...]
+      const id = parseInt(args[1]);
+      const verdict = args[2];
+      const notes = args.slice(3).join(' ');
+      if (!id || !verdict) {
+        console.error('  Usage: nexus advice verdict <id> <worked|partial|wrong|reject> [notes]');
+        return;
+      }
+      let body;
+      if (verdict === 'reject' || verdict === 'rejected') {
+        body = { accepted: false, notes };
+      } else if (['worked', 'partial', 'wrong'].includes(verdict)) {
+        body = { accepted: true, outcome: verdict, notes };
+      } else {
+        console.error('  Verdict must be one of: worked, partial, wrong, reject');
+        return;
+      }
+      const updated = await api(`/advice/${id}/verdict`, { method: 'PATCH', body });
+      if (updated.error) {
+        console.log(`  ${red('◈')} ${updated.error}`);
+        return;
+      }
+      const mark = updated.accepted === false ? red('✗ rejected') :
+                   updated.outcome === 'worked' ? green('✓ worked') :
+                   updated.outcome === 'partial' ? amber('~ partial') :
+                   red('✗ wrong');
+      console.log(`  ${mark}  Advice #${updated.id} verdict recorded.`);
+      return;
+    }
+
+    // recent (default)
+    const limit = parseInt(args[1]) || 10;
+    const data = await api(`/advice?limit=${limit}&unjudged=${args.includes('--unjudged') ? 'true' : 'false'}`);
+    if (data.length === 0) {
+      console.log(`  ${dim('No advice recorded yet.')}`);
+      return;
+    }
+    console.log(`\n  ${amber('◈')} ${amber('Recent Advice')} (${data.length})\n`);
+    for (const a of data) {
+      const mark = a.accepted === null ? dim('?') :
+                   a.accepted === false ? red('✗') :
+                   a.outcome === 'worked' ? green('✓') :
+                   a.outcome === 'partial' ? amber('~') :
+                   a.outcome === 'wrong' ? red('✗') : dim('?');
+      const time = new Date(a.created_at).toLocaleString('cs-CZ', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+      console.log(`  ${dim(`#${a.id}`)} ${mark} ${dim(`[${a.source}]`)} ${dim(time)}`);
+      const firstLine = a.recommendation.split('\n').find(l => l.trim()) || a.recommendation;
+      console.log(`      ${firstLine.slice(0, 100)}${firstLine.length > 100 ? '...' : ''}`);
+    }
+    console.log('');
+    console.log(`  ${dim('Record verdict:')} nexus advice verdict <id> <worked|partial|wrong|reject> [notes]`);
+    console.log(`  ${dim('Patterns:')}       nexus advice patterns`);
+    console.log('');
+  },
+
   async summarize(args) {
     // Parse project and --commit flag
     const commit = args.includes('--commit') || args.includes('-c');
@@ -1380,6 +1465,9 @@ TOOLS:      nexus ai | notify | digest | gpu
     nexus plan                      Autonomous session plan (AI-generated)
     nexus summarize [project]       Overseer writes session log (preview)
     nexus summarize [project] -c    ...and save it as a session entry
+    nexus advice                    Recent Overseer recommendations
+    nexus advice patterns           Accuracy + acceptance rate stats
+    nexus advice verdict <id> <worked|partial|wrong|reject> [notes]
     nexus predict                   Detect graph gaps (dry run)
     nexus predict --generate        Auto-create tasks for detected gaps
     nexus onboard [project]          How to use Nexus (for new agents)

@@ -88,6 +88,27 @@ export interface Bookmark {
   created_at: string;
 }
 
+export interface AdviceEntry {
+  id: number;
+  created_at: string;
+  source: 'overseer' | 'plan' | 'ask' | 'forecast' | 'predict';
+  question: string;           // what the agent asked, or empty for unsolicited analysis
+  recommendation: string;     // what Overseer said
+  recommendation_hash: string; // first-100-chars hash for dedup
+  context_snapshot: {         // minimal state when advice was given
+    session_fuel: number | null;
+    weekly_fuel: number | null;
+    open_tasks: number;
+    in_progress_tasks: number;
+    recent_decisions: number;
+  };
+  // User verdict (filled in later via nexus advice verdict <id> ...)
+  accepted: boolean | null;       // did we follow the advice?
+  outcome: 'worked' | 'partial' | 'wrong' | null;
+  notes: string;                  // why, or what happened
+  measured_fuel_cost: number | null; // actual session% burned after accepting
+}
+
 // ── Store data shape ───────────────────────────────────
 
 export interface NexusData {
@@ -100,6 +121,7 @@ export interface NexusData {
   bookmarks: Bookmark[];
   ledger: Decision[];
   graph_edges: GraphEdge[];
+  advice: AdviceEntry[];
   _sessionTiming?: SessionTiming;
 }
 

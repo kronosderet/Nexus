@@ -241,6 +241,17 @@ async function buildSessionPlan(store: NexusStore, projectFilter?: string) {
     sessionFuel, effectiveRunway, inProgress, backlog, activeBlockers, burnPerHour,
   });
 
+  // ── 8.5. Auto-log advice to journal ─────────────────
+  let adviceId: number | null = null;
+  if (aiPlan) {
+    const advice = store.recordAdvice({
+      source: 'plan',
+      question: projectFilter ? `Plan session for ${projectFilter}` : 'Plan session',
+      recommendation: aiPlan,
+    });
+    adviceId = advice?.id ?? null;
+  }
+
   // ── 9. Return complete plan ─────────────────────────
   return {
     generatedAt: new Date().toISOString(),
@@ -258,6 +269,7 @@ async function buildSessionPlan(store: NexusStore, projectFilter?: string) {
       criticalRisks: criticalRisks.length,
     },
     aiPlan: aiPlan || null,
+    adviceId,
     aiProvider: ai.available ? ai.model : null,
     aiError,
     fallbackPlan,
