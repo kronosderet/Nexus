@@ -17,12 +17,7 @@ function RiskCard({ risk }) {
     setRunning(label);
     setResult(null);
     try {
-      const res = await fetch('/api/remediate/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, project, param }),
-      });
-      const data = await res.json();
+      const data = await api.executeRemediate({ action, project, param });
       setResult(data);
     } catch (err) {
       setResult({ success: false, error: err.message });
@@ -108,7 +103,7 @@ function AutoFixPanel() {
   async function scanForFixes() {
     setScanning(true);
     try {
-      const data = await fetch('/api/remediate/scan').then(r => r.json());
+      const data = await api.getRemediateScan();
       setFixableRisks(data.risks);
     } catch {} finally {
       setScanning(false);
@@ -124,12 +119,7 @@ function AutoFixPanel() {
     for (const risk of fixableRisks) {
       for (const action of (risk.actions || [])) {
         try {
-          const res = await fetch('/api/remediate/execute', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(action),
-          });
-          const data = await res.json();
+          const data = await api.executeRemediate(action);
           allResults.push({ label: action.label, ...data });
         } catch (err) {
           allResults.push({ label: action.label, success: false, error: err.message });
@@ -240,7 +230,7 @@ export default function Overseer() {
 
   async function fetchRisks() {
     try {
-      const data = await fetch('/api/overseer/risks').then(r => r.json());
+      const data = await api.getOverseerRisks();
       setRisks(data.risks);
     } catch {}
   }
@@ -248,7 +238,7 @@ export default function Overseer() {
   async function fetchAnalysis() {
     setLoading(true);
     try {
-      const data = await fetch('/api/overseer').then(r => r.json());
+      const data = await api.getOverseer();
       if (data.error) { setAnalysis(data.error); }
       else {
         setAnalysis(data.analysis);
@@ -266,11 +256,7 @@ export default function Overseer() {
     setAsking(true);
     setAnswer(null);
     try {
-      const data = await fetch('/api/overseer/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question }),
-      }).then(r => r.json());
+      const data = await api.askOverseer({ question });
       setAnswer(data.answer || data.error);
     } catch (err) {
       setAnswer(`Error: ${err.message}`);

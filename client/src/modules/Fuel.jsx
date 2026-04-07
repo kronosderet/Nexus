@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Fuel as FuelIcon, Clock, TrendingDown, Calendar, Zap, AlertTriangle } from 'lucide-react';
+import { api } from '../hooks/useApi.js';
 
 function color(pct) {
   if (pct == null) return 'text-nexus-text-faint';
@@ -28,14 +29,18 @@ export default function FuelModule({ ws }) {
   const [history, setHistory] = useState(null);
 
   async function fetchAll() {
-    const [f, w, h] = await Promise.all([
-      fetch('/api/estimator').then(r => r.json()),
-      fetch('/api/estimator/workload').then(r => r.json()),
-      fetch('/api/estimator/history').then(r => r.json()),
-    ]);
-    setFuel(f);
-    setWorkload(w);
-    setHistory(h);
+    try {
+      const [f, w, h] = await Promise.all([
+        api.getEstimator(),
+        api.getEstimatorWorkload(),
+        api.getEstimatorHistory(),
+      ]);
+      setFuel(f);
+      setWorkload(w);
+      setHistory(h);
+    } catch (err) {
+      console.error('Failed to fetch fuel data', err);
+    }
   }
 
   useEffect(() => { fetchAll(); const i = setInterval(fetchAll, 30000); return () => clearInterval(i); }, []);
@@ -72,7 +77,7 @@ export default function FuelModule({ ws }) {
       </div>
 
       {/* Main gauges */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Session Fuel</span>
@@ -104,7 +109,7 @@ export default function FuelModule({ ws }) {
       </div>
 
       {/* Burn rate + workload */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         {/* Burn rate */}
         <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-3">

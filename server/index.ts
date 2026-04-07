@@ -167,7 +167,7 @@ server.listen(PORT, () => {
 
   store.addActivity('system', 'Nexus is online. Setting course.');
   startFileWatcher(store, broadcast);
-  startGpuPoller(store);
+  startGpuPoller(store, broadcast);
   startOverseerPoller(store, broadcast);
 });
 

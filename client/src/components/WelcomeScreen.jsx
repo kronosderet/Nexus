@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { api } from '../hooks/useApi.js';
 
 const INIT_STEPS = [
   { key: 'system', label: 'System core', icon: '⚙' },
@@ -35,8 +36,7 @@ export default function WelcomeScreen({ connected, onReady }) {
 
   useEffect(() => {
     if (!connected) return;
-    fetch('/api/init')
-      .then(r => r.json())
+    api.getInit()
       .then(data => setChecks(data.checks))
       .catch(() => setChecks({}));
   }, [connected]);

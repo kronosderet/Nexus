@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { api } from '../hooks/useApi.js';
-import { BookOpen, Tag, AlertTriangle, FileText, ChevronDown, ChevronRight } from 'lucide-react';
+import { BookOpen, Tag, AlertTriangle, FileText, ChevronDown, ChevronRight, Search } from 'lucide-react';
 
 function formatDate(dateStr) {
   const d = new Date(dateStr);
@@ -108,10 +108,12 @@ export default function Sessions({ ws }) {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [blockersOnly, setBlockersOnly] = useState(false);
 
   async function fetchSessions() {
     try {
-      const params = filter ? `?project=${encodeURIComponent(filter)}` : '';
       const data = await api.getSessions(filter);
       setSessions(data);
     } catch {} finally {
@@ -133,6 +135,30 @@ export default function Sessions({ ws }) {
   // Get unique project names for filter
   const projects = [...new Set(sessions.map(s => s.project))];
 
+  // Apply search / blockers filter / sort locally
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let list = sessions.filter((s) => {
+      if (blockersOnly && (!s.blockers || s.blockers.length === 0)) return false;
+      if (!q) return true;
+      const haystack = [
+        s.summary,
+        s.project,
+        ...(s.tags || []),
+        ...(s.decisions || []),
+        ...(s.blockers || []),
+        ...(s.files_touched || []),
+      ].join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+    list = [...list].sort((a, b) => {
+      const ta = new Date(a.created_at).getTime();
+      const tb = new Date(b.created_at).getTime();
+      return sortOrder === 'asc' ? ta - tb : tb - ta;
+    });
+    return list;
+  }, [sessions, search, blockersOnly, sortOrder]);
+
   if (loading) {
     return (
       <div className="flex items-center gap-3 h-64 justify-center">
@@ -152,41 +178,78 @@ export default function Sessions({ ws }) {
         <p className="text-xs font-mono text-nexus-text-faint mt-1">
           {sessions.length === 0
             ? 'No sessions recorded. Use: nexus session "summary"'
-            : `${sessions.length} sessions charted. The bridge holds.`}
+            : `${visible.length} of ${sessions.length} sessions shown. The bridge holds.`}
         </p>
       </div>
 
-      {/* Project filter */}
-      {projects.length > 1 && (
-        <div className="flex gap-1 mb-4">
+      {/* Filters */}
+      <div className="mb-4 space-y-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-nexus-text-faint" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search summaries, tags, decisions..."
+              className="w-full bg-nexus-bg border border-nexus-border rounded-lg pl-8 pr-3 py-1.5 text-xs text-nexus-text font-mono focus:border-nexus-amber focus:outline-none"
+            />
+          </div>
           <button
-            onClick={() => setFilter('')}
-            className={`px-2.5 py-1 text-xs font-mono rounded-md transition-colors ${
-              !filter ? 'bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20' : 'text-nexus-text-faint hover:text-nexus-text border border-transparent'
+            onClick={() => setBlockersOnly((v) => !v)}
+            className={`px-3 py-1.5 rounded-lg text-[10px] font-mono border transition-colors flex items-center gap-1 ${
+              blockersOnly
+                ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/20'
+                : 'text-nexus-text-faint border-nexus-border hover:text-nexus-text'
             }`}
           >
-            All
+            <AlertTriangle size={10} /> Blockers only
           </button>
-          {projects.map((p) => (
+          <button
+            onClick={() => setSortOrder((s) => (s === 'desc' ? 'asc' : 'desc'))}
+            className="px-3 py-1.5 rounded-lg text-[10px] font-mono text-nexus-text-faint hover:text-nexus-amber border border-nexus-border transition-colors"
+          >
+            {sortOrder === 'desc' ? 'Newest first' : 'Oldest first'}
+          </button>
+        </div>
+
+        {projects.length > 1 && (
+          <div className="flex gap-1 flex-wrap">
             <button
-              key={p}
-              onClick={() => setFilter(p)}
+              onClick={() => setFilter('')}
               className={`px-2.5 py-1 text-xs font-mono rounded-md transition-colors ${
-                filter === p ? 'bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20' : 'text-nexus-text-faint hover:text-nexus-text border border-transparent'
+                !filter ? 'bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20' : 'text-nexus-text-faint hover:text-nexus-text border border-transparent'
               }`}
             >
-              {p}
+              All
             </button>
+            {projects.map((p) => (
+              <button
+                key={p}
+                onClick={() => setFilter(p)}
+                className={`px-2.5 py-1 text-xs font-mono rounded-md transition-colors ${
+                  filter === p ? 'bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20' : 'text-nexus-text-faint hover:text-nexus-text border border-transparent'
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Session list */}
+      {visible.length === 0 ? (
+        <div className="text-center py-12 bg-nexus-surface border border-nexus-border rounded-xl">
+          <BookOpen size={24} className="mx-auto text-nexus-text-faint mb-2 opacity-40" />
+          <p className="text-xs font-mono text-nexus-text-faint">No sessions match these filters.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {visible.map((s) => (
+            <SessionCard key={s.id} session={s} />
           ))}
         </div>
       )}
-
-      {/* Session list */}
-      <div className="space-y-3">
-        {sessions.map((s) => (
-          <SessionCard key={s.id} session={s} />
-        ))}
-      </div>
     </div>
   );
 }

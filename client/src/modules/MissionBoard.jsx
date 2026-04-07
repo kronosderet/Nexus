@@ -155,7 +155,7 @@ export default function MissionBoard({ ws }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {COLUMNS.map((col) => {
           const colTasks = tasks.filter((t) => t.status === col.key);
           return (

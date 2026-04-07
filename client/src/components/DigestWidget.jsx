@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react';
 import { BarChart3, GitCommit, CheckCircle2, FileEdit, BookOpen, Flame, AlertTriangle, Calendar } from 'lucide-react';
+import { api } from '../hooks/useApi.js';
 
 export default function DigestWidget() {
   const [digest, setDigest] = useState(null);
   const [range, setRange] = useState('7d');
 
   useEffect(() => {
-    fetch(`/api/digest?range=${range}`)
-      .then(r => r.json())
-      .then(setDigest)
-      .catch(() => {});
+    api.getDigest(range).then(setDigest).catch(() => {});
   }, [range]);
 
   if (!digest) return null;
