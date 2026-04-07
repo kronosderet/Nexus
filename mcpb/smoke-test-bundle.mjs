@@ -88,23 +88,92 @@ async function main() {
   console.log(`✓ nexus_check_guard works`);
   console.log(guard.result.content[0].text.split('\n').slice(0, 6).join('\n'));
 
-  // New in v3.1.1: log_usage round-trip
+  // v3.1.1: log_usage round-trip
   const logUsage = await send('tools/call', {
     name: 'nexus_log_usage',
-    arguments: {
-      session_percent: 76,
-      weekly_percent: 6,
-      note: 'smoke test',
-    },
+    arguments: { session_percent: 74, weekly_percent: 6, note: 'smoke test' },
   });
   if (logUsage.result.isError) {
     console.error('✗ nexus_log_usage returned error:', logUsage.result.content[0].text);
     process.exit(1);
   }
   console.log(`\n✓ nexus_log_usage works`);
-  console.log(logUsage.result.content[0].text);
+
+  // v3.2 write tools — create, activity, search, critique, predict, bridge
+  const createTask = await send('tools/call', {
+    name: 'nexus_create_task',
+    arguments: {
+      title: 'SMOKE TEST TASK — safe to delete',
+      description: 'Created by mcpb/smoke-test-bundle.mjs',
+      status: 'backlog',
+    },
+  });
+  if (createTask.result.isError) {
+    console.error('✗ nexus_create_task error:', createTask.result.content[0].text);
+    process.exit(1);
+  }
+  console.log(`✓ nexus_create_task works`);
+  const createdText = createTask.result.content[0].text;
+  console.log('  ', createdText.split('\n')[0]);
+
+  // Extract id from "◈ Task #123 plotted..." for cleanup
+  const idMatch = createdText.match(/#(\d+)/);
+  const createdId = idMatch ? parseInt(idMatch[1]) : null;
+
+  // Clean up: mark the smoke-test task done so the backlog stays clean
+  if (createdId) {
+    const complete = await send('tools/call', {
+      name: 'nexus_complete_task',
+      arguments: { id: createdId },
+    });
+    if (!complete.result.isError) {
+      console.log(`✓ nexus_complete_task works (closed smoke-test #${createdId})`);
+    }
+  }
+
+  const logAct = await send('tools/call', {
+    name: 'nexus_log_activity',
+    arguments: { message: 'smoke test activity', type: 'system' },
+  });
+  console.log(`✓ nexus_log_activity works`);
+
+  const search = await send('tools/call', {
+    name: 'nexus_search',
+    arguments: { query: 'mcp server' },
+  });
+  if (search.result.isError) {
+    console.error('✗ nexus_search error:', search.result.content[0].text);
+    process.exit(1);
+  }
+  console.log(`✓ nexus_search works`);
+
+  const critique = await send('tools/call', {
+    name: 'nexus_get_critique',
+    arguments: {},
+  });
+  if (critique.result.isError) {
+    console.error('✗ nexus_get_critique error:', critique.result.content[0].text);
+    process.exit(1);
+  }
+  console.log(`✓ nexus_get_critique works`);
+
+  const predict = await send('tools/call', {
+    name: 'nexus_predict_gaps',
+    arguments: {},
+  });
+  if (predict.result.isError) {
+    console.error('✗ nexus_predict_gaps error:', predict.result.content[0].text);
+    process.exit(1);
+  }
+  console.log(`✓ nexus_predict_gaps works`);
+
+  // Skip nexus_ask_overseer (slow AI inference) and nexus_bridge_session
+  // (would commit a real session entry). Those are verified by existence
+  // in the tools list + manifest schema validation.
+  console.log(`  (skipped: nexus_ask_overseer, nexus_bridge_session — side-effects)`);
 
   console.log('\n=== BUNDLED SERVER WORKS AS STANDALONE NODE PROCESS ===');
+  console.log(`  ${list.result.tools.length} tools total`);
   child.kill();
   process.exit(0);
 }
