@@ -1,0 +1,81 @@
+{
+  "manifest_version": "0.3",
+  "name": "nexus",
+  "display_name": "Nexus — The Cartographer",
+  "version": "3.1.0",
+  "description": "Local AI Cowork metabrain. Exposes The Ledger, Thought Stack, Decision Guard, Session Plan, and Compass dashboard as native MCP tools so every Claude instance can access shared cognitive state.",
+  "long_description": "Nexus is a local mission-control dashboard and metabrain for AI-assisted development. This MCPB extension surfaces the Nexus knowledge graph as native MCP tools so any Claude Desktop instance can call mcp__nexus__brief at session start, mcp__nexus__check_guard before starting work, mcp__nexus__push_thought before context-switching, and mcp__nexus__pop_thought when returning from interruption — turning the Ledger from 'a tool I use via bash' into ambient memory shared across all concurrent sessions.\n\nRequires the Nexus HTTP server to be running locally (default http://localhost:3001). Start it with: cd C:/Projects/Nexus && npm run dev:server",
+  "author": {
+    "name": "kronosderet",
+    "url": "https://github.com/kronosderet/Nexus"
+  },
+  "homepage": "https://github.com/kronosderet/Nexus",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kronosderet/Nexus"
+  },
+  "license": "MIT",
+  "keywords": [
+    "metabrain",
+    "knowledge-graph",
+    "session-memory",
+    "ledger",
+    "cowork",
+    "ai-assisted-development"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/index.js"
+      ],
+      "env": {
+        "NEXUS_BASE_URL": "${user_config.nexus_base_url}"
+      }
+    }
+  },
+  "user_config": {
+    "nexus_base_url": {
+      "type": "string",
+      "title": "Nexus Server URL",
+      "description": "URL of your local Nexus HTTP server. Default works for the standard `npm run dev:server` setup.",
+      "default": "http://localhost:3001",
+      "required": false
+    }
+  },
+  "tools": [
+    {
+      "name": "nexus_brief",
+      "description": "Get the current Nexus state for a project: fuel, active tasks, recent sessions, key decisions, and risks. Call this at the start of any session to load the metabrain context."
+    },
+    {
+      "name": "nexus_get_plan",
+      "description": "Get an AI-generated session plan combining current fuel, active tasks, and the knowledge graph. Returns focus, prioritized tasks with time estimates, rationale, and what to avoid."
+    },
+    {
+      "name": "nexus_check_guard",
+      "description": "Check whether a proposed task or decision is redundant. Returns similar tasks/decisions/sessions with similarity scores. Use BEFORE starting non-trivial work."
+    },
+    {
+      "name": "nexus_record_decision",
+      "description": "Record a strategic decision into The Ledger (long-term decision graph). For architectural choices, design decisions, scope boundaries."
+    },
+    {
+      "name": "nexus_push_thought",
+      "description": "Push a thought onto the LIFO Thought Stack — interrupt-recovery working memory. Call BEFORE switching context, getting interrupted, or stopping mid-task."
+    },
+    {
+      "name": "nexus_pop_thought",
+      "description": "Pop the top thought off the Thought Stack — call when returning from an interruption to recover what you were doing."
+    }
+  ],
+  "tools_generated": false,
+  "compatibility": {
+    "platforms": ["win32", "darwin", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

@@ -1,0 +1,3 @@
+smoke-test-bundle.mjs
+*.bak
+.DS_Store
