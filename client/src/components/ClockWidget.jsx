@@ -1,17 +1,29 @@
 import { useState, useEffect } from 'react';
 import { Clock, Calendar } from 'lucide-react';
+import { api } from '../hooks/useApi.js';
 
-export default function ClockWidget() {
+export default function ClockWidget({ ws }) {
   const [data, setData] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
     function fetchClock() {
-      fetch('/api/clock').then(r => r.json()).then(setData).catch(() => {});
+      api.getClock().then(d => { if (!cancelled) setData(d); }).catch(() => {});
     }
     fetchClock();
-    const interval = setInterval(fetchClock, 30000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchClock, 60000); // slow poll as safety net
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
+
+  // Real-time refresh on usage and fuel events (instead of aggressive polling)
+  useEffect(() => {
+    if (!ws?.subscribe) return;
+    return ws.subscribe((msg) => {
+      if (msg.type === 'usage_update' || msg.type === 'fuel_update') {
+        api.getClock().then(setData).catch(() => {});
+      }
+    });
+  }, [ws]);
 
   if (!data) return null;
 

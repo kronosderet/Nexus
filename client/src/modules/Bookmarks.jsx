@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bookmark, Plus, Trash2, ExternalLink } from 'lucide-react';
+import { api } from '../hooks/useApi.js';
 
 const SEED_BOOKMARKS = [
   { title: 'GitHub Nexus', url: 'https://github.com/kronosderet/Nexus', category: 'repos' },
@@ -20,19 +21,15 @@ export default function BookmarksModule() {
   async function fetchBookmarks() {
     setLoading(true);
     try {
-      const res = await fetch('/api/bookmarks');
-      const data = await res.json();
+      const data = await api.getBookmarks();
       if (Array.isArray(data) && data.length === 0 && !seedingRef.current) {
         // Seed defaults on first load (guarded against StrictMode double-mount)
         seedingRef.current = true;
         const created = [];
         for (const seed of SEED_BOOKMARKS) {
-          const r = await fetch('/api/bookmarks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(seed),
-          });
-          if (r.ok) created.push(await r.json());
+          try {
+            created.push(await api.createBookmark(seed));
+          } catch {}
         }
         setBookmarks(created);
       } else {
@@ -56,23 +53,22 @@ export default function BookmarksModule() {
       url: form.url.trim(),
       category: form.category.trim() || 'general',
     };
-    const res = await fetch('/api/bookmarks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) {
-      const created = await res.json();
+    try {
+      const created = await api.createBookmark(body);
       setBookmarks((prev) => [created, ...prev]);
       setForm({ title: '', url: '', category: '' });
       setShowForm(false);
+    } catch (err) {
+      console.error('Failed to create bookmark', err);
     }
   }
 
   async function handleDelete(id) {
-    const res = await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' });
-    if (res.ok) {
+    try {
+      await api.deleteBookmark(id);
       setBookmarks((prev) => prev.filter((b) => b.id !== id));
+    } catch (err) {
+      console.error('Failed to delete bookmark', err);
     }
   }
 

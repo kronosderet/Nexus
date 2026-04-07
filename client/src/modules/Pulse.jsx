@@ -189,7 +189,7 @@ function GpuPanel({ gpu }) {
   );
 }
 
-export default function Pulse() {
+export default function Pulse({ ws }) {
   const [pulse, setPulse] = useState(null);
   const [projectHealth, setProjectHealth] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -206,9 +206,20 @@ export default function Pulse() {
 
   useEffect(() => {
     fetchPulse();
-    const interval = setInterval(fetchPulse, 10000); // 10s for GPU freshness
+    // Slow safety-net poll — real-time updates come via WebSocket below
+    const interval = setInterval(fetchPulse, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  // Subscribe to server-pushed snapshots instead of aggressive polling
+  useEffect(() => {
+    if (!ws?.subscribe) return;
+    return ws.subscribe((msg) => {
+      if (msg.type === 'gpu_snapshot' || msg.type === 'activity') {
+        fetchPulse();
+      }
+    });
+  }, [ws]);
 
   if (loading) {
     return (
@@ -236,7 +247,7 @@ export default function Pulse() {
       </div>
 
       {/* System stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard
           icon={Cpu}
           label="CPUs"
@@ -267,7 +278,7 @@ export default function Pulse() {
 
       {/* Clock + Calendar */}
       <div className="mb-6">
-        <ClockWidget />
+        <ClockWidget ws={ws} />
       </div>
 
       {/* Digest + Quick Actions row */}

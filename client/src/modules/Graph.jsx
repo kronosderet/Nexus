@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { GitBranch, Target, AlertTriangle, BarChart3, Link2, RefreshCw, Search, ChevronRight, Network } from 'lucide-react';
+import { api } from '../hooks/useApi.js';
 
 export default function GraphModule() {
   const [view, setView] = useState('overview'); // overview, blast, centrality, contradictions, holes, visual
@@ -13,28 +14,40 @@ export default function GraphModule() {
 
   async function fetchAll() {
     setLoading(true);
-    const [g, c, con, h] = await Promise.all([
-      fetch('/api/ledger/graph/full').then(r => r.json()),
-      fetch('/api/impact/centrality').then(r => r.json()),
-      fetch('/api/impact/contradictions').then(r => r.json()),
-      fetch('/api/impact/holes').then(r => r.json()),
-    ]);
-    setGraph(g);
-    setCentrality(c);
-    setContradictions(con);
-    setHoles(h);
-    setLoading(false);
+    try {
+      const [g, c, con, h] = await Promise.all([
+        api.getGraphFull(),
+        api.getImpactCentrality(),
+        api.getImpactContradictions(),
+        api.getImpactHoles(),
+      ]);
+      setGraph(g);
+      setCentrality(c);
+      setContradictions(con);
+      setHoles(h);
+    } catch (err) {
+      console.error('Failed to fetch graph data', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function autoLink() {
-    await fetch('/api/ledger/auto-link', { method: 'POST' });
-    fetchAll();
+    try {
+      await api.autoLinkGraph();
+      fetchAll();
+    } catch (err) {
+      console.error('Auto-link failed', err);
+    }
   }
 
   async function runBlast() {
     if (!blastId) return;
-    const data = await fetch(`/api/impact/blast/${blastId}`).then(r => r.json());
-    setBlastResult(data);
+    try {
+      setBlastResult(await api.getImpactBlast(blastId));
+    } catch (err) {
+      console.error('Blast analysis failed', err);
+    }
   }
 
   useEffect(() => { fetchAll(); }, []);
@@ -61,7 +74,7 @@ export default function GraphModule() {
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-1 mb-4 border-b border-nexus-border pb-2">
+      <div className="flex flex-wrap gap-1 mb-4 border-b border-nexus-border pb-2">
         {[
           { key: 'overview', label: 'Overview', icon: BarChart3 },
           { key: 'blast', label: 'Blast Radius', icon: Target },
@@ -112,7 +125,7 @@ function OverviewView({ graph, centrality, contradictions, holes }) {
   for (const n of graph?.nodes || []) projects[n.project] = (projects[n.project] || 0) + 1;
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       <StatCard label="Decisions" value={graph?.nodes.length || 0} sub="Total indexed" />
       <StatCard label="Connections" value={graph?.edges.length || 0} sub={`Avg ${centrality?.averageConnections || '?'} per node`} />
       <StatCard label="Conflicts" value={contradictions?.total || 0} sub={contradictions?.total > 0 ? 'Needs attention' : 'All clear'} color={contradictions?.total > 0 ? 'text-nexus-amber' : 'text-nexus-green'} />
@@ -417,7 +430,7 @@ function VisualView({ graph }) {
 
   return (
     <div>
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
         <StatCard label="Nodes" value={graph.nodes.length} sub="Decisions" />
         <StatCard label="Edges" value={graph.edges?.length || 0} sub="Connections" />
         <StatCard label="Components" value={components} sub={components === 1 ? 'Fully connected' : 'Disconnected clusters'} />

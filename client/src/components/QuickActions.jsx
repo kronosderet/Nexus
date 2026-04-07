@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Zap, GitBranch, Activity, CheckCircle2, Loader2 } from 'lucide-react';
+import { api } from '../hooks/useApi.js';
 
 const ICON_MAP = {
   'git-branch': GitBranch,
@@ -13,15 +14,14 @@ export default function QuickActions() {
   const [lastResult, setLastResult] = useState(null);
 
   useEffect(() => {
-    fetch('/api/actions').then(r => r.json()).then(setActions).catch(() => {});
+    api.getActions().then(setActions).catch(() => {});
   }, []);
 
   async function runAction(action) {
     setRunning(action.id);
     setLastResult(null);
     try {
-      const res = await fetch(`/api/actions/${action.id}/run`, { method: 'POST' });
-      const data = await res.json();
+      const data = await api.runAction(action.id);
       setLastResult({ action: action.label, result: data.result });
     } catch (err) {
       setLastResult({ action: action.label, error: err.message });

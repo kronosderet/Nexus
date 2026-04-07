@@ -1,18 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, X, Compass, ScrollText, BookOpen, PenTool } from 'lucide-react';
+import { Search, X, Compass, ScrollText, BookOpen } from 'lucide-react';
+import { api } from '../hooks/useApi.js';
 
 const TYPE_ICONS = {
   task: Compass,
   activity: ScrollText,
   session: BookOpen,
-  scratchpad: PenTool,
 };
 
 const TYPE_COLORS = {
   task: 'text-nexus-blue',
   activity: 'text-nexus-text-faint',
   session: 'text-nexus-green',
-  scratchpad: 'text-nexus-amber',
 };
 
 export default function SearchModal({ open, onClose, onNavigate }) {
@@ -39,9 +38,9 @@ export default function SearchModal({ open, onClose, onNavigate }) {
     timerRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-        const data = await res.json();
-        setResults(data);
+        const data = await api.search(query);
+        // Filter out scratchpad results — no UI for them anymore
+        setResults(data.filter(r => r.type !== 'scratchpad'));
         setSelected(0);
       } catch {} finally {
         setLoading(false);
@@ -77,7 +76,7 @@ export default function SearchModal({ open, onClose, onNavigate }) {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             className="flex-1 bg-transparent text-sm text-nexus-text placeholder:text-nexus-text-faint focus:outline-none"
-            placeholder="Search tasks, sessions, activity, scratchpads..."
+            placeholder="Search tasks, sessions, activity..."
           />
           <kbd className="text-[10px] font-mono text-nexus-text-faint px-1.5 py-0.5 rounded bg-nexus-bg border border-nexus-border">
             ESC

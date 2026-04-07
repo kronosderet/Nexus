@@ -1,7 +1,9 @@
 import { execSync } from 'child_process';
 import type { NexusStore } from '../db/store.ts';
 
-export function startGpuPoller(store: NexusStore, intervalMs = 60000) {
+type BroadcastFn = (data: any) => void;
+
+export function startGpuPoller(store: NexusStore, broadcast?: BroadcastFn, intervalMs = 60000) {
   function snapshot() {
     try {
       const csv = execSync(
@@ -11,7 +13,7 @@ export function startGpuPoller(store: NexusStore, intervalMs = 60000) {
 
       const [gpuUtil, memUtil, memUsed, memTotal, temp, power] = csv.split(', ').map(s => parseFloat(s.trim()));
 
-      store.logGpuSnapshot({
+      const snap = store.logGpuSnapshot({
         gpu_util: gpuUtil,
         mem_util: memUtil,
         vram_used: memUsed,
@@ -19,6 +21,9 @@ export function startGpuPoller(store: NexusStore, intervalMs = 60000) {
         temperature: temp,
         power: power,
       });
+
+      // Broadcast so clients can refresh without polling
+      if (broadcast) broadcast({ type: 'gpu_snapshot', payload: snap });
     } catch {}
   }
 

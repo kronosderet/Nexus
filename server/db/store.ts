@@ -212,11 +212,13 @@ export class NexusStore {
   }
 
   // ── GPU History ────────────────────────────────────────
-  logGpuSnapshot(snapshot: Omit<GpuSnapshot, 'created_at'>): void {
-    this.data.gpu_history.push({ ...snapshot, created_at: this._now() });
+  logGpuSnapshot(snapshot: Omit<GpuSnapshot, 'created_at'>): GpuSnapshot {
+    const entry: GpuSnapshot = { ...snapshot, created_at: this._now() };
+    this.data.gpu_history.push(entry);
     const cutoff = Date.now() - 24 * 3600000;
     this.data.gpu_history = this.data.gpu_history.filter(g => new Date(g.created_at).getTime() > cutoff);
     this._flush();
+    return entry;
   }
 
   getGpuHistory(hours = 1): GpuSnapshot[] {
