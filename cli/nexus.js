@@ -15,6 +15,14 @@
  *   nexus note "some text"                  Append to Captain's Log
  */
 
+import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 const BASE = process.env.NEXUS_URL || 'http://localhost:3001';
 
 function timeSince(date) {
@@ -1634,12 +1642,95 @@ TOOLS:      nexus ai | notify | digest | gpu | bookmarks
     }
   },
 
+  async mcp(args) {
+    // Print Claude Code MCP server config snippet for the user to add.
+    // Run: nexus mcp        → print config
+    //      nexus mcp --run  → run the stdio server in this terminal (for debugging)
+
+    // Locate server/mcp/index.ts relative to where the CLI lives
+    const repoRoot = resolve(__dirname, '..');
+    const mcpEntry = join(repoRoot, 'server', 'mcp', 'index.ts');
+
+    if (args[0] === '--run' || args[0] === '-r') {
+      // Just exec the stdio server directly
+      const child = spawn('npx', ['tsx', mcpEntry], {
+        stdio: 'inherit',
+        shell: process.platform === 'win32',
+      });
+      child.on('exit', (code) => process.exit(code || 0));
+      return;
+    }
+
+    if (!existsSync(mcpEntry)) {
+      console.error(`  ${red('◈')} MCP server not found at ${mcpEntry}`);
+      console.error(`  Expected: server/mcp/index.ts in the Nexus repo.`);
+      process.exit(1);
+    }
+
+    // Build the config snippet. Claude Code reads MCP servers from
+    // ~/.claude.json (project-scoped) or via `claude mcp add`. We print
+    // both the JSON snippet and the equivalent CLI command for convenience.
+    const config = {
+      mcpServers: {
+        nexus: {
+          command: 'npx',
+          args: ['tsx', mcpEntry.replace(/\\/g, '/')],
+          env: {
+            NEXUS_BASE_URL: BASE,
+          },
+        },
+      },
+    };
+
+    console.log(`
+  ${amber('◈')} ${amber('NEXUS MCP SERVER')} -- v3.1
+
+  ${dim('Exposes the Nexus metabrain as native MCP tools so every Claude Code')}
+  ${dim('instance can call mcp__nexus__brief, mcp__nexus__check_guard, etc.')}
+  ${dim('without shelling out to the CLI or fetching the HTTP API.')}
+
+  ${amber('Available tools (v1):')}
+    mcp__nexus__brief             Current state for a project
+    mcp__nexus__get_plan          AI session plan with fuel context
+    mcp__nexus__check_guard       Redundancy check before starting work
+    mcp__nexus__record_decision   Write to The Ledger
+    mcp__nexus__push_thought      Push onto interrupt-recovery stack
+    mcp__nexus__pop_thought       Pop the top thought (recover)
+
+  ${amber('Setup -- option A: claude CLI')}
+    ${green(`claude mcp add nexus -- npx tsx "${mcpEntry.replace(/\\/g, '/')}"`)}
+
+  ${amber('Setup -- option B: ~/.claude.json')}
+    Merge this into your ~/.claude.json file:
+
+${JSON.stringify(config, null, 2).split('\n').map(l => '    ' + l).join('\n')}
+
+  ${amber('Setup -- option C: project-scoped (.mcp.json in any repo)')}
+    Same JSON as above, in a .mcp.json file at the project root.
+    Claude Code will pick it up when launched in that project.
+
+  ${amber('Requirements:')}
+    1. Nexus server must be running: ${dim('cd ' + repoRoot + ' && npm run dev:server')}
+    2. NEXUS_BASE_URL defaults to ${BASE}
+    3. tsx must be available (already in devDependencies)
+
+  ${amber('Test from this terminal:')}
+    ${green('nexus mcp --run')}
+    ${dim('Then send JSON-RPC requests to stdin (or use server/mcp/smoke-test.mjs)')}
+
+  ${amber('Verify after install:')}
+    Open a new Claude Code session, then ask: ${dim('"call mcp__nexus__brief"')}
+`);
+  },
+
   async help() {
     console.log(`
   ${amber('◈')} ${amber('N E X U S')}  CLI
   ${dim('The Cartographer -- talk to mission control from anywhere.')}
 
   ${amber('Commands:')}
+    nexus mcp                       Print Claude Code MCP server config (v3.1)
+    nexus mcp --run                 Run the MCP stdio server (for debugging)
     nexus plan                      Autonomous session plan (AI-generated)
     nexus summarize [project]       Overseer writes session log (preview)
     nexus summarize [project] -c    ...and save it as a session entry

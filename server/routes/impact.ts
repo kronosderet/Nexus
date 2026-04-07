@@ -190,39 +190,131 @@ export function createImpactRoutes(store: NexusStore) {
     res.json(baseResult);
   });
 
-  // Structural holes: find clusters with weak cross-links
-  router.get('/holes', (req: Request, res: Response) => {
+  // Structural holes: find INTRA-project disconnection via union-find
+  // (projects whose decisions form multiple disconnected sub-clusters).
+  // The old version flagged every unrelated project pair — meaningless noise
+  // for users who run multiple unrelated projects. This version surfaces real
+  // signal: "your Nexus decisions split into 3 islands that don't reference
+  // each other" is something worth knowing.
+  router.get('/holes', (_req: Request, res: Response) => {
     const decisions = (store as any).data.ledger || [];
     const edges = (store as any).data.graph_edges || [];
 
-    // Group by project
+    // Group decisions by project
     const projects: Record<string, number[]> = {};
     for (const d of decisions) {
       if (!projects[d.project]) projects[d.project] = [];
       projects[d.project].push(d.id);
     }
 
-    // Count cross-project edges
+    // For each project, run union-find on the subgraph of edges where BOTH
+    // endpoints belong to that project. Count connected components.
+    const projectAnalysis = Object.entries(projects).map(([project, ids]) => {
+      const idSet = new Set(ids);
+      const parent: Record<number, number> = {};
+      for (const id of ids) parent[id] = id;
+
+      const find = (x: number): number => {
+        while (parent[x] !== x) {
+          parent[x] = parent[parent[x]];
+          x = parent[x];
+        }
+        return x;
+      };
+      const union = (a: number, b: number) => {
+        const ra = find(a);
+        const rb = find(b);
+        if (ra !== rb) parent[ra] = rb;
+      };
+
+      // Only consider edges where BOTH endpoints are in this project
+      const intraEdges = edges.filter(
+        (e: any) => idSet.has(e.from) && idSet.has(e.to)
+      );
+      for (const e of intraEdges) union(e.from, e.to);
+
+      // Group ids by component root
+      const componentMap: Record<number, number[]> = {};
+      for (const id of ids) {
+        const root = find(id);
+        if (!componentMap[root]) componentMap[root] = [];
+        componentMap[root].push(id);
+      }
+
+      const components = Object.values(componentMap)
+        .map((memberIds) => ({
+          size: memberIds.length,
+          memberIds,
+          // Sample decision titles for the largest few members so the UI
+          // can show what the cluster is "about"
+          sampleTitles: memberIds
+            .slice(0, 3)
+            .map((id) => {
+              const d = decisions.find((x: any) => x.id === id);
+              return d ? d.decision.slice(0, 60) : `#${id}`;
+            }),
+        }))
+        .sort((a, b) => b.size - a.size);
+
+      // Orphans are components of size 1 (isolated decisions)
+      const orphans = components.filter((c) => c.size === 1).length;
+      const isFragmented = components.length > 1;
+
+      return {
+        project,
+        decisions: ids.length,
+        edges: intraEdges.length,
+        components: components.length,
+        orphans,
+        isFragmented,
+        clusters: components,
+      };
+    });
+
+    // Sort: fragmented projects first (most clusters), then by decision count
+    projectAnalysis.sort((a, b) => {
+      if (a.isFragmented !== b.isFragmented) return a.isFragmented ? -1 : 1;
+      if (a.components !== b.components) return b.components - a.components;
+      return b.decisions - a.decisions;
+    });
+
+    // Cross-project links are still useful as supplementary info,
+    // but no longer flagged as "holes" by default.
     const crossLinks: Record<string, number> = {};
-    const projectPairs = Object.keys(projects);
-    for (let i = 0; i < projectPairs.length; i++) {
-      for (let j = i + 1; j < projectPairs.length; j++) {
-        const key = `${projectPairs[i]} \u2194 ${projectPairs[j]}`;
-        const aIds = new Set(projects[projectPairs[i]]);
-        const bIds = new Set(projects[projectPairs[j]]);
-        const links = edges.filter((e: any) =>
-          (aIds.has(e.from) && bIds.has(e.to)) || (bIds.has(e.from) && aIds.has(e.to))
+    const projectNames = Object.keys(projects);
+    for (let i = 0; i < projectNames.length; i++) {
+      for (let j = i + 1; j < projectNames.length; j++) {
+        const aIds = new Set(projects[projectNames[i]]);
+        const bIds = new Set(projects[projectNames[j]]);
+        const links = edges.filter(
+          (e: any) =>
+            (aIds.has(e.from) && bIds.has(e.to)) ||
+            (bIds.has(e.from) && aIds.has(e.to))
         );
-        crossLinks[key] = links.length;
+        if (links.length > 0) {
+          crossLinks[`${projectNames[i]} \u2194 ${projectNames[j]}`] = links.length;
+        }
       }
     }
 
-    // Find weak connections (potential structural holes)
-    const holes = Object.entries(crossLinks)
-      .filter(([, count]) => count <= 1)
-      .map(([pair, count]) => ({ pair, connections: count, note: count === 0 ? 'No connection' : 'Weak connection' }));
+    // Total holes = projects with >1 component (i.e. decisions that should
+    // probably be linked but aren't)
+    const fragmented = projectAnalysis.filter((p) => p.isFragmented);
 
-    res.json({ crossLinks, holes, totalHoles: holes.length });
+    res.json({
+      projectAnalysis,
+      fragmented,
+      totalFragmented: fragmented.length,
+      totalOrphans: projectAnalysis.reduce((n, p) => n + p.orphans, 0),
+      crossLinks,
+      // Backwards-compat aliases for any consumer still expecting the old shape
+      holes: fragmented.map((p) => ({
+        project: p.project,
+        components: p.components,
+        note: `${p.components} disconnected clusters`,
+      })),
+      totalHoles: fragmented.length,
+    });
   });
 
   return router;
