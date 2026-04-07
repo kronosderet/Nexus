@@ -31,6 +31,7 @@ import { createSmartSearchRoutes } from './routes/smartSearch.ts';
 import { readFileSync, existsSync } from 'fs';
 import { createEstimatorRoutes } from './routes/estimator.ts';
 import { createFuelIntelRoutes } from './routes/fuelIntel.ts';
+import { createPlanRoutes } from './routes/plan.ts';
 import { createLedgerRoutes } from './routes/ledger.ts';
 import { createImpactRoutes } from './routes/impact.ts';
 import { startFileWatcher } from './watchers/fileWatcher.ts';
@@ -125,6 +126,7 @@ try { if (existsSync(embedCachePath)) embedCache = JSON.parse(readFileSync(embed
 app.use('/api/smart-search', createSmartSearchRoutes(store, embedCache));
 app.use('/api/estimator', createEstimatorRoutes(store));
 app.use('/api/fuel-intel', createFuelIntelRoutes(store));
+app.use('/api/plan', createPlanRoutes(store));
 app.use('/api/ledger', createLedgerRoutes(store, broadcast));
 app.use('/api/impact', createImpactRoutes(store));
 
