@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import type {
   NexusData, Task, ActivityEntry, Session, Scratchpad,
   UsageEntry, GpuSnapshot, Decision, GraphEdge, GraphData, SessionTiming,
-  Bookmark, AdviceEntry,
+  Bookmark, AdviceEntry, Thought,
 } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -31,6 +31,7 @@ export class NexusStore {
     if (!this.data.graph_edges) this.data.graph_edges = [];
     if (!this.data.bookmarks) this.data.bookmarks = [];
     if (!this.data.advice) this.data.advice = [];
+    if (!this.data.thoughts) this.data.thoughts = [];
 
     this._nextId = {
       tasks: Math.max(0, ...this.data.tasks.map(t => t.id)) + 1,
@@ -44,7 +45,7 @@ export class NexusStore {
   private _seed(): NexusData {
     return {
       tasks: [], activity: [], sessions: [], usage: [], gpu_history: [],
-      ledger: [], graph_edges: [], advice: [],
+      ledger: [], graph_edges: [], advice: [], thoughts: [],
       scratchpads: [{
         id: 1, name: "Scratchpad",
         content: "# Scratchpad\n\nWorking area.\n",
@@ -457,5 +458,220 @@ export class NexusStore {
         : null,
       bySource,
     };
+  }
+
+  // ── Thought Stack ──────────────────────────────────────
+  // Working memory for interrupt-recovery: push when distracted, pop when returning.
+  pushThought(opts: { text: string; context?: string; project?: string; related_task_id?: number | null }): Thought {
+    if (!this.data.thoughts) this.data.thoughts = [];
+    const thought: Thought = {
+      id: (this.data.thoughts.length > 0 ? Math.max(...this.data.thoughts.map(t => t.id)) : 0) + 1,
+      text: opts.text,
+      context: opts.context ?? '',
+      project: opts.project ?? 'general',
+      pushed_at: this._now(),
+      popped_at: null,
+      status: 'active',
+      related_task_id: opts.related_task_id ?? null,
+    };
+    this.data.thoughts.push(thought);
+    this._flush();
+    return thought;
+  }
+
+  popThought(id?: number): Thought | null {
+    const thoughts = this.data.thoughts || [];
+    // If no id given, pop the most recently pushed active thought (LIFO)
+    let target: Thought | undefined;
+    if (id != null) {
+      target = thoughts.find(t => t.id === id && t.status === 'active');
+    } else {
+      const active = thoughts.filter(t => t.status === 'active');
+      target = active.sort((a, b) => new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime())[0];
+    }
+    if (!target) return null;
+    target.popped_at = this._now();
+    target.status = 'resolved';
+    this._flush();
+    return target;
+  }
+
+  abandonThought(id: number, reason = ''): Thought | null {
+    const thought = (this.data.thoughts || []).find(t => t.id === id);
+    if (!thought) return null;
+    thought.status = 'abandoned';
+    thought.popped_at = this._now();
+    if (reason) thought.context = thought.context ? `${thought.context} | abandoned: ${reason}` : `abandoned: ${reason}`;
+    this._flush();
+    return thought;
+  }
+
+  getActiveThoughts(project?: string): Thought[] {
+    let thoughts = (this.data.thoughts || []).filter(t => t.status === 'active');
+    if (project) thoughts = thoughts.filter(t => t.project.toLowerCase() === project.toLowerCase());
+    return thoughts.sort((a, b) => new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime());
+  }
+
+  getAllThoughts(opts: { project?: string; limit?: number; status?: Thought['status'] } = {}): Thought[] {
+    let thoughts = [...(this.data.thoughts || [])];
+    if (opts.project) thoughts = thoughts.filter(t => t.project.toLowerCase() === opts.project!.toLowerCase());
+    if (opts.status) thoughts = thoughts.filter(t => t.status === opts.status);
+    return thoughts
+      .sort((a, b) => new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime())
+      .slice(0, opts.limit ?? 50);
+  }
+
+  // ── Self-Critique: pattern detection on task completion times ─────
+  // Returns insights about which task types are slow / fast / stuck
+  getSelfCritique(): {
+    slowTasks: Array<{ id: number; title: string; minutes: number; status: string }>;
+    fastTasks: Array<{ id: number; title: string; minutes: number; status: string }>;
+    stuckTasks: Array<{ id: number; title: string; ageHours: number }>;
+    averageCompletionMinutes: number | null;
+    insights: string[];
+  } {
+    const tasks = this.data.tasks || [];
+    const completed = tasks.filter(t =>
+      t.status === 'done' &&
+      t.created_at &&
+      t.updated_at &&
+      t.created_at !== t.updated_at
+    );
+
+    const withDuration = completed.map(t => ({
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      minutes: Math.round((new Date(t.updated_at).getTime() - new Date(t.created_at).getTime()) / 60000),
+    })).filter(t => t.minutes >= 0 && t.minutes < 24 * 60); // sanity bounds
+
+    if (withDuration.length === 0) {
+      return { slowTasks: [], fastTasks: [], stuckTasks: [], averageCompletionMinutes: null, insights: ['Insufficient data for self-critique. Complete more tasks.'] };
+    }
+
+    const sorted = [...withDuration].sort((a, b) => b.minutes - a.minutes);
+    const avg = withDuration.reduce((s, t) => s + t.minutes, 0) / withDuration.length;
+
+    // Stuck = in_progress for > 24h
+    const stuck = tasks
+      .filter(t => t.status === 'in_progress')
+      .map(t => ({
+        id: t.id,
+        title: t.title,
+        ageHours: Math.round((Date.now() - new Date(t.created_at).getTime()) / 3600000),
+      }))
+      .filter(t => t.ageHours > 24);
+
+    const insights: string[] = [];
+    insights.push(`Average completion time: ${Math.round(avg)} min across ${withDuration.length} completed tasks.`);
+
+    if (sorted.length >= 3) {
+      const slowest = sorted[0];
+      if (slowest.minutes > avg * 2) {
+        insights.push(`Slowest task (${slowest.minutes}m) was ${Math.round(slowest.minutes / avg)}x average — investigate what made it hard.`);
+      }
+    }
+
+    if (stuck.length > 0) {
+      insights.push(`${stuck.length} task${stuck.length > 1 ? 's' : ''} stuck in progress >24h. Either complete or abandon.`);
+    }
+
+    // Group by category to find slow categories
+    const byCategory: Record<string, number[]> = {};
+    for (const t of withDuration) {
+      const cat = this.categorizeTaskTitle(t.title);
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push(t.minutes);
+    }
+    const categoryAvgs = Object.entries(byCategory)
+      .map(([cat, times]) => ({ cat, avg: times.reduce((s, t) => s + t, 0) / times.length, count: times.length }))
+      .filter(c => c.count >= 2)
+      .sort((a, b) => b.avg - a.avg);
+
+    if (categoryAvgs.length > 0) {
+      const slowest = categoryAvgs[0];
+      insights.push(`Slowest category: "${slowest.cat}" averages ${Math.round(slowest.avg)}m (${slowest.count} samples).`);
+    }
+
+    return {
+      slowTasks: sorted.slice(0, 5),
+      fastTasks: sorted.slice(-5).reverse(),
+      stuckTasks: stuck,
+      averageCompletionMinutes: Math.round(avg),
+      insights,
+    };
+  }
+
+  // Helper: categorize a task title (matches estimator categorization)
+  private categorizeTaskTitle(title: string): string {
+    const t = title.toLowerCase();
+    if (t.includes('typescript') || t.includes('migration') || t.includes('convert')) return 'TypeScript/Migration';
+    if (t.includes('test') || t.includes('vitest')) return 'Testing';
+    if (t.includes('fix') || t.includes('bug') || t.includes('patch')) return 'Bug Fix';
+    if (t.includes('overseer') || t.includes('ai') || t.includes('llm')) return 'AI/Overseer';
+    if (t.includes('graph') || t.includes('ledger') || t.includes('decision')) return 'Knowledge Graph';
+    if (t.includes('search') || t.includes('embed')) return 'Search';
+    if (t.includes('fuel') || t.includes('usage') || t.includes('estimator')) return 'Fuel Management';
+    if (t.includes('git') || t.includes('commit') || t.includes('push')) return 'Git Operations';
+    if (t.includes('dashboard') || t.includes('ui') || t.includes('widget')) return 'Dashboard/UI';
+    if (t.includes('audit')) return 'Audit';
+    return 'Feature Build';
+  }
+
+  // ── Decision Guard: warn before creating redundant tasks ───────
+  // Returns existing similar work that might overlap with a proposed task title
+  checkForRedundancy(taskTitle: string): {
+    similarTasks: Array<{ id: number; title: string; status: string; similarity: number }>;
+    relatedDecisions: Array<{ id: number; decision: string; project: string }>;
+    pastSessions: Array<{ id: number; project: string; summary: string }>;
+    warning: string | null;
+  } {
+    const lower = taskTitle.toLowerCase();
+    const words = lower.split(/\s+/).filter(w => w.length > 3);
+    if (words.length === 0) {
+      return { similarTasks: [], relatedDecisions: [], pastSessions: [], warning: null };
+    }
+
+    // Score similarity by shared significant words
+    const score = (text: string): number => {
+      const t = text.toLowerCase();
+      let count = 0;
+      for (const w of words) {
+        if (t.includes(w)) count++;
+      }
+      return count / words.length;
+    };
+
+    // Similar tasks (active or recently done)
+    const similarTasks = (this.data.tasks || [])
+      .map(t => ({ id: t.id, title: t.title, status: t.status, similarity: score(t.title) }))
+      .filter(t => t.similarity >= 0.4)
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, 5);
+
+    // Related decisions (search the Ledger)
+    const relatedDecisions = (this.data.ledger || [])
+      .map(d => ({ id: d.id, decision: d.decision, project: d.project, similarity: score(d.decision + ' ' + (d.context || '')) }))
+      .filter(d => d.similarity >= 0.3)
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, 5)
+      .map(({ similarity, ...rest }) => rest);
+
+    // Past sessions that touched similar topics
+    const pastSessions = (this.data.sessions || [])
+      .map(s => ({ id: s.id, project: s.project, summary: s.summary, similarity: score(s.summary + ' ' + s.tags.join(' ')) }))
+      .filter(s => s.similarity >= 0.3)
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, 3)
+      .map(({ similarity, ...rest }) => rest);
+
+    let warning: string | null = null;
+    if (similarTasks.length > 0 && similarTasks[0].similarity >= 0.7) {
+      warning = `Very similar existing task: #${similarTasks[0].id} "${similarTasks[0].title}" (${similarTasks[0].status})`;
+    } else if (relatedDecisions.length > 0 || similarTasks.length > 0) {
+      warning = `Related work exists. Review before creating.`;
+    }
+
+    return { similarTasks, relatedDecisions, pastSessions, warning };
   }
 }
