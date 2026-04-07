@@ -80,6 +80,50 @@ const commands = {
     console.log(`  ◈ Nexus is ${green('online')}. ${data.message}`);
   },
 
+  async plan(args) {
+    console.log(`\n  ${amber('◈')} ${amber('Autonomous Session Plan')}\n`);
+    console.log(`  ${dim('The Overseer is planning...')}\n`);
+
+    const data = await api('/plan');
+    const f = data.fuelState;
+    const ctx = data.context;
+
+    // Fuel header
+    const fC = f.session <= 15 ? red : f.session <= 40 ? amber : green;
+    const wC = f.weekly <= 10 ? red : f.weekly <= 30 ? amber : green;
+    console.log(`  ${dim('Fuel:')}    ${fC(`S:${f.session}%`)} ${wC(`W:${f.weekly}%`)} ${dim(`| ${f.runwayMinutes}m runway | ${f.burnPerHour}%/h burn`)}`);
+    console.log(`  ${dim('Context:')} ${ctx.inProgressCount} in progress, ${ctx.backlogCount} backlog, ${ctx.blockersCount} blockers${ctx.criticalRisks > 0 ? `, ${red(ctx.criticalRisks + ' critical risks')}` : ''}`);
+    console.log('');
+
+    // AI plan if available
+    if (data.aiPlan) {
+      console.log(`  ${amber('━━━ AI PLAN ━━━')} ${dim(`(${data.aiProvider})`)}\n`);
+      console.log(data.aiPlan.split('\n').map(l => `  ${l}`).join('\n'));
+      console.log('');
+    } else if (data.aiError) {
+      console.log(`  ${red('◈')} AI unavailable: ${data.aiError}`);
+      console.log(`  ${dim('Falling back to heuristic plan...')}\n`);
+    }
+
+    // Fallback plan always shown as backup
+    const fb = data.fallbackPlan;
+    if (!data.aiPlan || args[0] === '--full') {
+      console.log(`  ${amber('━━━ HEURISTIC PLAN ━━━')}  ${dim(`(${fb.tier.toUpperCase()}, ${fb.totalMinutes}m)`)}\n`);
+      console.log(`  ${fb.summary}\n`);
+      if (fb.tasks.length > 0) {
+        for (const t of fb.tasks) {
+          const statusColor = t.status === 'in_progress' ? amber : dim;
+          console.log(`  ${dim(`[${t.minutes}m]`)} ${statusColor(`#${t.id}`)} ${t.title}`);
+        }
+        console.log('');
+      }
+    }
+
+    console.log(`  ${dim('Run this plan:')} nexus task -s in_progress "..." / nexus done <id>`);
+    console.log(`  ${dim('Regenerate:')}     nexus plan`);
+    console.log('');
+  },
+
   async onboard(args) {
     const project = args[0] || process.cwd().split(/[/\\]/).pop();
 
@@ -1172,6 +1216,7 @@ TOOLS:      nexus ai | notify | digest | gpu
   ${dim('The Cartographer -- talk to mission control from anywhere.')}
 
   ${amber('Commands:')}
+    nexus plan                      Autonomous session plan (AI-generated)
     nexus onboard [project]          How to use Nexus (for new agents)
     nexus quick                     3-line status (fuel + risks + task)
     nexus brief [project]           Full agent briefing (START HERE)
