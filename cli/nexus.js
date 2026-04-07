@@ -149,6 +149,64 @@ const commands = {
     console.log('');
   },
 
+  async summarize(args) {
+    // Parse project and --commit flag
+    const commit = args.includes('--commit') || args.includes('-c');
+    const projectArg = args.find(a => !a.startsWith('-'));
+    const project = projectArg || process.cwd().split(/[/\\]/).pop();
+
+    console.log(`\n  ${amber('◈')} ${amber('Auto-Summarize')} — ${green(project)}\n`);
+    console.log(`  ${dim('The Overseer is writing the session log...')}\n`);
+
+    const url = `/auto-summary?project=${encodeURIComponent(project)}`;
+    const data = await api(url);
+
+    if (data.error) {
+      console.log(`  ${red('◈')} ${data.error}`);
+      return;
+    }
+
+    const ctx = data.context || {};
+    console.log(`  ${dim('Context:')} ${ctx.completedTasks || 0} tasks done, ${ctx.decisions || 0} decisions, ${ctx.activityEvents || 0} events`);
+    console.log('');
+
+    if (data.parsed) {
+      console.log(`  ${amber('SUMMARY')}`);
+      console.log(`  ${data.parsed.summary}\n`);
+      if (data.parsed.decisions?.length) {
+        console.log(`  ${amber('DECISIONS')}`);
+        for (const d of data.parsed.decisions) console.log(`    · ${d}`);
+        console.log('');
+      }
+      if (data.parsed.blockers?.length) {
+        console.log(`  ${amber('BLOCKERS')}`);
+        for (const b of data.parsed.blockers) console.log(`    ${red('!')} ${b}`);
+        console.log('');
+      }
+      if (data.parsed.tags?.length) {
+        console.log(`  ${dim('Tags:')} ${data.parsed.tags.join(', ')}`);
+        console.log('');
+      }
+    } else {
+      console.log(`  ${dim('Raw (could not parse as JSON):')}`);
+      console.log(data.raw?.split('\n').map(l => `  ${l}`).join('\n'));
+      console.log('');
+    }
+
+    if (commit) {
+      console.log(`  ${dim('Saving as session entry...')}`);
+      const saved = await api('/auto-summary', { method: 'POST', body: { project } });
+      if (saved.session) {
+        console.log(`  ${green('◈')} Saved as session #${saved.session.id}`);
+      } else {
+        console.log(`  ${red('◈')} Save failed: ${saved.error || 'unknown'}`);
+      }
+    } else {
+      console.log(`  ${dim('Preview only. To save:')} nexus summarize ${project} --commit`);
+    }
+    console.log('');
+  },
+
   async plan(args) {
     // Parse --project flag
     let project = null;
@@ -1177,7 +1235,33 @@ TOOLS:      nexus ai | notify | digest | gpu
       return;
     }
 
-    console.log('  Usage: nexus impact blast <id> | contradictions | centrality | holes');
+    if (args[0] === 'forecast' && args[1]) {
+      const id = parseInt(args[1]);
+      console.log(`\n  ${amber('◈')} ${amber('Forecasting impact')} for #${id}...\n`);
+      const data = await api(`/impact/forecast/${id}`);
+      console.log(`  ${dim('Decision:')} ${data.decision?.decision}`);
+      console.log(`  ${dim('Project:')}  ${data.decision?.project}`);
+      console.log(`  ${dim('Affected:')} ${data.affectedCount} downstream decision${data.affectedCount === 1 ? '' : 's'} (max depth ${data.depth})\n`);
+      if (data.affected?.length > 0) {
+        console.log(`  ${dim('Downstream:')}`);
+        for (const a of data.affected.slice(0, 10)) {
+          console.log(`    ${'  '.repeat(Math.max(0, a.depth - 1))}${dim('→')} ${green(`#${a.id}`)} ${a.decision} ${dim(`[${a.project}]`)}`);
+        }
+        if (data.affected.length > 10) console.log(`    ${dim(`... and ${data.affected.length - 10} more`)}`);
+        console.log('');
+      }
+      if (data.forecast) {
+        console.log(`  ${amber('Forecast (AI):')}`);
+        const lines = String(data.forecast).split('\n');
+        for (const line of lines) console.log(`    ${line}`);
+        console.log('');
+      } else {
+        console.log(`  ${dim('AI forecast unavailable. Start LM Studio with google/gemma-4-26b-a4b loaded.')}\n`);
+      }
+      return;
+    }
+
+    console.log('  Usage: nexus impact blast <id> | contradictions | centrality | holes | forecast <id>');
   },
 
   async link(args) {
@@ -1294,6 +1378,8 @@ TOOLS:      nexus ai | notify | digest | gpu
 
   ${amber('Commands:')}
     nexus plan                      Autonomous session plan (AI-generated)
+    nexus summarize [project]       Overseer writes session log (preview)
+    nexus summarize [project] -c    ...and save it as a session entry
     nexus predict                   Detect graph gaps (dry run)
     nexus predict --generate        Auto-create tasks for detected gaps
     nexus onboard [project]          How to use Nexus (for new agents)
@@ -1316,6 +1402,7 @@ TOOLS:      nexus ai | notify | digest | gpu
     nexus impact contradictions    Find conflicting decisions
     nexus impact centrality        Most foundational decisions
     nexus impact holes             Weak cross-project connections
+    nexus impact forecast <id>     AI-narrated downstream impact forecast
     nexus link <from> <rel> <to>   Link two decisions (knowledge graph)
     nexus graph [id] [depth]       View graph stats or traverse from a node
     nexus search "query"           Smart search (keyword + semantic)

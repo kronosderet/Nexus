@@ -130,6 +130,66 @@ export function createImpactRoutes(store: NexusStore) {
     });
   });
 
+  // AI-powered impact forecast: BFS + LM Studio narrative
+  router.get('/forecast/:decisionId', async (req: Request, res: Response) => {
+    const id = Number(req.params.decisionId);
+    if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid decision id.' });
+
+    const decision = (store as any).data.ledger.find((d: any) => d.id === id);
+    if (!decision) return res.status(404).json({ error: 'Decision not found.' });
+
+    // BFS along led_to + depends_on edges, tracking depth
+    const affectedRaw = traverseDirected(store, id, ['led_to', 'depends_on']);
+    const affected = affectedRaw.map((d: any) => ({
+      id: d.id,
+      decision: d.decision,
+      project: d.project,
+      depth: d._depth,
+    }));
+    const maxDepth = affected.reduce((m: number, d: any) => Math.max(m, d.depth || 0), 0);
+
+    const baseResult: any = {
+      decision,
+      affectedCount: affected.length,
+      affected,
+      depth: maxDepth,
+    };
+
+    // Generate AI narrative — graceful fallback if AI is unavailable
+    try {
+      const list = affected
+        .slice(0, 12)
+        .map((d: any) => `- #${d.id} [${d.project}] ${d.decision}`)
+        .join('\n');
+      const userPrompt = `Given this architectural decision: '${decision.decision}'. ` +
+        `If we change or reverse this decision, these ${affected.length} downstream decisions would be affected: ` +
+        `${list || '(none)'}. Generate a 3-4 sentence impact forecast describing: (1) what breaks, ` +
+        `(2) estimated scope of change, (3) recommended migration approach. Be specific and concise.`;
+
+      const aiRes = await fetch('http://localhost:1234/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': 'none' },
+        body: JSON.stringify({
+          model: 'google/gemma-4-26b-a4b',
+          max_tokens: 400,
+          messages: [{ role: 'user', content: userPrompt }],
+        }),
+        signal: AbortSignal.timeout(60000),
+      });
+
+      if (aiRes.ok) {
+        const data: any = await aiRes.json();
+        const textBlocks = (data.content || []).filter((b: any) => b.type === 'text');
+        const forecast = textBlocks.map((b: any) => b.text).join('\n').trim();
+        if (forecast) baseResult.forecast = forecast;
+      }
+    } catch {
+      // AI unavailable — silently omit forecast field
+    }
+
+    res.json(baseResult);
+  });
+
   // Structural holes: find clusters with weak cross-links
   router.get('/holes', (req: Request, res: Response) => {
     const decisions = (store as any).data.ledger || [];

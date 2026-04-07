@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { GitBranch, Target, AlertTriangle, BarChart3, Link2, RefreshCw, Search, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { GitBranch, Target, AlertTriangle, BarChart3, Link2, RefreshCw, Search, ChevronRight, Network } from 'lucide-react';
 
 export default function GraphModule() {
-  const [view, setView] = useState('overview'); // overview, blast, centrality, contradictions, holes
+  const [view, setView] = useState('overview'); // overview, blast, centrality, contradictions, holes, visual
   const [graph, setGraph] = useState(null);
   const [centrality, setCentrality] = useState(null);
   const [contradictions, setContradictions] = useState(null);
@@ -68,6 +68,7 @@ export default function GraphModule() {
           { key: 'centrality', label: 'Centrality', icon: Link2 },
           { key: 'contradictions', label: 'Conflicts', icon: AlertTriangle },
           { key: 'holes', label: 'Holes', icon: Search },
+          { key: 'visual', label: 'Visual', icon: Network },
         ].map(tab => {
           const Icon = tab.icon;
           return (
@@ -96,6 +97,7 @@ export default function GraphModule() {
       {view === 'centrality' && <CentralityView data={centrality} />}
       {view === 'contradictions' && <ContradictionsView data={contradictions} />}
       {view === 'holes' && <HolesView data={holes} />}
+      {view === 'visual' && <VisualView graph={graph} />}
     </div>
   );
 }
@@ -251,6 +253,273 @@ function StatCard({ label, value, sub, color = 'text-nexus-text' }) {
       <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">{label}</span>
       <p className={`text-2xl font-light mt-1 ${color}`}>{value}</p>
       {sub && <p className="text-[10px] font-mono text-nexus-text-faint mt-1">{sub}</p>}
+    </div>
+  );
+}
+
+// ── Visual / Force-Directed View ─────────────────────────
+const PROJECT_PALETTE = [
+  { name: 'amber', stroke: '#f59e0b', fill: '#f59e0b' },
+  { name: 'green', stroke: '#22c55e', fill: '#22c55e' },
+  { name: 'blue', stroke: '#3b82f6', fill: '#3b82f6' },
+  { name: 'purple', stroke: '#a855f7', fill: '#a855f7' },
+  { name: 'red', stroke: '#ef4444', fill: '#ef4444' },
+];
+
+function hashProjectColor(project) {
+  if (!project) return PROJECT_PALETTE[0];
+  let h = 0;
+  for (let i = 0; i < project.length; i++) {
+    h = (h * 31 + project.charCodeAt(i)) | 0;
+  }
+  return PROJECT_PALETTE[Math.abs(h) % PROJECT_PALETTE.length];
+}
+
+function VisualView({ graph }) {
+  const WIDTH = 600;
+  const HEIGHT = 400;
+  const [hoveredId, setHoveredId] = useState(null);
+
+  // Memoized force-directed layout: runs once per graph (and on graph change)
+  const layout = useMemo(() => {
+    if (!graph || !graph.nodes || graph.nodes.length === 0) {
+      return { positions: {}, components: 0 };
+    }
+    const nodes = graph.nodes;
+    const edges = graph.edges || [];
+
+    // Position state — seeded deterministically by id so layout is stable
+    const positions = {};
+    for (const n of nodes) {
+      const seed = n.id * 9301 + 49297;
+      const r1 = ((seed % 233280) / 233280);
+      const r2 = (((seed * 13) % 233280) / 233280);
+      positions[n.id] = {
+        x: WIDTH / 2 + (r1 - 0.5) * WIDTH * 0.7,
+        y: HEIGHT / 2 + (r2 - 0.5) * HEIGHT * 0.7,
+      };
+    }
+
+    // Connection counts (degree)
+    const degree = {};
+    for (const n of nodes) degree[n.id] = 0;
+    for (const e of edges) {
+      if (degree[e.from] !== undefined) degree[e.from]++;
+      if (degree[e.to] !== undefined) degree[e.to]++;
+    }
+
+    // Spring-embedder iterations
+    const ITER = 100;
+    const k = Math.sqrt((WIDTH * HEIGHT) / Math.max(1, nodes.length)) * 0.6;
+    const repel = k * k;
+    const cooling = (i) => Math.max(0.01, 1 - i / ITER) * 6;
+
+    for (let i = 0; i < ITER; i++) {
+      // Reset displacements
+      const disp = {};
+      for (const n of nodes) disp[n.id] = { x: 0, y: 0 };
+
+      // Repulsive forces between all pairs
+      for (let a = 0; a < nodes.length; a++) {
+        for (let b = a + 1; b < nodes.length; b++) {
+          const na = nodes[a];
+          const nb = nodes[b];
+          const dx = positions[na.id].x - positions[nb.id].x;
+          const dy = positions[na.id].y - positions[nb.id].y;
+          const dist = Math.max(0.01, Math.sqrt(dx * dx + dy * dy));
+          const force = repel / dist;
+          const fx = (dx / dist) * force;
+          const fy = (dy / dist) * force;
+          disp[na.id].x += fx;
+          disp[na.id].y += fy;
+          disp[nb.id].x -= fx;
+          disp[nb.id].y -= fy;
+        }
+      }
+
+      // Attractive forces along edges
+      for (const e of edges) {
+        const pa = positions[e.from];
+        const pb = positions[e.to];
+        if (!pa || !pb) continue;
+        const dx = pa.x - pb.x;
+        const dy = pa.y - pb.y;
+        const dist = Math.max(0.01, Math.sqrt(dx * dx + dy * dy));
+        const force = (dist * dist) / k;
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        disp[e.from].x -= fx;
+        disp[e.from].y -= fy;
+        disp[e.to].x += fx;
+        disp[e.to].y += fy;
+      }
+
+      // Apply with cooling
+      const temp = cooling(i);
+      for (const n of nodes) {
+        const d = disp[n.id];
+        const len = Math.max(0.01, Math.sqrt(d.x * d.x + d.y * d.y));
+        const limited = Math.min(len, temp);
+        positions[n.id].x += (d.x / len) * limited;
+        positions[n.id].y += (d.y / len) * limited;
+        // Keep inside the canvas with margin
+        positions[n.id].x = Math.max(20, Math.min(WIDTH - 20, positions[n.id].x));
+        positions[n.id].y = Math.max(20, Math.min(HEIGHT - 20, positions[n.id].y));
+      }
+    }
+
+    // Connected components (union-find)
+    const parent = {};
+    for (const n of nodes) parent[n.id] = n.id;
+    const find = (x) => {
+      while (parent[x] !== x) {
+        parent[x] = parent[parent[x]];
+        x = parent[x];
+      }
+      return x;
+    };
+    const union = (a, b) => {
+      const ra = find(a);
+      const rb = find(b);
+      if (ra !== rb) parent[ra] = rb;
+    };
+    for (const e of edges) {
+      if (parent[e.from] !== undefined && parent[e.to] !== undefined) {
+        union(e.from, e.to);
+      }
+    }
+    const roots = new Set();
+    for (const n of nodes) roots.add(find(n.id));
+    const components = roots.size;
+
+    return { positions, degree, components };
+  }, [graph]);
+
+  if (!graph || !graph.nodes || graph.nodes.length === 0) {
+    return (
+      <div className="bg-nexus-surface border border-nexus-border rounded-xl p-8 text-center">
+        <Network size={20} className="mx-auto text-nexus-text-faint mb-2" />
+        <p className="text-xs font-mono text-nexus-text-dim">No graph data to visualize.</p>
+      </div>
+    );
+  }
+
+  const { positions, degree, components } = layout;
+  const maxDegree = Math.max(1, ...Object.values(degree || {}));
+  const nodeRadius = (id) => {
+    const d = (degree && degree[id]) || 0;
+    return 4 + (d / maxDegree) * 8; // 4..12
+  };
+
+  const hovered = hoveredId != null
+    ? graph.nodes.find((n) => n.id === hoveredId)
+    : null;
+
+  return (
+    <div>
+      <div className="grid grid-cols-3 gap-4 mb-4">
+        <StatCard label="Nodes" value={graph.nodes.length} sub="Decisions" />
+        <StatCard label="Edges" value={graph.edges?.length || 0} sub="Connections" />
+        <StatCard label="Components" value={components} sub={components === 1 ? 'Fully connected' : 'Disconnected clusters'} />
+      </div>
+
+      <div className="bg-nexus-surface border border-nexus-border rounded-xl p-4">
+        <div className="relative" style={{ width: WIDTH, height: HEIGHT, maxWidth: '100%' }}>
+          <svg
+            viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+            width={WIDTH}
+            height={HEIGHT}
+            className="block max-w-full"
+            style={{ background: '#0a0e1a' }}
+          >
+            {/* Edges */}
+            {(graph.edges || []).map((e) => {
+              const a = positions[e.from];
+              const b = positions[e.to];
+              if (!a || !b) return null;
+              const isHi = hoveredId != null && (e.from === hoveredId || e.to === hoveredId);
+              return (
+                <line
+                  key={e.id}
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  stroke={isHi ? '#f59e0b' : '#334155'}
+                  strokeOpacity={isHi ? 0.9 : 0.4}
+                  strokeWidth={isHi ? 1.5 : 0.8}
+                />
+              );
+            })}
+
+            {/* Nodes */}
+            {graph.nodes.map((n) => {
+              const p = positions[n.id];
+              if (!p) return null;
+              const color = hashProjectColor(n.project);
+              const r = nodeRadius(n.id);
+              const isHi = hoveredId === n.id;
+              return (
+                <g key={n.id}>
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={isHi ? r + 2 : r}
+                    fill={color.fill}
+                    fillOpacity={isHi ? 1 : 0.75}
+                    stroke={isHi ? '#f59e0b' : color.stroke}
+                    strokeOpacity={isHi ? 1 : 0.6}
+                    strokeWidth={isHi ? 2 : 1}
+                    style={{ cursor: 'pointer', transition: 'r 0.1s' }}
+                    onMouseEnter={() => setHoveredId(n.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                  />
+                </g>
+              );
+            })}
+
+            {/* Hover label rendered on top */}
+            {hovered && positions[hovered.id] && (
+              <g pointerEvents="none">
+                <rect
+                  x={Math.min(WIDTH - 220, Math.max(4, positions[hovered.id].x + 10))}
+                  y={Math.max(4, positions[hovered.id].y - 22)}
+                  width={210}
+                  height={22}
+                  rx={4}
+                  fill="#0a0e1a"
+                  stroke="#f59e0b"
+                  strokeOpacity={0.6}
+                />
+                <text
+                  x={Math.min(WIDTH - 220, Math.max(4, positions[hovered.id].x + 10)) + 8}
+                  y={Math.max(4, positions[hovered.id].y - 22) + 14}
+                  fill="#e2e8f0"
+                  fontSize={10}
+                  fontFamily="ui-monospace, monospace"
+                >
+                  #{hovered.id} {String(hovered.label || '').slice(0, 40)}
+                </text>
+              </g>
+            )}
+          </svg>
+        </div>
+
+        <div className="mt-3 flex items-center gap-3 flex-wrap">
+          <span className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider">Project legend:</span>
+          {PROJECT_PALETTE.map((c) => (
+            <div key={c.name} className="flex items-center gap-1">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ background: c.fill }} />
+              <span className="text-[10px] font-mono text-nexus-text-faint">{c.name}</span>
+            </div>
+          ))}
+          {hovered && (
+            <span className="text-[10px] font-mono text-nexus-amber ml-auto">
+              {String(hovered.project || 'unknown')}
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

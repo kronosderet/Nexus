@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import type {
   NexusData, Task, ActivityEntry, Session, Scratchpad,
   UsageEntry, GpuSnapshot, Decision, GraphEdge, GraphData, SessionTiming,
+  Bookmark,
 } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -28,6 +29,7 @@ export class NexusStore {
     if (!this.data.gpu_history) this.data.gpu_history = [];
     if (!this.data.ledger) this.data.ledger = [];
     if (!this.data.graph_edges) this.data.graph_edges = [];
+    if (!this.data.bookmarks) this.data.bookmarks = [];
 
     this._nextId = {
       tasks: Math.max(0, ...this.data.tasks.map(t => t.id)) + 1,
@@ -141,6 +143,48 @@ export class NexusStore {
     const idx = this.data.scratchpads.findIndex(s => s.id === id);
     if (idx === -1) return null;
     return this.data.scratchpads.splice(idx, 1)[0];
+  }
+
+  // ── Bookmarks ──────────────────────────────────────────
+  getAllBookmarks(): Bookmark[] {
+    if (!this.data.bookmarks) this.data.bookmarks = [];
+    return [...this.data.bookmarks].sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  }
+
+  createBookmark({ title, url, category = 'general' }: {
+    title: string; url: string; category?: string;
+  }): Bookmark {
+    if (!this.data.bookmarks) this.data.bookmarks = [];
+    const bookmark: Bookmark = {
+      id: this._id('bookmarks'),
+      title,
+      url,
+      category,
+      created_at: this._now(),
+    };
+    this.data.bookmarks.push(bookmark);
+    this._flush();
+    return bookmark;
+  }
+
+  updateBookmark(id: number, updates: Partial<Bookmark>): Bookmark | null {
+    if (!this.data.bookmarks) this.data.bookmarks = [];
+    const idx = this.data.bookmarks.findIndex(b => b.id === id);
+    if (idx === -1) return null;
+    this.data.bookmarks[idx] = { ...this.data.bookmarks[idx], ...updates, id } as Bookmark;
+    this._flush();
+    return this.data.bookmarks[idx];
+  }
+
+  deleteBookmark(id: number): Bookmark | null {
+    if (!this.data.bookmarks) this.data.bookmarks = [];
+    const idx = this.data.bookmarks.findIndex(b => b.id === id);
+    if (idx === -1) return null;
+    const bookmark = this.data.bookmarks.splice(idx, 1)[0];
+    this._flush();
+    return bookmark;
   }
 
   // ── Usage ──────────────────────────────────────────────
