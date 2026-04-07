@@ -20829,7 +20829,7 @@ var StdioServerTransport = class {
 // server/mcp/index.ts
 var NEXUS_BASE = process.env.NEXUS_BASE_URL || "http://localhost:3001";
 var SERVER_NAME = "nexus";
-var SERVER_VERSION = "3.1.1";
+var SERVER_VERSION = "3.2.0";
 async function nexusFetch(path, init = {}) {
   let res;
   try {
@@ -21074,6 +21074,213 @@ var TOOLS = [
         }
       }
     }
+  },
+  {
+    name: "nexus_create_task",
+    description: "Create a new task on the Mission Board. Defaults to backlog status. Use this when the user describes something that should be tracked as a discrete work unit, or when planning work and you want to queue up items for later. Returns the new task id.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: 'Task title. Be specific \u2014 "Fix auth bug" is weak, "Fix token refresh race in auth middleware causing 401s after token rotation" is strong.'
+        },
+        description: {
+          type: "string",
+          description: "Optional longer description or context for the task."
+        },
+        status: {
+          type: "string",
+          enum: ["backlog", "in_progress", "review", "done"],
+          description: 'Initial status. Defaults to "backlog".'
+        },
+        priority: {
+          type: "number",
+          description: "Optional priority 0-2 (0=low, 1=normal, 2=high)."
+        }
+      },
+      required: ["title"]
+    }
+  },
+  {
+    name: "nexus_complete_task",
+    description: "Mark a task as done by id. Use this when work on a task finishes during the conversation. Equivalent to `nexus done <id>` in the CLI.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "number",
+          description: "Task id to mark as done."
+        }
+      },
+      required: ["id"]
+    }
+  },
+  {
+    name: "nexus_log_activity",
+    description: `Log an activity entry into the live activity stream. Use for notable events that aren't full-fledged tasks or sessions \u2014 e.g. "deployed v3.2 to origin/main", "fixed CI after rerun", "calibrated fuel readings". Activity entries feed the digest, Compass Done panel, and Overseer context.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        message: {
+          type: "string",
+          description: "The activity message. Concrete and past-tense."
+        },
+        type: {
+          type: "string",
+          description: 'Optional entry type for filtering (e.g. "deploy", "fix", "decision", "system"). Defaults to "system".'
+        }
+      },
+      required: ["message"]
+    }
+  },
+  {
+    name: "nexus_log_session",
+    description: "Log a session summary with decisions, blockers, tags, and files touched. This is the memory-bridge operation \u2014 the most important write operation in Nexus. Call at the end of meaningful work (a shipped feature, a debugging session, a planning session). The session becomes part of the metabrain permanently and surfaces in future briefs.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: {
+          type: "string",
+          description: "Project this session belongs to."
+        },
+        summary: {
+          type: "string",
+          description: "Narrative summary of the work. 2-5 sentences. Lead with outcomes, not process."
+        },
+        decisions: {
+          type: "array",
+          items: { type: "string" },
+          description: "Strategic/architectural decisions made during this session. These will be extracted into The Ledger."
+        },
+        blockers: {
+          type: "array",
+          items: { type: "string" },
+          description: "Things that blocked or impeded work (empty array if none)."
+        },
+        tags: {
+          type: "array",
+          items: { type: "string" },
+          description: "Short tags for later search/filter."
+        },
+        files_touched: {
+          type: "array",
+          items: { type: "string" },
+          description: "File paths modified during this session."
+        }
+      },
+      required: ["project", "summary"]
+    }
+  },
+  {
+    name: "nexus_link_decisions",
+    description: "Create a typed edge between two existing decisions in The Ledger (the knowledge graph). Use this when you notice that one decision led to, depends on, contradicts, or replaces another. The graph feeds blast-radius analysis, centrality ranking, contradiction detection, and fragmented-project detection in the Holes view.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        from: {
+          type: "number",
+          description: "Source decision id."
+        },
+        to: {
+          type: "number",
+          description: "Target decision id."
+        },
+        rel: {
+          type: "string",
+          enum: ["led_to", "depends_on", "contradicts", "replaced", "related"],
+          description: 'Edge type. "led_to" = causal, "depends_on" = prerequisite, "contradicts" = conflict, "replaced" = supersession, "related" = weak association.'
+        },
+        note: {
+          type: "string",
+          description: "Optional note explaining why the link exists."
+        }
+      },
+      required: ["from", "to"]
+    }
+  },
+  {
+    name: "nexus_search",
+    description: 'Smart hybrid (keyword + semantic) search across tasks, sessions, decisions, and activity. Use when the user references prior work vaguely ("the thing we decided about auth"), when you need to find related context, or when checking history before making a new suggestion.',
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Search query. Natural language works (semantic matching) but keywords also work (BM25)."
+        }
+      },
+      required: ["query"]
+    }
+  },
+  {
+    name: "nexus_get_critique",
+    description: "Get self-critique from Nexus: which tasks took unusually long to complete, which are stuck, which categories are slowest, and any patterns detected. Surfaces implicit thrashing as explicit feedback. Use before starting a new task similar to one that historically ran long, or for periodic reflection.",
+    inputSchema: {
+      type: "object",
+      properties: {}
+    }
+  },
+  {
+    name: "nexus_predict_gaps",
+    description: "Detect structural gaps in the knowledge graph and current project state. Returns suggestions across six categories: blind_spot (projects with no decisions), orphan (isolated decisions), unvalidated (high-centrality decisions with no verification), stale (old decisions in active projects), blocker (session blockers not tracked as tasks), drift (repos with uncommitted changes). Use to find things worth doing next.",
+    inputSchema: {
+      type: "object",
+      properties: {}
+    }
+  },
+  {
+    name: "nexus_get_blast_radius",
+    description: "Get the downstream impact of a decision: what other decisions depend on it, what gets affected if it changes. Traverses led_to and depends_on edges from the given decision id. Use before proposing changes to architectural decisions to understand the blast radius.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        decision_id: {
+          type: "number",
+          description: "Decision id to analyze."
+        }
+      },
+      required: ["decision_id"]
+    }
+  },
+  {
+    name: "nexus_ask_overseer",
+    description: 'Ask the Overseer (local AI running against the full Nexus metabrain context) a strategic question. Unlike asking the main model directly, the Overseer has the Ledger, recent sessions, active tasks, fuel state, and risks all loaded as context. Use for high-level strategic questions: "what should I prioritize?", "am I missing something?", "what are the tradeoffs here?". Takes longer than other tools (AI inference).',
+    inputSchema: {
+      type: "object",
+      properties: {
+        question: {
+          type: "string",
+          description: "The strategic question to ask."
+        }
+      },
+      required: ["question"]
+    }
+  },
+  {
+    name: "nexus_bridge_session",
+    description: "Composite end-of-work ritual. Call this when wrapping up a meaningful chunk of work instead of making multiple separate calls. In one shot it: (1) generates an AI-drafted session summary from recent activity via auto-summary, (2) optionally pushes a thought onto the Thought Stack so the next Claude instance can recover context, (3) returns a handoff note that future-you or another instance can read immediately. This turns the shutdown ritual into a single reflex, which is the whole point of having a metabrain.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: {
+          type: "string",
+          description: 'Project to bridge (defaults to "Nexus").'
+        },
+        handoff_thought: {
+          type: "string",
+          description: "Optional: text to push onto the Thought Stack as a pointer for the next instance. If omitted, no thought is pushed (pure summary generation)."
+        },
+        handoff_context: {
+          type: "string",
+          description: 'Optional context for the handoff thought (e.g. "mid-refactor of Graph.jsx line 240, about to add new tab").'
+        },
+        commit_summary: {
+          type: "boolean",
+          description: "If true, also commit the generated summary as a real session entry (not just a preview). Defaults to false."
+        }
+      }
+    }
   }
 ];
 async function handleTool(name, args) {
@@ -21211,6 +21418,247 @@ async function handleTool(name, args) {
         lines.push(`  \u26A0 Weekly fuel CRITICAL (${result.weekly_percent}%) \u2014 ration carefully.`);
       }
       return lines.join("\n");
+    }
+    // ── v2 write tools ────────────────────────────────
+    case "nexus_create_task": {
+      if (!args?.title) throw new Error("title is required");
+      const body = {
+        title: args.title,
+        status: args.status || "backlog"
+      };
+      if (args.description) body.description = args.description;
+      if (args.priority != null) body.priority = Number(args.priority);
+      const result = await nexusFetch("/api/tasks", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      return `\u25C8 Task #${result.id} plotted [${result.status}]
+  ${result.title}`;
+    }
+    case "nexus_complete_task": {
+      if (args?.id == null) throw new Error("id is required");
+      const result = await nexusFetch(`/api/tasks/${Number(args.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "done" })
+      });
+      return `\u25C8 Landmark reached #${result.id}
+  ${result.title}`;
+    }
+    case "nexus_log_activity": {
+      if (!args?.message) throw new Error("message is required");
+      const body = {
+        type: args.type || "system",
+        message: String(args.message)
+      };
+      const result = await nexusFetch("/api/activity", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      return `\u25C8 Logged [${result.type}]: ${result.message}`;
+    }
+    case "nexus_log_session": {
+      if (!args?.project) throw new Error("project is required");
+      if (!args?.summary) throw new Error("summary is required");
+      const body = {
+        project: args.project,
+        summary: args.summary,
+        decisions: Array.isArray(args.decisions) ? args.decisions : [],
+        blockers: Array.isArray(args.blockers) ? args.blockers : [],
+        tags: Array.isArray(args.tags) ? args.tags : [],
+        files_touched: Array.isArray(args.files_touched) ? args.files_touched : []
+      };
+      const result = await nexusFetch("/api/sessions", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      const lines = [
+        `\u25C8 Session #${result.id} recorded for ${result.project}`,
+        `  ${result.summary.slice(0, 120)}${result.summary.length > 120 ? "..." : ""}`
+      ];
+      if (body.decisions.length) lines.push(`  ${body.decisions.length} decision${body.decisions.length !== 1 ? "s" : ""} captured`);
+      if (body.blockers.length) lines.push(`  \u26A0 ${body.blockers.length} blocker${body.blockers.length !== 1 ? "s" : ""}`);
+      if (body.tags.length) lines.push(`  tags: ${body.tags.join(", ")}`);
+      return lines.join("\n");
+    }
+    case "nexus_link_decisions": {
+      if (args?.from == null || args?.to == null) {
+        throw new Error("from and to decision ids are required");
+      }
+      const body = {
+        from: Number(args.from),
+        to: Number(args.to),
+        rel: args.rel || "related",
+        note: args.note || ""
+      };
+      const result = await nexusFetch("/api/ledger/link", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      return `\u25C8 Linked #${body.from} --[${body.rel}]--> #${body.to}${result.id ? ` (edge #${result.id})` : ""}`;
+    }
+    // ── v2 intelligence tools ─────────────────────────
+    case "nexus_search": {
+      if (!args?.query) throw new Error("query is required");
+      const data = await nexusFetch(
+        `/api/smart-search?q=${encodeURIComponent(args.query)}`
+      );
+      const results = data.results || [];
+      if (results.length === 0) {
+        return `\u25C8 No results for "${args.query}"`;
+      }
+      const lines = [
+        `\u25C8 Search: "${args.query}" (${data.method || "hybrid"}, ${results.length} results)`,
+        ""
+      ];
+      for (const r of results.slice(0, 10)) {
+        const score = r.score != null ? ` (${(r.score * 100).toFixed(0)}%)` : "";
+        lines.push(`  [${r.type}]${score} ${r.display || r.title || r.summary || `#${r.id}`}`.slice(0, 160));
+      }
+      if (results.length > 10) lines.push(`  ... +${results.length - 10} more`);
+      return lines.join("\n");
+    }
+    case "nexus_get_critique": {
+      const data = await nexusFetch("/api/critique");
+      const lines = ["\u25C8 Self-Critique"];
+      if (data.averageCompletionMinutes != null) {
+        lines.push(`  Average completion: ${Math.round(data.averageCompletionMinutes)}m`);
+      }
+      if (data.slowTasks?.length) {
+        lines.push("", "Slow tasks:");
+        for (const t of data.slowTasks.slice(0, 5)) {
+          lines.push(`  \u23F1 #${t.id} [${t.status}] ${t.title?.slice(0, 80)} \u2014 ${t.minutes}m`);
+        }
+      }
+      if (data.stuckTasks?.length) {
+        lines.push("", "Stuck (in_progress too long):");
+        for (const t of data.stuckTasks.slice(0, 5)) {
+          lines.push(`  \u2297 #${t.id} ${t.title?.slice(0, 80)}`);
+        }
+      }
+      if (data.insights?.length) {
+        lines.push("", "Insights:");
+        for (const i of data.insights) lines.push(`  \u203A ${i}`);
+      }
+      return lines.join("\n");
+    }
+    case "nexus_predict_gaps": {
+      const data = await nexusFetch("/api/predict");
+      const suggestions = data.suggestions || [];
+      if (suggestions.length === 0) {
+        return "\u25C8 Graph is healthy. No gaps detected.";
+      }
+      const lines = [`\u25C8 Predicted gaps (${suggestions.length})`];
+      lines.push("");
+      const byCategory = {};
+      for (const s of suggestions) {
+        if (!byCategory[s.category]) byCategory[s.category] = [];
+        byCategory[s.category].push(s);
+      }
+      for (const [cat, items] of Object.entries(byCategory)) {
+        lines.push(`${cat} (${items.length}):`);
+        for (const s of items.slice(0, 3)) {
+          const prio = s.priority === 2 ? "!" : s.priority === 1 ? "\u2022" : " ";
+          lines.push(`  ${prio} [${s.project || "?"}] ${s.title}`);
+        }
+        if (items.length > 3) lines.push(`    ... +${items.length - 3} more`);
+      }
+      return lines.join("\n");
+    }
+    case "nexus_get_blast_radius": {
+      if (args?.decision_id == null) throw new Error("decision_id is required");
+      const data = await nexusFetch(`/api/impact/blast/${Number(args.decision_id)}`);
+      const lines = [`\u25C8 Blast radius for #${args.decision_id}`];
+      if (data.decision?.decision) {
+        lines.push(`  ${data.decision.decision.slice(0, 120)}`);
+      }
+      lines.push("");
+      lines.push(data.warning || `Impact: ${data.blastRadius || 0} downstream`);
+      if (data.affected?.length) {
+        lines.push("", "Downstream (led_to / depends_on):");
+        for (const a of data.affected.slice(0, 10)) {
+          const indent = "  ".repeat(a.depth || 1);
+          lines.push(`${indent}\u203A #${a.id} ${a.decision?.slice(0, 90)}`);
+        }
+      }
+      if (data.related?.length) {
+        lines.push("", "Related (weak links):");
+        for (const r of data.related.slice(0, 5)) {
+          lines.push(`  ~ #${r.id} ${r.decision?.slice(0, 90)}`);
+        }
+      }
+      return lines.join("\n");
+    }
+    case "nexus_ask_overseer": {
+      if (!args?.question) throw new Error("question is required");
+      const data = await nexusFetch("/api/overseer/ask", {
+        method: "POST",
+        body: JSON.stringify({ question: args.question })
+      });
+      if (data.error) return `\u25C8 Overseer error: ${data.error}`;
+      return `\u25C8 Overseer:
+
+${data.answer || "(no response)"}`;
+    }
+    // ── v2 composite / reflexive ──────────────────────
+    case "nexus_bridge_session": {
+      const project = args?.project || "Nexus";
+      const commitSummary = args?.commit_summary === true;
+      const results = ["\u25C8 Bridging session"];
+      results.push("");
+      let summary;
+      if (commitSummary) {
+        summary = await nexusFetch("/api/auto-summary", {
+          method: "POST",
+          body: JSON.stringify({ project })
+        });
+        if (summary?.id) {
+          results.push(`\u2713 Session #${summary.id} committed for ${project}`);
+        } else if (summary?.error) {
+          results.push(`\u26A0 Summary generation failed: ${summary.error}`);
+        }
+      } else {
+        summary = await nexusFetch(
+          `/api/auto-summary?project=${encodeURIComponent(project)}`
+        );
+        if (summary?.parsed?.summary) {
+          results.push(`\u2713 Summary generated (preview only, not committed):`);
+          results.push(`  ${summary.parsed.summary}`);
+          if (summary.parsed.decisions?.length) {
+            results.push(`  Decisions: ${summary.parsed.decisions.length}`);
+          }
+          if (summary.parsed.tags?.length) {
+            results.push(`  Tags: ${summary.parsed.tags.join(", ")}`);
+          }
+        } else if (summary?.error) {
+          results.push(`\u26A0 Summary generation failed: ${summary.error}`);
+        }
+      }
+      if (args?.handoff_thought) {
+        const thought = await nexusFetch("/api/thoughts", {
+          method: "POST",
+          body: JSON.stringify({
+            text: args.handoff_thought,
+            context: args.handoff_context || void 0,
+            project
+          })
+        });
+        results.push("");
+        results.push(`\u2713 Thought #${thought.id} pushed for next instance`);
+        results.push(`  "${args.handoff_thought}"`);
+        if (args.handoff_context) {
+          results.push(`  context: ${args.handoff_context}`);
+        }
+      }
+      results.push("");
+      results.push("\u25C8 Handoff note for next instance:");
+      results.push("  Call nexus_brief to see current state.");
+      if (args?.handoff_thought) {
+        results.push("  Call nexus_pop_thought to recover the context of this session.");
+      }
+      if (commitSummary && summary?.id) {
+        results.push(`  Recent session #${summary.id} documents what was done.`);
+      }
+      return results.join("\n");
     }
     default:
       throw new Error(`Unknown tool: ${name}`);

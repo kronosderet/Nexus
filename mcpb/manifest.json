@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "nexus",
   "display_name": "Nexus — The Cartographer",
-  "version": "3.1.1",
+  "version": "3.2.0",
   "description": "Local AI Cowork metabrain. Exposes The Ledger, Thought Stack, Decision Guard, Session Plan, and Compass dashboard as native MCP tools so every Claude instance can access shared cognitive state.",
   "long_description": "Nexus is a local mission-control dashboard and metabrain for AI-assisted development. This MCPB extension surfaces the Nexus knowledge graph as native MCP tools so any Claude Desktop instance can call mcp__nexus__brief at session start, mcp__nexus__check_guard before starting work, mcp__nexus__push_thought before context-switching, and mcp__nexus__pop_thought when returning from interruption — turning the Ledger from 'a tool I use via bash' into ambient memory shared across all concurrent sessions.\n\nRequires the Nexus HTTP server to be running locally (default http://localhost:3001). Start it with: cd C:/Projects/Nexus && npm run dev:server",
   "author": {
@@ -73,6 +73,50 @@
     {
       "name": "nexus_log_usage",
       "description": "Log a Claude fuel reading (session% remaining, weekly% remaining). Call whenever the user reports a new fuel state. Optionally pass reset_in_minutes to (re)start the session timing window."
+    },
+    {
+      "name": "nexus_create_task",
+      "description": "Create a new task on the Mission Board. Defaults to backlog status. Use when the user describes something that should be tracked as a discrete work unit."
+    },
+    {
+      "name": "nexus_complete_task",
+      "description": "Mark a task as done by id. Use when work on a task finishes during the conversation."
+    },
+    {
+      "name": "nexus_log_activity",
+      "description": "Log an activity entry into the live activity stream. For notable events that aren't full-fledged tasks or sessions (deploys, fixes, calibrations)."
+    },
+    {
+      "name": "nexus_log_session",
+      "description": "Log a session summary with decisions, blockers, tags, files_touched. The memory-bridge operation — call at the end of meaningful work."
+    },
+    {
+      "name": "nexus_link_decisions",
+      "description": "Create a typed edge between two existing decisions in The Ledger (led_to / depends_on / contradicts / replaced / related). Feeds blast-radius and centrality analysis."
+    },
+    {
+      "name": "nexus_search",
+      "description": "Smart hybrid (keyword + semantic) search across tasks, sessions, decisions, and activity. Use when the user references prior work vaguely."
+    },
+    {
+      "name": "nexus_get_critique",
+      "description": "Get self-critique: which tasks took unusually long, which are stuck, which categories are slow, and any patterns detected."
+    },
+    {
+      "name": "nexus_predict_gaps",
+      "description": "Detect structural gaps in the knowledge graph: blind spots, orphans, unvalidated decisions, stale entries, blockers, uncommitted drift."
+    },
+    {
+      "name": "nexus_get_blast_radius",
+      "description": "Get the downstream impact of a decision — what gets affected if it changes. Use before proposing changes to architectural decisions."
+    },
+    {
+      "name": "nexus_ask_overseer",
+      "description": "Ask the Overseer (local AI with full Nexus metabrain context) a strategic question. Slower than other tools but has full context loaded."
+    },
+    {
+      "name": "nexus_bridge_session",
+      "description": "Composite end-of-work ritual: generates AI session summary + pushes a handoff thought + returns a handoff note. Turns shutdown into one reflex."
     }
   ],
   "tools_generated": false,
