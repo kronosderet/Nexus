@@ -112,7 +112,15 @@
     },
     {
       "name": "nexus_ask_overseer",
-      "description": "Ask the Overseer (local AI with full Nexus metabrain context) a strategic question. Slower than other tools but has full context loaded."
+      "description": "Ask the Overseer (local AI with full Nexus metabrain context) a strategic question. Slower than other tools but has full context loaded. If this times out, use nexus_ask_overseer_start + nexus_get_overseer_result instead."
+    },
+    {
+      "name": "nexus_ask_overseer_start",
+      "description": "Start an async Overseer query — returns taskId immediately (no timeout risk). Poll with nexus_get_overseer_result."
+    },
+    {
+      "name": "nexus_get_overseer_result",
+      "description": "Poll for the result of an async Overseer query. Returns pending/done/error status."
     },
     {
       "name": "nexus_bridge_session",

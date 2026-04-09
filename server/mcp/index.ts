@@ -573,7 +573,8 @@ const TOOLS: Tool[] = [
       'Ask the Overseer (local AI running against the full Nexus metabrain context) a strategic question. ' +
       'Unlike asking the main model directly, the Overseer has the Ledger, recent sessions, active tasks, fuel ' +
       'state, and risks all loaded as context. Use for high-level strategic questions: "what should I prioritize?", ' +
-      '"am I missing something?", "what are the tradeoffs here?". Takes longer than other tools (AI inference).',
+      '"am I missing something?", "what are the tradeoffs here?". Takes longer than other tools (AI inference). ' +
+      'NOTE: If this times out due to slow local AI inference, use nexus_ask_overseer_start + nexus_get_overseer_result instead.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -583,6 +584,41 @@ const TOOLS: Tool[] = [
         },
       },
       required: ['question'],
+    },
+  },
+  {
+    name: 'nexus_ask_overseer_start',
+    description:
+      'Start an async Overseer query. Returns a taskId immediately (no timeout risk). ' +
+      'The Overseer runs in the background against the full metabrain context. ' +
+      'Poll with nexus_get_overseer_result to get the answer when ready. ' +
+      'Use this instead of nexus_ask_overseer when local AI inference takes >60s.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        question: {
+          type: 'string',
+          description: 'The strategic question to ask.',
+        },
+      },
+      required: ['question'],
+    },
+  },
+  {
+    name: 'nexus_get_overseer_result',
+    description:
+      'Poll for the result of an async Overseer query started with nexus_ask_overseer_start. ' +
+      'Returns status: "pending" (still thinking), "done" (answer ready), or "error". ' +
+      'Call every 10-15 seconds until status is "done".',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        task_id: {
+          type: 'string',
+          description: 'The taskId returned by nexus_ask_overseer_start.',
+        },
+      },
+      required: ['task_id'],
     },
   },
   {
@@ -968,6 +1004,28 @@ async function handleTool(name: string, args: any): Promise<string> {
       });
       if (data.error) return `◈ Overseer error: ${data.error}`;
       return `◈ Overseer:\n\n${data.answer || '(no response)'}`;
+    }
+
+    case 'nexus_ask_overseer_start': {
+      if (!args?.question) throw new Error('question is required');
+      const data = await nexusFetch('/api/overseer/ask/start', {
+        method: 'POST',
+        body: JSON.stringify({ question: args.question }),
+      });
+      if (data.error) return `◈ Overseer error: ${data.error}`;
+      return `◈ Overseer query started.\n  taskId: ${data.taskId}\n  status: ${data.status}\n\nPoll with nexus_get_overseer_result({ task_id: "${data.taskId}" }) every 10-15s.`;
+    }
+
+    case 'nexus_get_overseer_result': {
+      if (!args?.task_id) throw new Error('task_id is required');
+      const data = await nexusFetch(`/api/overseer/ask/result/${encodeURIComponent(args.task_id)}`);
+      if (data.status === 'pending') {
+        return `◈ Overseer still thinking... (${data.elapsed}s elapsed)\n  Poll again in 10-15 seconds.`;
+      }
+      if (data.status === 'error') {
+        return `◈ Overseer error: ${data.error}`;
+      }
+      return `◈ Overseer (completed in ${data.elapsed}s):\n\n${data.answer || '(no response)'}`;
     }
 
     // ── v2 composite / reflexive ──────────────────────
