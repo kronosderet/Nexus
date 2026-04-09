@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { execSync } from 'child_process';
-import { readdirSync, statSync } from 'fs';
+import { readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
 
@@ -44,7 +44,7 @@ async function ask(ai: any, system: string, prompt: string, maxTokens = 1500) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': 'none' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(300000),
+      signal: AbortSignal.timeout(600000),
     });
     if (!res.ok) throw new Error(`AI ${res.status}`);
     const data: any = await res.json();
@@ -295,6 +295,85 @@ export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) 
     } catch (err: any) {
       res.json({ error: err.message });
     }
+  });
+
+  // ── Code audit: load full codebase into context ──────
+  // Reads all server + client + CLI source files and asks the Overseer
+  // to audit for bugs, dead code, inconsistencies. Runs async (fire & poll).
+  // The 200k context window can hold ~90k tokens of source + reasoning.
+  router.post('/code-audit', async (req: Request, res: Response) => {
+    const ai = await detectAI();
+    if (!ai.available) return res.json({ error: 'No local AI available.' });
+
+    const { focus = 'full' } = req.body || {}; // full | server | client
+    const root = join(PROJECTS_DIR, 'Nexus');
+    const files: { path: string; content: string }[] = [];
+
+    function readDir(dir: string, ext: string[], prefix = '') {
+      try {
+        for (const name of readdirSync(dir)) {
+          const full = join(dir, name);
+          try {
+            const stat = statSync(full);
+            if (stat.isDirectory() && !name.startsWith('.') && name !== 'node_modules' && name !== 'dist') {
+              readDir(full, ext, prefix + name + '/');
+            } else if (ext.some(e => name.endsWith(e))) {
+              const content = readFileSync(full, 'utf-8');
+              files.push({ path: prefix + name, content });
+            }
+          } catch {}
+        }
+      } catch {}
+    }
+
+    if (focus === 'full' || focus === 'server') {
+      readDir(join(root, 'server'), ['.ts']);
+    }
+    if (focus === 'full' || focus === 'client') {
+      readDir(join(root, 'client', 'src'), ['.jsx', '.js']);
+    }
+    if (focus === 'full') {
+      readDir(join(root, 'cli'), ['.js']);
+    }
+
+    const codeBlock = files.map(f => `=== ${f.path} ===\n${f.content}`).join('\n\n');
+    const totalChars = codeBlock.length;
+    const estTokens = Math.round(totalChars / 4);
+
+    const CODE_AUDIT_SYSTEM = `You are a senior code auditor reviewing the Nexus project codebase.
+Your job: find REAL bugs, security issues, dead code, logic errors, and inconsistencies.
+Do NOT repeat what the code does — only flag PROBLEMS.
+For each finding: file path, line (approximate), severity (critical/important/polish), one-line description.
+Group by severity. Be terse. Maximum 30 findings.`;
+
+    const taskId = `audit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    asyncTasks.set(taskId, {
+      status: 'pending',
+      question: `Code audit (${focus}, ${files.length} files, ~${estTokens} tokens)`,
+      startedAt: Date.now(),
+    });
+
+    ask(ai, CODE_AUDIT_SYSTEM, `Audit this codebase (${files.length} files, ~${estTokens} tokens):\n\n${codeBlock}`)
+      .then((answer) => {
+        const task = asyncTasks.get(taskId);
+        if (task) {
+          task.status = 'done';
+          task.answer = answer;
+          task.model = ai.model;
+        }
+      })
+      .catch((err) => {
+        const task = asyncTasks.get(taskId);
+        if (task) { task.status = 'error'; task.error = err.message; }
+      });
+
+    res.json({
+      taskId,
+      status: 'pending',
+      files: files.length,
+      estimatedTokens: estTokens,
+      message: `Auditing ${files.length} files (~${estTokens} tokens). Poll /ask/result/${taskId}`,
+    });
   });
 
   // ── Async ask pattern ─────────────────────────────────
