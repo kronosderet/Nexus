@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
+import { createGpuAwareSignal } from '../lib/gpuSignal.ts';
 
 /**
  * Auto-Summary: The Overseer writes session logs for you.
@@ -30,20 +31,25 @@ async function detectAI(): Promise<{ available: boolean; base?: string; model?: 
 }
 
 async function askAI(ai: any, system: string, prompt: string, maxTokens = 1000): Promise<string> {
-  const res = await fetch(`${ai.base}/messages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': 'none' },
-    body: JSON.stringify({
-      model: ai.model,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-    signal: AbortSignal.timeout(300000),
-  });
-  if (!res.ok) throw new Error(`AI ${res.status}`);
-  const data: any = await res.json();
-  return (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
+  const { signal, cleanup } = createGpuAwareSignal(60_000, 3_600_000);
+  try {
+    const res = await fetch(`${ai.base}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': 'none' },
+      body: JSON.stringify({
+        model: ai.model,
+        max_tokens: maxTokens,
+        system,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal,
+    });
+    if (!res.ok) throw new Error(`AI ${res.status}`);
+    const data: any = await res.json();
+    return (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
+  } finally {
+    cleanup();
+  }
 }
 
 const SUMMARY_SYSTEM = `You are the Overseer writing a concise session log summary for Nexus.
