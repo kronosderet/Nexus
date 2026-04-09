@@ -11,7 +11,13 @@ export function createActivityRoutes(store: NexusStore) {
 
   router.post('/', (req: Request, res: Response) => {
     const { type, message, meta = '{}' } = req.body;
-    const entry = store.addActivity(type, message, typeof meta === 'string' ? JSON.parse(meta) : meta);
+    let parsed = {};
+    if (typeof meta === 'string') {
+      try { parsed = JSON.parse(meta); } catch { parsed = {}; }
+    } else {
+      parsed = meta || {};
+    }
+    const entry = store.addActivity(type, message, parsed);
     res.status(201).json(entry);
   });
 

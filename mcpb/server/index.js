@@ -20829,7 +20829,7 @@ var StdioServerTransport = class {
 // server/mcp/index.ts
 var NEXUS_BASE = process.env.NEXUS_BASE_URL || "http://localhost:3001";
 var SERVER_NAME = "nexus";
-var SERVER_VERSION = "3.2.1";
+var SERVER_VERSION = "3.3.0";
 var SLOW_TOOLS = /* @__PURE__ */ new Set([
   "nexus_ask_overseer",
   "nexus_bridge_session"

@@ -50,9 +50,9 @@ function planFocus(aiPlan) {
 function groupByProject(tasks) {
   const groups = {};
   for (const t of tasks) {
-    // Try to detect project from title tag like [FW-DATA], [NX-*], else "Other"
-    const tag = t.title.match(/^\[([A-Z][A-Z0-9-]+)\]/);
-    const key = tag ? tag[1].split('-')[0] : 'Other';
+    // Detect project from title tag like [FW-DATA], [NX-*], [fw-data], else "Other"
+    const tag = t.title.match(/^\[([A-Za-z][A-Za-z0-9-]+)\]/i);
+    const key = tag ? tag[1].split('-')[0].toUpperCase() : 'Other';
     if (!groups[key]) groups[key] = [];
     groups[key].push(t);
   }
@@ -61,7 +61,11 @@ function groupByProject(tasks) {
 }
 
 function minutesAgo(iso) {
-  const diff = (Date.now() - new Date(iso).getTime()) / 60000;
+  if (!iso) return 'unknown';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return 'unknown';
+  const diff = (Date.now() - d.getTime()) / 60000;
+  if (diff < 0) return 'just now'; // future timestamps
   if (diff < 1) return 'just now';
   if (diff < 60) return `${Math.round(diff)}m ago`;
   const h = diff / 60;

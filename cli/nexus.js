@@ -505,14 +505,17 @@ const commands = {
 ## Nexus Integration for ${project}
 
 ### What is Nexus?
-Local AI-powered mission control (v3.0-alpha4). Tracks tasks, sessions, decisions,
+Local AI-powered mission control (v3.3). Tracks tasks, sessions, decisions,
 fuel usage, and git state across all projects. Features:
-  • Knowledge Graph of architectural decisions (76+ nodes, typed edges)
-  • Local AI Overseer (Gemma 4 26B via LM Studio) with self-improving feedback loop
+  • Knowledge Graph of 87+ decisions with 5 typed edge types + blast-radius analysis
+  • Local AI Overseer (Gemma 4 via LM Studio) with self-improving Advice Journal
+  • 18 native MCP tools — every Nexus operation callable from Claude Desktop natively
+  • Compass module — Now/Next/Later/Done strategic dashboard replacing Scratchpad
   • Smart Fuel Intelligence with autonomous session planning
-  • Predictive Task Generation from graph gaps
-  • Impact Forecasting with AI-narrated migration plans
-  • 100% TypeScript server, 114 Vitest tests
+  • Predictive Task Generation from graph gaps (6 gap categories)
+  • Thought Stack — LIFO interrupt-recovery across Claude instances (Ctrl+T)
+  • MCPB bundle — one-click install for Claude Desktop
+  • 100% TypeScript server, 114 Vitest tests, 10 dashboard modules
 
 ### Session Workflow (FOLLOW THIS)
 
@@ -563,7 +566,7 @@ nexus summarize ${project} --commit    # AI generates + saves session log
 nexus handoff ${project}               # Generate context capsule for next agent
 \`\`\`
 
-### Key Commands Reference (51 total)
+### Key Commands Reference (46 CLI + 18 MCP tools)
 \`\`\`
 CONTEXT:    nexus brief | quick | handoff | context | onboard
 FUEL:       nexus usage | fuel | intel | workload | plan
@@ -576,21 +579,35 @@ TOOLS:      nexus ai | notify | digest | gpu | bookmarks
 \`\`\`
 
 ### Dashboard Modules (http://localhost:5173)
-1. Pulse (^1) — system overview, GPU, project health
-2. Fuel (^2) — usage gauges, burn rate, workload planner
-3. Graph (^3) — knowledge graph with blast/centrality/visual
-4. Overseer (^4) — AI strategic analysis, Q&A
-5. Missions (^5) — Kanban board
-6. Activity (^6) — event stream
-7. Sessions (^7) — voyage log
-8. Bookmarks (^8) — curated links
-9. Terminal (^9) — embedded shell
+1. Compass (^1) — Now/Next/Later/Done strategic view (flagship)
+2. Pulse (^2) — system overview, GPU, project health
+3. Fuel (^3) — usage gauges, burn rate, workload planner
+4. Graph (^4) — knowledge graph with blast/centrality/visual/holes
+5. Overseer (^5) — AI strategic analysis, Q&A, auto-remediation
+6. Missions (^6) — Kanban board with drag-and-drop
+7. Activity (^7) — filtered event stream with type chips
+8. Sessions (^8) — voyage log with search + blockers filter
+9. Bookmarks (^9) — curated links by category
+10. Terminal (^0) — embedded PowerShell shell
 + Search (^K) — global hybrid search
++ Thoughts (^T) — interrupt-recovery stack overlay
++ Shortcuts (^/) — keyboard shortcut matrix
+
+### Native MCP Tools (18 tools via nexus.mcpb)
+Install: double-click mcpb/nexus.mcpb → restart Claude Desktop
+Read:    nexus_brief, nexus_get_plan, nexus_check_guard, nexus_search,
+         nexus_get_critique, nexus_predict_gaps, nexus_get_blast_radius,
+         nexus_ask_overseer
+Write:   nexus_create_task, nexus_complete_task, nexus_log_activity,
+         nexus_log_session, nexus_log_usage, nexus_record_decision,
+         nexus_link_decisions, nexus_push_thought, nexus_pop_thought
+Ritual:  nexus_bridge_session (end-of-work: auto-summary + handoff)
 
 ### Important Rules
-- Session fuel is a ROLLING 5-HOUR WINDOW, not daily
+- Session fuel resets on a FIXED 5-HOUR schedule (not rolling from first use)
 - Weekly resets Thursday 21:00 CET (Europe/Prague)
 - Weekly limit is MUCH LARGER than session — different scales, plan accordingly
+- Fuel values are STATIC — only update when user reports new numbers
 - ALWAYS log a session at the end (or use \`nexus summarize -c\`) — it's the memory bridge
 - Overseer recommendations auto-log to /api/advice — mark verdicts to make it smarter
 - Knowledge Graph decisions feed Overseer context — record big choices with \`nexus record\`
@@ -1683,19 +1700,35 @@ TOOLS:      nexus ai | notify | digest | gpu | bookmarks
     };
 
     console.log(`
-  ${amber('◈')} ${amber('NEXUS MCP SERVER')} -- v3.1
+  ${amber('◈')} ${amber('NEXUS MCP SERVER')} -- v3.3
 
-  ${dim('Exposes the Nexus metabrain as native MCP tools so every Claude Code')}
+  ${dim('Exposes the Nexus metabrain as 18 native MCP tools so every Claude')}
   ${dim('instance can call mcp__nexus__brief, mcp__nexus__check_guard, etc.')}
   ${dim('without shelling out to the CLI or fetching the HTTP API.')}
 
-  ${amber('Available tools (v1):')}
-    mcp__nexus__brief             Current state for a project
-    mcp__nexus__get_plan          AI session plan with fuel context
-    mcp__nexus__check_guard       Redundancy check before starting work
-    mcp__nexus__record_decision   Write to The Ledger
-    mcp__nexus__push_thought      Push onto interrupt-recovery stack
-    mcp__nexus__pop_thought       Pop the top thought (recover)
+  ${amber('Read tools (8):')}
+    nexus_brief               Current state for a project
+    nexus_get_plan            AI session plan with fuel context
+    nexus_check_guard         Redundancy check before starting work
+    nexus_search              Smart hybrid search across all entities
+    nexus_get_critique        Self-evaluation on task completion patterns
+    nexus_predict_gaps        Knowledge-graph gap detection (6 categories)
+    nexus_get_blast_radius    Downstream impact of changing a decision
+    nexus_ask_overseer        Strategic Q&A against full metabrain context
+
+  ${amber('Write tools (9):')}
+    nexus_create_task         Create a backlog task
+    nexus_complete_task       Mark a task as done by id
+    nexus_log_activity        Log an activity entry
+    nexus_log_session         Log session with decisions/tags/files (memory bridge)
+    nexus_log_usage           Log fuel readings (session% + weekly% remaining)
+    nexus_record_decision     Write strategic decision to The Ledger
+    nexus_link_decisions      Create typed edge between two decisions
+    nexus_push_thought        Push onto interrupt-recovery stack
+    nexus_pop_thought         Pop the top thought (recover)
+
+  ${amber('Composite (1):')}
+    nexus_bridge_session      End-of-work ritual: auto-summary + handoff thought
 
   ${amber('Setup -- option A: claude CLI')}
     ${green(`claude mcp add nexus -- npx tsx "${mcpEntry.replace(/\\/g, '/')}"`)}
@@ -1729,7 +1762,7 @@ ${JSON.stringify(config, null, 2).split('\n').map(l => '    ' + l).join('\n')}
   ${dim('The Cartographer -- talk to mission control from anywhere.')}
 
   ${amber('Commands:')}
-    nexus mcp                       Print Claude Code MCP server config (v3.1)
+    nexus mcp                       Print MCP server config (18 tools, v3.3)
     nexus mcp --run                 Run the MCP stdio server (for debugging)
     nexus plan                      Autonomous session plan (AI-generated)
     nexus summarize [project]       Overseer writes session log (preview)

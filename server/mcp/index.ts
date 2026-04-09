@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Nexus MCP Server — v3.2.1
+ * Nexus MCP Server — v3.3
  *
  * Exposes the Nexus metabrain as Model Context Protocol tools so every
  * Claude Code instance can call native `mcp__nexus__*` tools instead of
@@ -62,7 +62,7 @@ import {
 // ── Configuration ────────────────────────────────────────
 const NEXUS_BASE = process.env.NEXUS_BASE_URL || 'http://localhost:3001';
 const SERVER_NAME = 'nexus';
-const SERVER_VERSION = '3.2.1';
+const SERVER_VERSION = '3.3.0';
 
 // ── Slow tools — need progress notifications to survive client timeouts ─
 // Tools in this set send periodic progress pings to the client during
