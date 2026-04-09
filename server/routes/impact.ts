@@ -17,7 +17,7 @@ export function createImpactRoutes(store: NexusStore) {
   // Blast radius for a specific decision
   router.get('/blast/:id', (req: Request, res: Response) => {
     const id = Number(req.params.id);
-    const decision = (store as any).data.ledger.find((d: any) => d.id === id);
+    const decision = store.getDecisionById( id);
     if (!decision) return res.status(404).json({ error: 'Decision not found.' });
 
     // Traverse all downstream decisions (follow 'led_to' and 'depends_on' edges)
@@ -27,7 +27,7 @@ export function createImpactRoutes(store: NexusStore) {
       .filter((e: any) => e.rel === 'related')
       .map((e: any) => {
         const otherId = e.from === id ? e.to : e.from;
-        return (store as any).data.ledger.find((d: any) => d.id === otherId);
+        return store.getDecisionById( otherId);
       })
       .filter(Boolean);
 
@@ -46,11 +46,11 @@ export function createImpactRoutes(store: NexusStore) {
 
   // Find potential contradictions across the graph
   router.get('/contradictions', (req: Request, res: Response) => {
-    const decisions = (store as any).data.ledger || [];
+    const decisions = store.getAllDecisions();
     const contradictions: any[] = [];
 
     // Strategy 1: Find 'replaced' edges where old decision still has active dependents
-    for (const edge of (store as any).data.graph_edges) {
+    for (const edge of store.getAllEdges()) {
       if (edge.rel === 'replaced') {
         const oldDecision = decisions.find((d: any) => d.id === edge.from);
         const newDecision = decisions.find((d: any) => d.id === edge.to);
@@ -80,7 +80,7 @@ export function createImpactRoutes(store: NexusStore) {
         for (const [a, b] of opposites) {
           if ((textA.includes(a) && textB.includes(b)) || (textA.includes(b) && textB.includes(a))) {
             // Check if they're already linked as 'replaced' or 'contradicts'
-            const alreadyLinked = (store as any).data.graph_edges.find((e: any) =>
+            const alreadyLinked = store.getAllEdges().find((e: any) =>
               (e.from === decisions[i].id && e.to === decisions[j].id) ||
               (e.from === decisions[j].id && e.to === decisions[i].id)
             );
@@ -102,8 +102,8 @@ export function createImpactRoutes(store: NexusStore) {
 
   // Centrality analysis: which decisions are most connected?
   router.get('/centrality', (req: Request, res: Response) => {
-    const decisions = (store as any).data.ledger || [];
-    const edges = (store as any).data.graph_edges || [];
+    const decisions = store.getAllDecisions();
+    const edges = store.getAllEdges();
 
     const centrality = decisions.map((d: any) => {
       const inbound = edges.filter((e: any) => e.to === d.id).length;
@@ -135,7 +135,7 @@ export function createImpactRoutes(store: NexusStore) {
     const id = Number(req.params.decisionId);
     if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid decision id.' });
 
-    const decision = (store as any).data.ledger.find((d: any) => d.id === id);
+    const decision = store.getDecisionById( id);
     if (!decision) return res.status(404).json({ error: 'Decision not found.' });
 
     // BFS along led_to + depends_on edges, tracking depth
@@ -197,8 +197,8 @@ export function createImpactRoutes(store: NexusStore) {
   // signal: "your Nexus decisions split into 3 islands that don't reference
   // each other" is something worth knowing.
   router.get('/holes', (_req: Request, res: Response) => {
-    const decisions = (store as any).data.ledger || [];
-    const edges = (store as any).data.graph_edges || [];
+    const decisions = store.getAllDecisions();
+    const edges = store.getAllEdges();
 
     // Group decisions by project
     const projects: Record<string, number[]> = {};
@@ -332,12 +332,12 @@ function traverseDirected(store: NexusStore, startId: number, edgeTypes: string[
     visited.add(id);
 
     if (id !== startId) {
-      const decision = (store as any).data.ledger.find((d: any) => d.id === id);
+      const decision = store.getDecisionById( id);
       if (decision) result.push({ ...decision, _depth: depth });
     }
 
     // Only follow specified edge types, in the forward direction
-    const outEdges = (store as any).data.graph_edges.filter((e: any) => e.from === id && edgeTypes.includes(e.rel));
+    const outEdges = store.getAllEdges().filter((e: any) => e.from === id && edgeTypes.includes(e.rel));
     for (const edge of outEdges) {
       if (!visited.has(edge.to)) queue.push({ id: edge.to, depth: depth + 1 });
     }

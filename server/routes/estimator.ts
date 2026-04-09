@@ -67,7 +67,7 @@ function buildEstimate(store: NexusStore) {
   }
 
   // Session timing
-  const timing = (store as any).data._sessionTiming || {};
+  const timing = store.getSessionTiming() || {} as any;
   const resetTime = timing.resetTime ? new Date(timing.resetTime) : null;
   const minutesUntilReset = resetTime ? Math.max(0, (resetTime.getTime() - now) / 60000) : null;
 

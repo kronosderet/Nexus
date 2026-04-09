@@ -33,7 +33,7 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
   // Auto-extract decisions from all sessions
   router.post('/extract', (req: Request, res: Response) => {
     const sessions = store.getSessions({ limit: 100 });
-    const existing = new Set(((store as any).data.ledger || []).map((l: any) => l.decision.toLowerCase().slice(0, 60)));
+    const existing = new Set((store.getAllDecisions()).map((l: any) => l.decision.toLowerCase().slice(0, 60)));
     let added = 0;
 
     for (const s of sessions) {
@@ -52,7 +52,7 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
       }
     }
 
-    res.json({ extracted: added, total: ((store as any).data.ledger || []).length });
+    res.json({ extracted: added, total: (store.getAllDecisions()).length });
   });
 
   // Auto-link: use AI to find relationships between decisions
@@ -68,7 +68,7 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
     }
 
     let linked = 0;
-    const existingEdges = new Set((store as any).data.graph_edges.map((e: any) => `${e.from}-${e.to}`));
+    const existingEdges = new Set(store.getAllEdges().map((e: any) => `${e.from}-${e.to}`));
 
     for (const [project, decs] of Object.entries(byProject)) {
       // Link sequential decisions in same project (temporal chain)
@@ -127,7 +127,7 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
 
     const entry = store.addActivity('graph', `Knowledge Graph: auto-linked ${linked} connections`);
     broadcast({ type: 'activity', payload: entry });
-    res.json({ linked, totalEdges: (store as any).data.graph_edges.length });
+    res.json({ linked, totalEdges: store.getAllEdges().length });
   });
 
   // ── Knowledge Graph edges ──────────────
@@ -150,13 +150,13 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
   // Get all connections for a decision
   router.get('/:id/connections', (req: Request, res: Response) => {
     const id = Number(req.params.id);
-    const decision = (store as any).data.ledger.find((d: any) => d.id === id);
+    const decision = store.getDecisionById( id);
     if (!decision) return res.status(404).json({ error: 'Decision not found.' });
 
     const edges = store.getEdgesFor(id);
     const connected = edges.map((e: any) => {
       const otherId = e.from === id ? e.to : e.from;
-      const other = (store as any).data.ledger.find((d: any) => d.id === otherId);
+      const other = store.getDecisionById( otherId);
       return { edge: e, decision: other };
     }).filter((c: any) => c.decision);
 

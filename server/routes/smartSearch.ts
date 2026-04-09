@@ -57,7 +57,7 @@ function buildCorpus(store: NexusStore) {
   const items: any[] = [];
 
   // Ledger decisions (highest priority -- structured knowledge)
-  for (const d of ((store as any).data.ledger || [])) {
+  for (const d of (store.getAllDecisions())) {
     items.push({
       key: `decision-${d.id}`,
       type: 'decision',

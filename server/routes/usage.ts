@@ -21,7 +21,7 @@ const WEEKLY_RESET_HOUR = 21;
 let _store: NexusStore | null = null;
 
 function getSessionTiming() {
-  return (_store as any)?.data?._sessionTiming || {};
+  return _store?.getSessionTiming() || {};
 }
 
 function nowInTZ() {
@@ -43,8 +43,7 @@ function startSession(resetMinutesFromNow: number | null = null) {
     resetSource: resetMinutesFromNow != null ? 'user' : (existing.resetSource || 'estimated'),
   };
   if (_store) {
-    (_store as any).data._sessionTiming = timing;
-    (_store as any)._flush();
+    _store.setSessionTiming(timing as any);
   }
 }
 
