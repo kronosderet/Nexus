@@ -14,8 +14,31 @@
  * Install via: nexus hooks install
  */
 
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { execSync } from 'node:child_process';
+
 const BASE = process.env.NEXUS_URL || 'http://localhost:3001';
-const project = process.cwd().split(/[/\\]/).pop() || 'unknown';
+
+function detectProject() {
+  const cwd = process.cwd();
+  try {
+    const pkgPath = join(cwd, 'package.json');
+    if (existsSync(pkgPath)) {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+      const name = (pkg.name || '').replace(/^@[^/]+\//, '');
+      if (name.length > 1) return name;
+    }
+  } catch {}
+  try {
+    const remote = execSync('git remote get-url origin', { cwd, encoding: 'utf-8', timeout: 2000 }).trim();
+    const match = remote.match(/[/:]([^/]+?)(?:\.git)?$/);
+    if (match?.[1]) return match[1];
+  } catch {}
+  return cwd.split(/[/\\]/).pop() || 'unknown';
+}
+
+const project = detectProject();
 
 async function api(path, opts = {}) {
   const res = await fetch(`${BASE}/api${path}`, {

@@ -57,14 +57,24 @@ function buildEstimate(store: NexusStore) {
   // Calculate burn rates from history
   const rates = calculateBurnRates(history);
 
-  // Interpolate current fuel
-  let estimatedSession = latest.session_percent ?? 0;
-  let estimatedWeekly = latest.weekly_percent ?? 0;
+  // Reported values are ALWAYS the primary reading. Extrapolation is secondary.
+  // The user explicitly asked for this: fuel values tick down during breaks when
+  // the user isn't actually consuming fuel, which is misleading. The reported
+  // value is the last authoritative reading; extrapolation is labeled as such.
+  const reportedSession = latest.session_percent ?? 0;
+  const reportedWeekly = latest.weekly_percent ?? 0;
 
+  // Extrapolated values (secondary — only useful as a rough estimate during active work)
+  let extrapolatedSession = reportedSession;
+  let extrapolatedWeekly = reportedWeekly;
   if (rates.sessionPerMinute > 0 && minutesSinceReport > 1) {
-    estimatedSession = Math.max(0, (latest.session_percent ?? 0) - (rates.sessionPerMinute * minutesSinceReport));
-    estimatedWeekly = Math.max(0, (latest.weekly_percent ?? 0) - (rates.weeklyPerMinute * minutesSinceReport));
+    extrapolatedSession = Math.max(0, reportedSession - (rates.sessionPerMinute * minutesSinceReport));
+    extrapolatedWeekly = Math.max(0, reportedWeekly - (rates.weeklyPerMinute * minutesSinceReport));
   }
+
+  // PRIMARY estimated values = REPORTED (static until user reports new numbers)
+  let estimatedSession = reportedSession;
+  let estimatedWeekly = reportedWeekly;
 
   // Session timing
   const timing = store.getSessionTiming() || {} as any;
@@ -106,15 +116,23 @@ function buildEstimate(store: NexusStore) {
   return {
     tracked: true,
     reported: {
-      session: latest.session_percent,
-      weekly: latest.weekly_percent,
+      session: reportedSession,
+      weekly: reportedWeekly,
       at: latest.created_at,
       minutesAgo: Math.round(minutesSinceReport),
     },
     estimated: {
+      // PRIMARY: static reported values (never tick down on their own)
       session: Math.round(estimatedSession * 10) / 10,
       weekly: Math.round(estimatedWeekly * 10) / 10,
       confidence: minutesSinceReport < 5 ? 'high' : minutesSinceReport < 30 ? 'medium' : 'low',
+      source: 'reported',
+    },
+    extrapolated: {
+      // SECONDARY: burn-rate projection (may be inaccurate during breaks)
+      session: Math.round(extrapolatedSession * 10) / 10,
+      weekly: Math.round(extrapolatedWeekly * 10) / 10,
+      source: 'extrapolated',
     },
     rates: {
       sessionPerHour: rates.sessionPerHour,
