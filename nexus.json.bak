@@ -1290,6 +1290,13 @@
   ],
   "activity": [
     {
+      "id": 73882,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] nexus.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"}]}",
+      "created_at": "2026-04-09T20:34:14.478Z"
+    },
+    {
       "id": 73883,
       "type": "file_change",
       "message": "Terrain shift -- [Nexus] nexus.json modified",
@@ -4781,13 +4788,6 @@
       "message": "Terrain shift -- [Nexus] 3 files modified",
       "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json.bak\",\"path\":\"Nexus/nexus.json.bak\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json.bak.2\",\"path\":\"Nexus/nexus.json.bak.2\"}]}",
       "created_at": "2026-04-09T20:47:52.605Z"
-    },
-    {
-      "id": 74382,
-      "type": "file_change",
-      "message": "Terrain shift -- [Nexus] 3 files modified",
-      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json.bak.2\",\"path\":\"Nexus/nexus.json.bak.2\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json\",\"path\":\"Nexus/nexus.json\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"nexus.json.bak\",\"path\":\"Nexus/nexus.json.bak\"}]}",
-      "created_at": "2026-04-09T20:47:54.154Z"
     }
   ],
   "scratchpads": [
