@@ -61,9 +61,12 @@ export default function SearchModal({ open, onClose, onNavigate }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" onClick={onClose}>
-      <div className="fixed inset-0 bg-black/60" />
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" onClick={onClose} role="presentation">
+      <div className="fixed inset-0 bg-black/60" aria-hidden="true" />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search"
         className="relative w-full max-w-lg bg-nexus-surface border border-nexus-border rounded-xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >

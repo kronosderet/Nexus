@@ -13,7 +13,7 @@ export function createAdviceRoutes(store: NexusStore) {
 
   // List recent advice (optionally filtered)
   router.get('/', (req: Request, res: Response) => {
-    const limit = parseInt(req.query.limit as string) || 20;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
     const source = typeof req.query.source === 'string' ? req.query.source : undefined;
     const onlyUnjudged = req.query.unjudged === 'true' || req.query.unjudged === '1';
     res.json(store.getAdvice({ limit, source, onlyUnjudged }));

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bookmark, Plus, Trash2, ExternalLink } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
+import { toast } from '../lib/toast.js';
 
 const SEED_BOOKMARKS = [
   { title: 'GitHub Nexus', url: 'https://github.com/kronosderet/Nexus', category: 'repos' },
@@ -48,18 +49,23 @@ export default function BookmarksModule() {
   async function handleCreate(e) {
     e?.preventDefault?.();
     if (!form.title.trim() || !form.url.trim()) return;
+    // Basic URL format check
+    try { new URL(form.url.trim()); } catch {
+      toast.warning('Invalid URL', 'Enter a valid URL starting with http:// or https://');
+      return;
+    }
     const body = {
-      title: form.title.trim(),
+      title: form.title.trim().slice(0, 200),
       url: form.url.trim(),
-      category: form.category.trim() || 'general',
+      category: form.category.trim().slice(0, 50) || 'general',
     };
     try {
       const created = await api.createBookmark(body);
       setBookmarks((prev) => [created, ...prev]);
       setForm({ title: '', url: '', category: '' });
       setShowForm(false);
-    } catch (err) {
-      console.error('Failed to create bookmark', err);
+    } catch {
+      // toast fires automatically from useApi error handler
     }
   }
 
