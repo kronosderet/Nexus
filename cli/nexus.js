@@ -1756,12 +1756,119 @@ ${JSON.stringify(config, null, 2).split('\n').map(l => '    ' + l).join('\n')}
 `);
   },
 
+  async hooks(args) {
+    const { readFileSync: rf, writeFileSync: wf, existsSync: ef } = await import('node:fs');
+    const { homedir } = await import('node:os');
+
+    const settingsPath = join(homedir(), '.claude', 'settings.json');
+    const hooksDir = join(__dirname, 'hooks');
+    const startScript = join(hooksDir, 'session-start.js').replace(/\\/g, '/');
+    const stopScript = join(hooksDir, 'session-stop.js').replace(/\\/g, '/');
+
+    const nexusHooks = {
+      SessionStart: [{
+        matcher: '',
+        hooks: [{ type: 'command', command: `node "${startScript}"` }],
+      }],
+      Stop: [{
+        matcher: '',
+        hooks: [{ type: 'command', command: `node "${stopScript}"` }],
+      }],
+    };
+
+    if (args[0] === 'install') {
+      let settings = {};
+      if (ef(settingsPath)) {
+        try { settings = JSON.parse(rf(settingsPath, 'utf-8')); } catch { settings = {}; }
+      }
+      if (!settings.hooks) settings.hooks = {};
+
+      // Merge Nexus hooks without clobbering existing hooks from other tools
+      for (const [event, entries] of Object.entries(nexusHooks)) {
+        if (!settings.hooks[event]) settings.hooks[event] = [];
+        // Remove any existing Nexus hooks (by checking for our script paths)
+        settings.hooks[event] = settings.hooks[event].filter(
+          entry => !entry.hooks?.some(h => h.command?.includes('Nexus/cli/hooks/'))
+        );
+        // Add fresh Nexus hooks
+        settings.hooks[event].push(...entries);
+      }
+
+      wf(settingsPath, JSON.stringify(settings, null, 2));
+      console.log(`  ${green('◈')} Hooks installed to ${settingsPath}`);
+      console.log(`    SessionStart → ${startScript}`);
+      console.log(`    Stop         → ${stopScript}`);
+      console.log(`\n  ${dim('Restart Claude Code to activate.')}`);
+      return;
+    }
+
+    if (args[0] === 'uninstall') {
+      if (!ef(settingsPath)) {
+        console.log(`  ${dim('No settings file found. Nothing to uninstall.')}`);
+        return;
+      }
+      let settings = {};
+      try { settings = JSON.parse(rf(settingsPath, 'utf-8')); } catch { return; }
+      if (!settings.hooks) { console.log(`  ${dim('No hooks configured.')}`); return; }
+
+      for (const event of Object.keys(nexusHooks)) {
+        if (settings.hooks[event]) {
+          settings.hooks[event] = settings.hooks[event].filter(
+            entry => !entry.hooks?.some(h => h.command?.includes('Nexus/cli/hooks/'))
+          );
+          if (settings.hooks[event].length === 0) delete settings.hooks[event];
+        }
+      }
+      if (Object.keys(settings.hooks).length === 0) delete settings.hooks;
+
+      wf(settingsPath, JSON.stringify(settings, null, 2));
+      console.log(`  ${green('◈')} Nexus hooks removed from ${settingsPath}`);
+      console.log(`\n  ${dim('Restart Claude Code to deactivate.')}`);
+      return;
+    }
+
+    // Default: show status
+    console.log(`
+  ${amber('◈')} ${amber('NEXUS HOOKS')} — Claude Code lifecycle integration
+
+  ${dim('Hooks fire automatically on Claude Code lifecycle events.')}
+  ${dim('They call the Nexus HTTP API to inject context and record sessions.')}
+
+  ${amber('Available hooks:')}
+    ${green('SessionStart')} → injects metabrain brief as system context
+      Script: ${dim(startScript)}
+
+    ${green('Stop')} → auto-generates session summary + pushes handoff thought
+      Script: ${dim(stopScript)}
+
+  ${amber('Commands:')}
+    ${green('nexus hooks install')}     Write hooks to ~/.claude/settings.json
+    ${green('nexus hooks uninstall')}   Remove Nexus hooks from settings.json
+
+  ${amber('Current status:')}`);
+    if (ef(settingsPath)) {
+      try {
+        const s = JSON.parse(rf(settingsPath, 'utf-8'));
+        const hasStart = s.hooks?.SessionStart?.some(e => e.hooks?.some(h => h.command?.includes('Nexus/cli/hooks/')));
+        const hasStop = s.hooks?.Stop?.some(e => e.hooks?.some(h => h.command?.includes('Nexus/cli/hooks/')));
+        console.log(`    SessionStart: ${hasStart ? green('installed') : dim('not installed')}`);
+        console.log(`    Stop:         ${hasStop ? green('installed') : dim('not installed')}`);
+      } catch {
+        console.log(`    ${dim('Could not read settings.json')}`);
+      }
+    } else {
+      console.log(`    ${dim('No ~/.claude/settings.json found')}`);
+    }
+    console.log('');
+  },
+
   async help() {
     console.log(`
   ${amber('◈')} ${amber('N E X U S')}  CLI
   ${dim('The Cartographer -- talk to mission control from anywhere.')}
 
   ${amber('Commands:')}
+    nexus hooks                     Claude Code lifecycle hooks (install/uninstall)
     nexus mcp                       Print MCP server config (18 tools, v3.3)
     nexus mcp --run                 Run the MCP stdio server (for debugging)
     nexus plan                      Autonomous session plan (AI-generated)
