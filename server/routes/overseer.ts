@@ -297,6 +297,88 @@ export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) 
     }
   });
 
+  // ── Async ask pattern ─────────────────────────────────
+  // For MCP clients with ~60s timeouts, the synchronous /ask can't return
+  // in time. /ask/start fires off the AI call and returns a task_id
+  // immediately. /ask/result/:id polls for the answer.
+  const asyncTasks = new Map<string, {
+    status: 'pending' | 'done' | 'error';
+    question: string;
+    answer?: string;
+    error?: string;
+    model?: string;
+    adviceId?: number | null;
+    startedAt: number;
+  }>();
+
+  // Clean up old tasks after 10 minutes
+  setInterval(() => {
+    const cutoff = Date.now() - 600_000;
+    for (const [id, task] of asyncTasks) {
+      if (task.startedAt < cutoff) asyncTasks.delete(id);
+    }
+  }, 60_000);
+
+  router.post('/ask/start', async (req: Request, res: Response) => {
+    const { question } = req.body;
+    if (!question) return res.status(400).json({ error: 'Question required.' });
+
+    const ai = await detectAI();
+    if (!ai.available) return res.json({ error: 'No local AI available.' });
+
+    const taskId = `overseer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    asyncTasks.set(taskId, {
+      status: 'pending',
+      question,
+      startedAt: Date.now(),
+    });
+
+    // Fire and forget — the inference runs in the background
+    const ctx = gatherContext(store);
+    const contextPrompt = buildContextPrompt(ctx);
+    ask(ai, OVERSEER_SYSTEM, `Given this workspace state:\n\n${contextPrompt}\n\nQuestion: ${question}`)
+      .then((answer) => {
+        const advice = store.recordAdvice({ source: 'ask', question, recommendation: answer });
+        const task = asyncTasks.get(taskId);
+        if (task) {
+          task.status = 'done';
+          task.answer = answer;
+          task.model = ai.model;
+          task.adviceId = advice?.id ?? null;
+        }
+      })
+      .catch((err) => {
+        const task = asyncTasks.get(taskId);
+        if (task) {
+          task.status = 'error';
+          task.error = err.message;
+        }
+      });
+
+    res.json({ taskId, status: 'pending', message: 'Overseer is thinking. Poll /ask/result/' + taskId });
+  });
+
+  router.get('/ask/result/:taskId', (req: Request, res: Response) => {
+    const task = asyncTasks.get(req.params.taskId);
+    if (!task) return res.status(404).json({ error: 'Task not found or expired.' });
+
+    if (task.status === 'pending') {
+      const elapsed = Math.round((Date.now() - task.startedAt) / 1000);
+      return res.json({ status: 'pending', elapsed, message: `Still thinking... (${elapsed}s)` });
+    }
+    if (task.status === 'error') {
+      return res.json({ status: 'error', error: task.error });
+    }
+    // Done
+    res.json({
+      status: 'done',
+      answer: task.answer,
+      model: task.model,
+      adviceId: task.adviceId,
+      elapsed: Math.round((Date.now() - task.startedAt) / 1000),
+    });
+  });
+
   // Quick risk scan (lightweight, no AI needed)
   router.get('/risks', (req: Request, res: Response) => {
     const ctx = gatherContext(store);

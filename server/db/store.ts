@@ -8,7 +8,7 @@ import type {
 } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DB_PATH = join(__dirname, '..', '..', 'nexus.json');
+const DB_PATH = process.env.NEXUS_DB_PATH || join(__dirname, '..', '..', 'nexus.json');
 
 type IdTable = 'tasks' | 'activity' | 'sessions' | 'scratchpads' | 'bookmarks';
 
