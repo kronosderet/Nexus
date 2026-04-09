@@ -2,11 +2,22 @@ import { Component } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 /**
- * Catches render-time errors in child modules so one bad panel
+ * Catches RENDER-TIME errors in child modules so one bad panel
  * doesn't take down the whole dashboard.
  *
  * Use with a `resetKey` prop (e.g. the active module name) — when the
  * key changes, the boundary resets so switching modules always recovers.
+ *
+ * Scope: render errors ONLY (getDerivedStateFromError). Async errors
+ * (useEffect, event handlers, API calls) are NOT caught here — they're
+ * handled by the toast system in useApi.js, which fires toast.error()
+ * on every failed API call and then re-throws. Module-level catch blocks
+ * prevent unhandled rejections after the toast surfaces the error.
+ *
+ * Error visibility chain:
+ *   Render error → ErrorBoundary → crash screen with retry button
+ *   Async/API error → useApi toast.error() → user sees toast notification
+ *   Both paths are covered. No silent failures.
  */
 export default class ErrorBoundary extends Component {
   constructor(props) {
