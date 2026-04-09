@@ -19,14 +19,14 @@ export function createGitHubRoutes(store: NexusStore, broadcast: BroadcastFn) {
 
   // Fetch recent commits across all repos
   router.get('/commits', (req: Request, res: Response) => {
-    const days = parseInt(req.query.days as string) || 7;
+    const days = Math.min(parseInt(req.query.days as string) || 7, 365);
     const commits = getAllCommits(days);
     res.json(commits);
   });
 
   // Fetch recent commits for a specific project
   router.get('/commits/:project', (req: Request, res: Response) => {
-    const limit = parseInt(req.query.limit as string) || 20;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
     const projectPath = join(PROJECTS_DIR, String(req.params.project));
     try {
       const commits = getProjectCommits(projectPath, String(req.params.project), limit);

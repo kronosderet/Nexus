@@ -6,7 +6,7 @@ export function createHeatmapRoutes(store: NexusStore): Router {
 
   // Get heatmap data: activity bucketed by day for the last N weeks
   router.get('/', (req: Request, res: Response) => {
-    const weeks = parseInt(req.query.weeks as string) || 12;
+    const weeks = Math.min(parseInt(req.query.weeks as string) || 12, 52);
     const project = (req.query.project as string) || null;
 
     const now = new Date();

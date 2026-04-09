@@ -338,6 +338,7 @@ export default function Overseer() {
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && askOverseer()}
+                maxLength={5000}
                 placeholder="What should I prioritize this week? / Is Firewall at risk? / ..."
                 className="flex-1 bg-nexus-bg border border-nexus-border rounded-lg px-3 py-2 text-sm text-nexus-text placeholder:text-nexus-text-faint focus:border-nexus-amber focus:outline-none"
               />

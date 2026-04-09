@@ -15,7 +15,7 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
   // Record a decision
   router.post('/', (req: Request, res: Response) => {
     const { decision, context, project, alternatives, tags } = req.body;
-    if (!decision) return res.status(400).json({ error: 'Decision text required.' });
+    if (!decision?.trim()) return res.status(400).json({ error: 'Decision text required.' });
 
     const entry = store.recordDecision({
       decision,
@@ -166,7 +166,7 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
   // Traverse the graph from a starting decision
   router.get('/:id/traverse', (req: Request, res: Response) => {
     const id = Number(req.params.id);
-    const depth = parseInt(req.query.depth as string) || 3;
+    const depth = Math.min(parseInt(req.query.depth as string) || 3, 10);
     const chain = store.traverse(id, depth);
     res.json({ startId: id, depth, chain });
   });

@@ -27,7 +27,7 @@ export function createThoughtRoutes(store: NexusStore, broadcast: (data: any) =>
   // POST /api/thoughts — push a new thought onto the stack
   router.post('/', (req: Request, res: Response) => {
     const { text, context, project, related_task_id } = req.body;
-    if (!text) return res.status(400).json({ error: 'Thought text required.' });
+    if (!text?.trim()) return res.status(400).json({ error: 'Thought text required.' });
     const thought = store.pushThought({ text, context, project, related_task_id });
 
     const entry = store.addActivity('thought', `Pushed thought: ${text.slice(0, 60)}`);

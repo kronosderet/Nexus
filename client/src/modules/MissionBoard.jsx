@@ -121,10 +121,14 @@ export default function MissionBoard({ ws }) {
 
   async function handleAdd(status) {
     if (!newTaskTitle.trim()) return;
-    await api.createTask({ title: newTaskTitle.trim(), status });
-    setNewTaskTitle('');
-    setAddingTo(null);
-    fetchTasks();
+    try {
+      await api.createTask({ title: newTaskTitle.trim(), status });
+      setNewTaskTitle('');
+      setAddingTo(null);
+      fetchTasks();
+    } catch {
+      // toast fires automatically from useApi error handler
+    }
   }
 
   async function handleUpdate(id, updates) {

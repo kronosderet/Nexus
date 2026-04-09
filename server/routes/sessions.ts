@@ -8,7 +8,7 @@ export function createSessionRoutes(store: NexusStore, broadcast: BroadcastFn) {
 
   router.get('/', (req: Request, res: Response) => {
     const project = typeof req.query.project === 'string' ? req.query.project : undefined;
-    const limit = parseInt(req.query.limit as string) || 20;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 200);
     res.json(store.getSessions({ project, limit }));
   });
 

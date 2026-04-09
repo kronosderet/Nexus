@@ -99,7 +99,7 @@ function GpuPanel({ gpu }) {
       <h3 className="text-lg font-light text-nexus-text mb-4">{gpu.name}</h3>
 
       {/* Main metrics grid */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
         {/* GPU Utilization */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
@@ -158,7 +158,7 @@ function GpuPanel({ gpu }) {
       </div>
 
       {/* Bottom stats row */}
-      <div className="grid grid-cols-4 gap-3 pt-3 border-t border-nexus-border">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-nexus-border">
         <div className="text-center">
           <p className="text-xs font-mono text-nexus-text-faint">Power</p>
           <p className="text-sm font-mono text-nexus-text">

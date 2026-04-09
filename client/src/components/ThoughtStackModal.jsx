@@ -85,10 +85,13 @@ export default function ThoughtStackModal({ open, onClose }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]">
-      <div className="fixed inset-0 bg-black/60" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]" role="presentation">
+      <div className="fixed inset-0 bg-black/60" onClick={onClose} aria-hidden="true" />
 
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Thought Stack"
         className="relative w-full max-w-lg max-h-[80vh] bg-nexus-surface border border-nexus-border rounded-xl shadow-2xl overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
