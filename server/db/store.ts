@@ -319,8 +319,50 @@ export class NexusStore {
       decision, context, project, alternatives, tags, created_at: this._now(),
     };
     this.data.ledger.push(entry);
+    // Auto-link: find related decisions by keyword overlap
+    const linked = this._autoLinkDecision(entry);
     this._flush();
     return entry;
+  }
+
+  /** Auto-link a new decision to existing ones by keyword similarity. */
+  private _autoLinkDecision(newDec: Decision): GraphEdge[] {
+    const linked: GraphEdge[] = [];
+    const newWords = this._significantWords(newDec.decision + ' ' + newDec.context);
+    if (newWords.size < 2) return linked;
+
+    for (const existing of this.data.ledger) {
+      if (existing.id === newDec.id) continue;
+      const existWords = this._significantWords(existing.decision + ' ' + (existing.context || ''));
+      // Count shared significant words
+      let shared = 0;
+      for (const w of newWords) if (existWords.has(w)) shared++;
+      const similarity = shared / Math.max(newWords.size, 1);
+      if (similarity < 0.3) continue; // threshold: 30% word overlap
+      // Check if edge already exists
+      const alreadyLinked = this.data.graph_edges.some(
+        e => (e.from === newDec.id && e.to === existing.id) || (e.from === existing.id && e.to === newDec.id)
+      );
+      if (alreadyLinked) continue;
+      // Same project? Use 'related'. Different project? Also 'related' (safe default)
+      const edge = this.addEdge(newDec.id, existing.id, 'related',
+        `auto-linked (${Math.round(similarity * 100)}% keyword overlap)`
+      );
+      linked.push(edge);
+      if (linked.length >= 5) break; // cap at 5 auto-links per decision
+    }
+    return linked;
+  }
+
+  /** Extract significant words (>3 chars, lowercased, deduped) from text. */
+  private _significantWords(text: string): Set<string> {
+    const stopwords = new Set(['this', 'that', 'with', 'from', 'have', 'been', 'will', 'should', 'could', 'would', 'about', 'into', 'more', 'also', 'than', 'them', 'then', 'each', 'when', 'which', 'their', 'does', 'were', 'what', 'some', 'other', 'over', 'only', 'very', 'just', 'because', 'through', 'after', 'before', 'between', 'under']);
+    return new Set(
+      text.toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 3 && !stopwords.has(w))
+    );
   }
 
   // ── Knowledge Graph ────────────────────────────────────

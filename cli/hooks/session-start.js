@@ -9,8 +9,48 @@
  * Install via: nexus hooks install
  */
 
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { execSync } from 'node:child_process';
+
 const BASE = process.env.NEXUS_URL || 'http://localhost:3001';
-const project = process.cwd().split(/[/\\]/).pop() || 'unknown';
+
+/**
+ * Detect the project name using multiple strategies (best → fallback):
+ * 1. package.json "name" field in CWD
+ * 2. Git remote origin URL → extract repo name
+ * 3. CWD basename (original fallback)
+ */
+function detectProject() {
+  const cwd = process.cwd();
+
+  // Strategy 1: package.json name
+  try {
+    const pkgPath = join(cwd, 'package.json');
+    if (existsSync(pkgPath)) {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+      if (pkg.name && pkg.name !== 'undefined') {
+        // Clean up scoped names: @foo/bar → bar, nexus-cli → nexus-cli
+        const name = pkg.name.replace(/^@[^/]+\//, '');
+        if (name.length > 1) return name;
+      }
+    }
+  } catch {}
+
+  // Strategy 2: git remote origin → repo name
+  try {
+    const remote = execSync('git remote get-url origin', { cwd, encoding: 'utf-8', timeout: 2000 }).trim();
+    // https://github.com/user/RepoName.git → RepoName
+    // git@github.com:user/RepoName.git → RepoName
+    const match = remote.match(/[/:]([^/]+?)(?:\.git)?$/);
+    if (match?.[1]) return match[1];
+  } catch {}
+
+  // Strategy 3: CWD basename
+  return cwd.split(/[/\\]/).pop() || 'unknown';
+}
+
+const project = detectProject();
 
 async function api(path) {
   const res = await fetch(`${BASE}/api${path}`, { signal: AbortSignal.timeout(3000) });
