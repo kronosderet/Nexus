@@ -144,7 +144,9 @@ export class NexusStore {
   deleteScratchpad(id: number): Scratchpad | null {
     const idx = this.data.scratchpads.findIndex(s => s.id === id);
     if (idx === -1) return null;
-    return this.data.scratchpads.splice(idx, 1)[0];
+    const removed = this.data.scratchpads.splice(idx, 1)[0];
+    this._flush();
+    return removed;
   }
 
   // ── Bookmarks ──────────────────────────────────────────

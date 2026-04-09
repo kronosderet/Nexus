@@ -6,7 +6,10 @@ type BroadcastFn = (data: any) => void;
 // ── Reset schedule ─────────────────────────────────────
 const TIMEZONE = 'Europe/Prague';
 
-// Session: rolling 5-hour window from session start
+// Session: FIXED 5-hour windows (hard reset, NOT rolling from first use).
+// The user reports reset_in_minutes which tells us when the current window
+// ends. We store that absolute time and count down to it. When it passes,
+// the next window starts. We NEVER auto-start a rolling window.
 const SESSION_WINDOW_HOURS = 5;
 
 // Weekly: fixed reset Thursday 21:00 CET
@@ -27,11 +30,17 @@ function nowInTZ() {
 
 function startSession(resetMinutesFromNow: number | null = null) {
   const now = nowInTZ();
+  // Only set resetTime when the user explicitly provides reset_in_minutes.
+  // Without that, use the last known resetTime or fall back to SESSION_WINDOW_HOURS
+  // from NOW (best guess, will be corrected on next user report).
+  const existing = getSessionTiming();
   const timing = {
     startTime: now.toISOString(),
     resetTime: resetMinutesFromNow != null
       ? new Date(now.getTime() + resetMinutesFromNow * 60000).toISOString()
-      : new Date(now.getTime() + SESSION_WINDOW_HOURS * 3600000).toISOString(),
+      : existing.resetTime || new Date(now.getTime() + SESSION_WINDOW_HOURS * 3600000).toISOString(),
+    // Track whether the resetTime came from user input (authoritative) or was guessed
+    resetSource: resetMinutesFromNow != null ? 'user' : (existing.resetSource || 'estimated'),
   };
   if (_store) {
     (_store as any).data._sessionTiming = timing;

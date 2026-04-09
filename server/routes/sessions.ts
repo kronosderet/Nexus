@@ -38,7 +38,13 @@ export function createSessionRoutes(store: NexusStore, broadcast: BroadcastFn) {
     const id = Number(req.params.id);
     const session = store.getSession(id);
     if (!session) return res.status(404).json({ error: 'Nothing on the charts.' });
-    Object.assign(session, req.body, { id });
+    // Explicit allowlist — don't let arbitrary body fields poison the session object
+    const { summary, decisions, blockers, tags, files_touched } = req.body;
+    if (summary !== undefined) session.summary = summary;
+    if (decisions !== undefined) session.decisions = decisions;
+    if (blockers !== undefined) session.blockers = blockers;
+    if (tags !== undefined) session.tags = tags;
+    if (files_touched !== undefined) session.files_touched = files_touched;
     store._flush();
     res.json(session);
   });
