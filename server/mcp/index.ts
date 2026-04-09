@@ -670,14 +670,23 @@ async function handleTool(name: string, args: any): Promise<string> {
       ]);
 
       const projectLower = project.toLowerCase();
-      const KNOWN = ['nexus', 'firewall-godot', 'noosphere', 'resonance godot', 'resonance-godot', 'shadowrun'];
+      // Build dynamic project list from actual data (no hardcoded list)
+      const allProjects = new Set<string>();
+      for (const s of sessions as any[]) allProjects.add((s.project || '').toLowerCase());
+      for (const d of (Array.isArray(ledger) ? ledger : []) as any[]) allProjects.add((d.project || '').toLowerCase());
+      allProjects.delete('');
+      allProjects.delete('general');
+
       const inProject = (s: string) => {
         const t = (s || '').toLowerCase();
         if (t.includes(projectLower)) return true;
-        if (projectLower === 'nexus') {
-          return !KNOWN.filter((p) => p !== 'nexus').some((p) => t.includes(p));
+        // Default project (e.g. "nexus"): include tasks that don't belong to any OTHER known project
+        const otherProjects = [...allProjects].filter((p) => p !== projectLower);
+        if (otherProjects.length > 0) {
+          const belongsToOther = otherProjects.some((p) => t.includes(p));
+          return !belongsToOther;
         }
-        return false;
+        return true; // no other projects known — include everything
       };
 
       const activeTasks = (tasks as any[]).filter(
