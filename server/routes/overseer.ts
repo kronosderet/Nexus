@@ -44,7 +44,7 @@ async function ask(ai: any, system: string, prompt: string, maxTokens = 1500) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': 'none' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(120000),
+      signal: AbortSignal.timeout(300000),
     });
     if (!res.ok) throw new Error(`AI ${res.status}`);
     const data: any = await res.json();
@@ -62,7 +62,7 @@ async function ask(ai: any, system: string, prompt: string, maxTokens = 1500) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(120000),
+    signal: AbortSignal.timeout(300000),
   });
   if (!res.ok) throw new Error(`AI ${res.status}`);
   const data: any = await res.json();
