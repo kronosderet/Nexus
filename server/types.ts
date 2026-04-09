@@ -78,6 +78,7 @@ export interface GraphEdge {
 export interface SessionTiming {
   startTime: string;
   resetTime: string;
+  resetSource?: 'user' | 'estimated';
 }
 
 export interface Bookmark {

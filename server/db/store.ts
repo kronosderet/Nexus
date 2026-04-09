@@ -59,6 +59,16 @@ export class NexusStore {
   private _id(table: IdTable): number { return this._nextId[table]++; }
   _now(): string { return new Date().toISOString(); }
 
+  // ── Typed accessors for Ledger / Graph / Timing ────────
+  // These replace (store as any).data.* casts in route files.
+  getAllDecisions(): Decision[] { return this.data.ledger || []; }
+  getDecisionById(id: number): Decision | null { return (this.data.ledger || []).find(d => d.id === id) || null; }
+  getDecisionCount(): number { return (this.data.ledger || []).length; }
+  getAllEdges(): GraphEdge[] { return this.data.graph_edges || []; }
+  getEdgeCount(): number { return (this.data.graph_edges || []).length; }
+  getSessionTiming(): SessionTiming | undefined { return this.data._sessionTiming; }
+  setSessionTiming(timing: SessionTiming): void { this.data._sessionTiming = timing; this._flush(); }
+
   // ── Tasks ──────────────────────────────────────────────
   getAllTasks(): Task[] {
     return [...this.data.tasks].sort((a, b) => a.sort_order - b.sort_order);

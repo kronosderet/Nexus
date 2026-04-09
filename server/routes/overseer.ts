@@ -87,10 +87,10 @@ function gatherContext(store: NexusStore) {
 
   // Graph analytics
   const graph = store.getGraph();
-  const edges = (store as any).data.graph_edges || [];
+  const edges = store.getAllEdges();
   // Centrality: top 5 most connected decisions
   const centralityMap: Record<number, { decision: string; project: string; count: number }> = {};
-  for (const d of (store as any).data.ledger || []) centralityMap[d.id] = { decision: d.decision, project: d.project, count: 0 };
+  for (const d of store.getAllDecisions()) centralityMap[d.id] = { decision: d.decision, project: d.project, count: 0 };
   for (const e of edges) {
     if (centralityMap[e.from]) centralityMap[e.from].count++;
     if (centralityMap[e.to]) centralityMap[e.to].count++;
@@ -118,7 +118,7 @@ function gatherContext(store: NexusStore) {
   } catch {}
 
   // Blind spots: projects with repos but no Ledger decisions
-  const projectsWithDecisions = new Set(((store as any).data.ledger || []).map((d: any) => d.project.toLowerCase()));
+  const projectsWithDecisions = new Set((store.getAllDecisions()).map((d: any) => d.project.toLowerCase()));
   const blindSpots = repos.filter(r => !projectsWithDecisions.has(r.name.toLowerCase())).map(r => r.name);
 
   // Advice journal: past recommendations + their outcomes (the learning loop)
