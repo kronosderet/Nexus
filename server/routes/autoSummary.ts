@@ -39,7 +39,7 @@ async function askAI(ai: any, system: string, prompt: string, maxTokens = 1000):
       system,
       messages: [{ role: 'user', content: prompt }],
     }),
-    signal: AbortSignal.timeout(120000),
+    signal: AbortSignal.timeout(300000),
   });
   if (!res.ok) throw new Error(`AI ${res.status}`);
   const data: any = await res.json();
