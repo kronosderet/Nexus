@@ -3,6 +3,7 @@ import { execSync } from 'child_process';
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
+import { createGpuAwareSignal } from '../lib/gpuSignal.ts';
 
 type BroadcastFn = (data: any) => void;
 
@@ -32,49 +33,56 @@ async function detectAI() {
 }
 
 async function ask(ai: any, system: string, prompt: string, maxTokens = 1500) {
-  // ── Anthropic Messages API (preferred) ──
-  if (ai.type === 'anthropic') {
-    const body = {
-      model: ai.model,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: 'user', content: prompt }],
-    };
-    const res = await fetch(`${ai.base}/messages`, {
+  // GPU-aware signal: waits as long as GPU is computing, aborts when idle 60s
+  const { signal, cleanup } = createGpuAwareSignal(60_000, 3_600_000);
+
+  try {
+    // ── Anthropic Messages API (preferred) ──
+    if (ai.type === 'anthropic') {
+      const body = {
+        model: ai.model,
+        max_tokens: maxTokens,
+        system,
+        messages: [{ role: 'user', content: prompt }],
+      };
+      const res = await fetch(`${ai.base}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': 'none' },
+        body: JSON.stringify(body),
+        signal,
+      });
+      if (!res.ok) throw new Error(`AI ${res.status}`);
+      const data: any = await res.json();
+      return (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
+    }
+
+    // ── OpenAI / Ollama ──
+    const url = ai.type === 'ollama' ? `${ai.base}/api/chat` : `${ai.base}/chat/completions`;
+    const messages = [{ role: 'system', content: system }, { role: 'user', content: prompt }];
+    const body = ai.type === 'ollama'
+      ? { model: ai.model, messages, stream: false }
+      : { model: ai.model, messages, max_tokens: maxTokens + 2048, temperature: 0.4 };
+
+    const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': 'none' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(600000),
+      signal,
     });
     if (!res.ok) throw new Error(`AI ${res.status}`);
     const data: any = await res.json();
-    return (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
+
+    if (ai.type === 'ollama') return data.message?.content || '';
+    const choice = data.choices?.[0]?.message;
+    if (choice?.content?.trim()) return choice.content.trim();
+    if (choice?.reasoning_content) {
+      const paras = choice.reasoning_content.trim().split(/\n\n+/).filter((p: string) => p.trim().length > 20);
+      return paras.slice(-3).join('\n\n').replace(/^\s*[*•-]\s+/gm, '').trim();
+    }
+    return '';
+  } finally {
+    cleanup(); // Always stop the GPU watchdog
   }
-
-  // ── OpenAI / Ollama ──
-  const url = ai.type === 'ollama' ? `${ai.base}/api/chat` : `${ai.base}/chat/completions`;
-  const messages = [{ role: 'system', content: system }, { role: 'user', content: prompt }];
-  const body = ai.type === 'ollama'
-    ? { model: ai.model, messages, stream: false }
-    : { model: ai.model, messages, max_tokens: maxTokens + 2048, temperature: 0.4 };
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(300000),
-  });
-  if (!res.ok) throw new Error(`AI ${res.status}`);
-  const data: any = await res.json();
-
-  if (ai.type === 'ollama') return data.message?.content || '';
-  const choice = data.choices?.[0]?.message;
-  if (choice?.content?.trim()) return choice.content.trim();
-  if (choice?.reasoning_content) {
-    const paras = choice.reasoning_content.trim().split(/\n\n+/).filter((p: string) => p.trim().length > 20);
-    return paras.slice(-3).join('\n\n').replace(/^\s*[*•-]\s+/gm, '').trim();
-  }
-  return '';
 }
 
 // ── Gather full fleet context ───────────────────────
