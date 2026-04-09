@@ -12,6 +12,9 @@ const DB_PATH = process.env.NEXUS_DB_PATH || join(__dirname, '..', '..', 'nexus.
 
 type IdTable = 'tasks' | 'activity' | 'sessions' | 'scratchpads' | 'bookmarks';
 
+const BAK_PATH = DB_PATH + '.bak';
+const BAK2_PATH = DB_PATH + '.bak.2';
+
 export class NexusStore {
   data: NexusData;
   _lastRiskScan?: { risks: any[]; scannedAt: string; critical: number; warnings: number };
@@ -19,7 +22,26 @@ export class NexusStore {
 
   constructor() {
     if (existsSync(DB_PATH)) {
-      this.data = JSON.parse(readFileSync(DB_PATH, 'utf-8'));
+      try {
+        this.data = JSON.parse(readFileSync(DB_PATH, 'utf-8'));
+      } catch (err) {
+        // Primary DB corrupted — try backup recovery
+        console.error(`◈ WARNING: ${DB_PATH} corrupted (${(err as Error).message}). Attempting backup recovery...`);
+        if (existsSync(BAK_PATH)) {
+          try {
+            this.data = JSON.parse(readFileSync(BAK_PATH, 'utf-8'));
+            console.error(`◈ Recovered from ${BAK_PATH}. Data may be slightly behind.`);
+            // Immediately save the recovered data as the primary
+            writeFileSync(DB_PATH, JSON.stringify(this.data, null, 2));
+          } catch {
+            console.error(`◈ Backup also corrupted. Starting fresh.`);
+            this.data = this._seed();
+          }
+        } else {
+          console.error(`◈ No backup found. Starting fresh.`);
+          this.data = this._seed();
+        }
+      }
     } else {
       this.data = this._seed();
       this._flush();
@@ -55,7 +77,19 @@ export class NexusStore {
     };
   }
 
-  _flush(): void { writeFileSync(DB_PATH, JSON.stringify(this.data, null, 2)); }
+  _flush(): void {
+    const json = JSON.stringify(this.data, null, 2);
+    // Rotate backups: .bak → .bak.2, current → .bak, then write new
+    try {
+      if (existsSync(BAK_PATH)) {
+        try { writeFileSync(BAK2_PATH, readFileSync(BAK_PATH)); } catch {}
+      }
+      if (existsSync(DB_PATH)) {
+        try { writeFileSync(BAK_PATH, readFileSync(DB_PATH)); } catch {}
+      }
+    } catch {}
+    writeFileSync(DB_PATH, json);
+  }
   private _id(table: IdTable): number { return this._nextId[table]++; }
   _now(): string { return new Date().toISOString(); }
 
