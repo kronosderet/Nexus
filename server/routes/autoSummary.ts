@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
 import { createGpuAwareSignal } from '../lib/gpuSignal.ts';
 import { acquireAiLock } from '../lib/aiSemaphore.ts';
+import { aiFetch } from '../lib/aiFetch.ts';
 
 /**
  * Auto-Summary: The Overseer writes session logs for you.
@@ -35,19 +36,12 @@ async function askAI(ai: any, system: string, prompt: string, maxTokens = 1000):
   const releaseLock = await acquireAiLock();
   const { signal, cleanup } = createGpuAwareSignal();
   try {
-    const res = await fetch(`${ai.base}/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': 'none' },
-      body: JSON.stringify({
-        model: ai.model,
-        max_tokens: maxTokens,
-        system,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-      signal,
-    });
-    if (!res.ok) throw new Error(`AI ${res.status}`);
-    const data: any = await res.json();
+    const data = await aiFetch(`${ai.base}/messages`, {
+      model: ai.model,
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: 'user', content: prompt }],
+    }, signal);
     return (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
   } finally {
     cleanup();
