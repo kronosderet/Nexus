@@ -522,7 +522,7 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
       </Panel>
 
       {/* LATER — with expand/collapse + start action (#100) */}
-      <LaterPanel backlog={backlog} onUpdate={handleUpdate} />
+      <LaterPanel backlog={backlog} onUpdate={onUpdate} />
 
       {/* DONE — with actual duration + today's stats (#102) */}
       <Panel title="Done" icon={CheckCircle2} accent="text-nexus-amber" count={recentDone.length}>
