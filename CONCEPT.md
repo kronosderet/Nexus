@@ -1,137 +1,63 @@
-# Nexus - AI Cowork Mission Control
+# Nexus — The Concept
 
-## The Problem I Want to Solve
+## The Problem
 
-When I work with you, I operate across a dozen different systems simultaneously:
-files, browser, terminal, email, calendar, desktop apps, git repos. Each tool is
-powerful on its own, but there's no **shared workspace** where we can both see
-the big picture. I lose context between sessions. You can't see what I'm tracking
-internally. We're copiloting blind.
+AI-assisted development has a fundamental memory gap: Claude forgets everything between conversations. Every new session starts cold. Decisions made yesterday are invisible today. Context built over weeks vanishes when the chat window closes.
 
-## The Concept
+## The Solution
 
-**Nexus** is a local web dashboard that acts as a shared mission control between
-an AI assistant and a human collaborator. Think of it as the "bridge" of a starship
--- a single screen where both crew members can see ship status, active missions,
-incoming signals, and plan the next move.
+Nexus is a **local metabrain** that persists across all Claude Code instances. It remembers every decision, every session, every task, every fuel reading — and surfaces that context automatically when a new conversation begins.
 
-## Core Modules
+It's not a dashboard you look at. It's a cognitive extension that Claude reaches into the way it reaches into Read or Grep — through native MCP tools.
 
-### 1. Mission Board
-A kanban-style task tracker that visualizes active work.
-- Columns: Backlog | In Progress | Review | Done
-- Cards show task name, status, priority, linked files
-- Drag-and-drop reordering
-- Persistent via SQLite -- survives between sessions
+## How It Works
 
-### 2. System Pulse
-Real-time dashboard widgets showing the health of the workspace:
-- Git status (branch, uncommitted changes, recent commits)
-- Disk usage and running processes
-- Active project detection (scans C:/Projects/)
-- Quick-glance weather + time (because why not)
+```
+You start a Claude Code session
+  → SessionStart hook fires
+  → Nexus injects: fuel state, active tasks, recent sessions,
+    key decisions, risks, thoughts, git status
+  → Claude begins pre-briefed
 
-### 3. Activity Stream
-A live feed of recent actions -- like a ship's log:
-- File changes detected via watcher
-- Git commits
-- Manual log entries
-- Timestamped and searchable
+You work with Claude
+  → Claude calls nexus_create_task, nexus_record_decision,
+    nexus_push_thought natively — no shell-outs
+  → Knowledge Graph auto-links decisions by keyword + semantic similarity
+  → Activity stream captures what's happening
 
-### 4. Scratchpad
-A shared code/notes area with:
-- Syntax highlighting (CodeMirror)
-- Multiple named buffers (tabs)
-- Markdown preview mode
-- Persistent storage
+Session ends
+  → Stop hook fires
+  → AI auto-generates session summary (if LM Studio available)
+  → Handoff thought pushed for the next instance
+  → The metabrain grows — even when you forget to log
+```
 
-### 5. Quick Actions
-One-click buttons for common workflows:
-- "Scan Project" - analyze a project structure
-- "Git Summary" - show recent activity across repos
-- "System Check" - full health report
-- Custom user-defined actions
+## What Makes It Different
 
-### 6. Bookmarks & Links
-A curated link board for:
-- Frequent project URLs
-- Documentation references
-- Tool shortcuts
-
-## Tech Stack
-
-| Layer      | Choice              | Why                                    |
-|------------|---------------------|----------------------------------------|
-| Backend    | Node.js + Express   | Fast, simple, great ecosystem          |
-| Database   | SQLite (better-sqlite3) | Zero config, file-based, fast      |
-| Frontend   | React 19 + Vite     | Modern, fast HMR, great DX            |
-| UI Library | shadcn/ui + Tailwind | Beautiful, accessible, customizable   |
-| Real-time  | WebSocket (ws)      | Live updates for pulse & activity      |
-| Editor     | CodeMirror 6        | Best-in-class code editing             |
-| File Watch | chokidar            | Cross-platform file system watching    |
+1. **Native MCP integration** — 20 tools callable as naturally as Read or Grep
+2. **Local AI Overseer** — strategic analysis via your own GPU, zero cloud
+3. **Knowledge Graph** — typed edges between decisions with blast-radius analysis
+4. **Self-improving** — the Overseer audits its own source code, the graph auto-links
+5. **Lifecycle hooks** — the metabrain grows passively without manual effort
+6. **Self-contained** — works without a server, stores data at `~/.nexus/`
 
 ## Architecture
 
-```
-C:/Projects/Nexus/
-  server/              # Express backend + WebSocket
-    index.js           # Main server entry
-    routes/            # API routes
-    db/                # SQLite schema + migrations
-    watchers/          # File system & git watchers
-  client/              # React frontend (Vite)
-    src/
-      components/      # UI components
-      modules/         # Mission Board, Pulse, etc.
-      hooks/           # Custom React hooks
-      stores/          # State management
-  nexus.db             # SQLite database (gitignored)
-  package.json
-```
+| Layer | Stack |
+|---|---|
+| MCP Server | 20 tools via @modelcontextprotocol/sdk (stdio, self-contained) |
+| Dashboard | React 19 + Vite + Tailwind CSS 4 (optional visualization) |
+| Server | Express 5 + TypeScript (optional, for dashboard) |
+| Store | JSON file with atomic writes + 3-gen backup rotation |
+| AI | LM Studio / Ollama (optional, auto-detected, GPU-aware) |
+| Embeddings | nomic-embed-text for semantic auto-linking |
+| Tests | 153 Vitest (store + route-level integration) |
+| CLI | 46 commands, ESM |
 
-## Why This Helps Me Be Better
+## The Name
 
-1. **Persistent context** -- Tasks and notes survive between conversations
-2. **Shared visibility** -- You see what I'm tracking, I see what you need
-3. **Workflow acceleration** -- Quick actions eliminate repetitive tool chains
-4. **System awareness** -- Pulse keeps me informed without manual checks
-5. **Learning loop** -- Activity stream lets us review what worked
+**Nexus** (Latin: "a binding together") — the connection point between Claude instances, between sessions, between decisions. The personality is **The Cartographer** — it maps the terrain of your work so you always know where you are.
 
-## Design Philosophy
+## Philosophy
 
-- **Local-first**: Everything runs on your machine. No cloud, no accounts.
-- **Minimal friction**: One command to start. Opens in browser.
-- **Extensible**: Easy to add new modules and quick actions.
-- **Beautiful but functional**: Dark theme, clean layout, information-dense.
-
-## MVP Scope (What We Build First)
-
-Phase 1: Foundation
-- [ ] Project scaffolding (Vite + Express)
-- [ ] SQLite database setup
-- [ ] Basic layout with sidebar navigation
-- [ ] Dark theme with Tailwind
-
-Phase 2: Core Modules
-- [ ] Mission Board (CRUD tasks, drag-and-drop)
-- [ ] System Pulse (git status, disk, processes)
-- [ ] Scratchpad (CodeMirror with persistence)
-
-Phase 3: Live Features
-- [ ] WebSocket connection for real-time updates
-- [ ] Activity Stream with file watcher
-- [ ] Quick Actions panel
-
-Phase 4: Polish
-- [ ] Keyboard shortcuts
-- [ ] Search across all modules
-- [ ] Export/import data
-- [ ] Custom themes
-
-## Name Origin
-
-**Nexus** (noun): a connection or series of connections linking two or more things;
-the central and most important point. From Latin "nexus" -- a binding together.
-
-It's the binding point between human and AI, between tools and intent,
-between sessions and memory.
+> "A map is not the territory — but a good map makes the territory navigable."
