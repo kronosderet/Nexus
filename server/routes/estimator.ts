@@ -113,6 +113,20 @@ function buildEstimate(store: NexusStore) {
   const avgSessionBurn = 3; // ~3% of weekly per session (rough estimate, improves with data)
   const sessionsLeftThisWeek = estimatedWeekly > 0 ? Math.floor(estimatedWeekly / avgSessionBurn) : 0;
 
+  // Event-based costs (derived from actual activity vs fuel data)
+  const eventCosts = calculateEventCosts(store);
+
+  // Better capacity: how many prompts/tasks fit in remaining fuel
+  const promptsRemaining = eventCosts?.sessionPerEvent
+    ? Math.floor(estimatedSession / eventCosts.sessionPerEvent)
+    : null;
+  const tasksRemaining = eventCosts?.sessionPerTask
+    ? Math.floor(estimatedSession / eventCosts.sessionPerTask)
+    : null;
+  const weeklyTasksRemaining = eventCosts?.weeklyPerTask
+    ? Math.floor(estimatedWeekly / eventCosts.weeklyPerTask)
+    : null;
+
   return {
     tracked: true,
     reported: {
@@ -122,14 +136,12 @@ function buildEstimate(store: NexusStore) {
       minutesAgo: Math.round(minutesSinceReport),
     },
     estimated: {
-      // PRIMARY: static reported values (never tick down on their own)
       session: Math.round(estimatedSession * 10) / 10,
       weekly: Math.round(estimatedWeekly * 10) / 10,
       confidence: minutesSinceReport < 5 ? 'high' : minutesSinceReport < 30 ? 'medium' : 'low',
       source: 'reported',
     },
     extrapolated: {
-      // SECONDARY: burn-rate projection (may be inaccurate during breaks)
       session: Math.round(extrapolatedSession * 10) / 10,
       weekly: Math.round(extrapolatedWeekly * 10) / 10,
       source: 'extrapolated',
@@ -138,6 +150,20 @@ function buildEstimate(store: NexusStore) {
       sessionPerHour: rates.sessionPerHour,
       weeklyPerHour: rates.weeklyPerHour,
       sessionPerMinute: Math.round(rates.sessionPerMinute * 1000) / 1000,
+    },
+    // Per-event costs derived from actual usage data
+    costs: eventCosts ? {
+      sessionPerPrompt: eventCosts.sessionPerEvent,
+      weeklyPerPrompt: eventCosts.weeklyPerEvent,
+      sessionPerTask: eventCosts.sessionPerTask,
+      weeklyPerTask: eventCosts.weeklyPerTask,
+      minutesPerPrompt: eventCosts.minutesPerEvent,
+      sampleSize: eventCosts.sampleSize,
+    } : null,
+    capacity: {
+      promptsRemaining,
+      tasksRemaining,
+      weeklyTasksRemaining,
     },
     session: {
       constrainingFactor: constraint,
@@ -204,6 +230,80 @@ function weightedAvg(values: number[]) {
     weightSum += weight;
   }
   return sum / weightSum;
+}
+
+/**
+ * Derive per-event and per-task fuel costs from actual historical data.
+ *
+ * Instead of just burn-rate-per-hour, this correlates usage readings with
+ * activity events between them to calculate how much each interaction costs.
+ * This gives us: "a prompt costs ~0.8% session fuel" instead of just "burning 20%/hour".
+ */
+function calculateEventCosts(store: NexusStore) {
+  const usage = store.getUsage(100).sort(
+    (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+  const activity = store.getActivity(500);
+
+  if (usage.length < 2) return null;
+
+  let totalEvents = 0;
+  let totalSessionBurned = 0;
+  let totalWeeklyBurned = 0;
+  let totalMinutes = 0;
+  let validPairs = 0;
+
+  for (let i = 1; i < usage.length; i++) {
+    const older = usage[i - 1];
+    const newer = usage[i];
+    const t1 = new Date(older.created_at).getTime();
+    const t2 = new Date(newer.created_at).getTime();
+    const mins = (t2 - t1) / 60000;
+
+    if (mins < 1 || mins > 120) continue;
+
+    const sessionBurned = (older.session_percent || 0) - (newer.session_percent || 0);
+    const weeklyBurned = (older.weekly_percent || 0) - (newer.weekly_percent || 0);
+
+    if (sessionBurned <= 0) continue;
+
+    // Count activity events in this window
+    const events = activity.filter((a: any) => {
+      const at = new Date(a.created_at).getTime();
+      return at >= t1 && at <= t2;
+    }).length;
+
+    if (events > 0) {
+      totalEvents += events;
+      totalSessionBurned += sessionBurned;
+      totalWeeklyBurned += Math.max(0, weeklyBurned);
+      totalMinutes += mins;
+      validPairs++;
+    }
+  }
+
+  if (validPairs === 0 || totalEvents === 0) return null;
+
+  const sessionPerEvent = totalSessionBurned / totalEvents;
+  const weeklyPerEvent = totalWeeklyBurned / totalEvents;
+  const minutesPerEvent = totalMinutes / totalEvents;
+
+  // Task cost: average events per task completion
+  const tasksDone = store.getAllTasks().filter(t => t.status === 'done');
+  const eventsPerTask = totalEvents > 0 && tasksDone.length > 0
+    ? Math.max(3, Math.round(totalEvents / Math.max(1, tasksDone.length / 3))) // rough: ~1/3 of events relate to a task
+    : 10; // default: 10 events per task
+
+  return {
+    sessionPerEvent: Math.round(sessionPerEvent * 1000) / 1000,
+    weeklyPerEvent: Math.round(weeklyPerEvent * 1000) / 1000,
+    minutesPerEvent: Math.round(minutesPerEvent * 10) / 10,
+    sessionPerTask: Math.round(sessionPerEvent * eventsPerTask * 10) / 10,
+    weeklyPerTask: Math.round(weeklyPerEvent * eventsPerTask * 10) / 10,
+    eventsPerTask,
+    sampleSize: validPairs,
+    totalEventsMeasured: totalEvents,
+  };
 }
 
 function buildHistoricalStats(store: NexusStore) {
