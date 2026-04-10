@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "nexus",
   "display_name": "Nexus — The Cartographer",
-  "version": "3.3.0",
+  "version": "4.1.0",
   "description": "Local AI Cowork metabrain. Exposes The Ledger, Thought Stack, Decision Guard, Session Plan, and Compass dashboard as native MCP tools so every Claude instance can access shared cognitive state.",
   "long_description": "Nexus is a local mission-control dashboard and metabrain for AI-assisted development. This MCPB extension surfaces the Nexus knowledge graph as native MCP tools so any Claude Desktop instance can call mcp__nexus__brief at session start, mcp__nexus__check_guard before starting work, mcp__nexus__push_thought before context-switching, and mcp__nexus__pop_thought when returning from interruption — turning the Ledger from 'a tool I use via bash' into ambient memory shared across all concurrent sessions.\n\nRequires the Nexus HTTP server to be running locally (default http://localhost:3001). Start it with: cd C:/Projects/Nexus && npm run dev:server",
   "author": {

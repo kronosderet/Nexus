@@ -30,6 +30,19 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
     res.status(201).json(entry);
   });
 
+  // Deprecate a decision
+  router.patch('/:id', (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    const { deprecated } = req.body;
+    const decision = store.getDecisionById(id);
+    if (!decision) return res.status(404).json({ error: 'Decision not found.' });
+    if (deprecated !== undefined) {
+      decision.deprecated = !!deprecated;
+      store._flush();
+    }
+    res.json(decision);
+  });
+
   // Auto-extract decisions from all sessions
   router.post('/extract', (req: Request, res: Response) => {
     const sessions = store.getSessions({ limit: 100 });
