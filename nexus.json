@@ -246,12 +246,12 @@
       "id": 93,
       "title": "v4.0 Phase 3: Create kronosderet/nexus-marketplace GitHub repo with marketplace.json",
       "description": "Self-hosted marketplace — no approval needed, immediately available. Users install via /plugin marketplace add kronosderet/nexus-marketplace then /plugin install nexus@nexus-marketplace. marketplace.json lists the Nexus plugin with source pointing to the plugin directory.",
-      "status": "backlog",
+      "status": "done",
       "priority": 1,
       "sort_order": 24,
       "linked_files": "[]",
       "created_at": "2026-04-10T09:20:37.366Z",
-      "updated_at": "2026-04-10T09:20:37.366Z"
+      "updated_at": "2026-04-10T11:15:19.231Z"
     },
     {
       "id": 94,
@@ -384,6 +384,28 @@
       "linked_files": "[]",
       "created_at": "2026-04-10T11:08:31.644Z",
       "updated_at": "2026-04-10T11:13:08.336Z"
+    },
+    {
+      "id": 106,
+      "title": "Phase 3: Create kronosderet/nexus-marketplace GitHub repo + push plugin",
+      "description": "",
+      "status": "done",
+      "priority": 2,
+      "sort_order": 1,
+      "linked_files": "[]",
+      "created_at": "2026-04-10T11:13:39.964Z",
+      "updated_at": "2026-04-10T11:15:19.245Z"
+    },
+    {
+      "id": 107,
+      "title": "Fix fuel estimation: derive per-prompt and per-task cost from actual usage data",
+      "description": "",
+      "status": "done",
+      "priority": 2,
+      "sort_order": 1,
+      "linked_files": "[]",
+      "created_at": "2026-04-10T11:29:29.142Z",
+      "updated_at": "2026-04-10T11:32:04.460Z"
     }
   ],
   "activity": [
@@ -1247,6 +1269,167 @@
       "message": "Landmark reached -- \"Pre-publish polish: fix predict noise, link orphans, rebuild MCPB, audit Log module\"",
       "meta": "{}",
       "created_at": "2026-04-10T11:13:08.339Z"
+    },
+    {
+      "id": 85639,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 20 files changed",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/ef/3085acd3c607b28df0cc70fc8f8ebc6c795142\",\"path\":\"Nexus/.git/objects/ef/3085acd3c607b28df0cc70fc8f8ebc6c795142\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/3d/d92e9faaa6ea9a91745987e9bd2893f066626d\",\"path\":\"Nexus/.git/objects/3d/d92e9faaa6ea9a91745987e9bd2893f066626d\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/03/de520c6392d59b179abde5bb37db10f525e80e\",\"path\":\"Nexus/.git/objects/03/de520c6392d59b179abde5bb37db10f525e80e\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/b9/f273984ad2a294fc93fe08a8811d49248705d3\",\"path\":\"Nexus/.git/objects/b9/f273984ad2a294fc93fe08a8811d49248705d3\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/f9/c27ab46269174325de8bfe9df159046f5380d4\",\"path\":\"Nexus/.git/objects/f9/c27ab46269174325de8bfe9df159046f5380d4\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/ae/40d7f455a73bd0f772939711fdb849d42c88ac\",\"path\":\"Nexus/.git/objects/ae/40d7f455a73bd0f772939711fdb849d42c88ac\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/ef/6500eaec82d0ad495cb7e59a749b685938b38c\",\"path\":\"Nexus/.git/objects/ef/6500eaec82d0ad495cb7e59a749b685938b38c\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/3e/43da2c508273ba07be87abc13414acdbe945ad\",\"path\":\"Nexus/.git/objects/3e/43da2c508273ba07be87abc13414acdbe945ad\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/70/3ea4a58366cbaa6fce61318e0bdf002c6344b1\",\"path\":\"Nexus/.git/objects/70/3ea4a58366cbaa6fce61318e0bdf002c6344b1\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/96/ff2b5952f24a79e8dfa0d3950b0613d884d662\",\"path\":\"Nexus/.git/objects/96/ff2b5952f24a79e8dfa0d3950b0613d884d662\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/d9/cc4e5ff2bd1ace24786e203551ff970875acf0\",\"path\":\"Nexus/.git/objects/d9/cc4e5ff2bd1ace24786e203551ff970875acf0\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/64/701d3d94616a268b2872abc3aa15d44b14a25b\",\"path\":\"Nexus/.git/objects/64/701d3d94616a268b2872abc3aa15d44b14a25b\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/e2/eb0350bcc71d7ec2caab60b1e06554fe15ae13\",\"path\":\"Nexus/.git/objects/e2/eb0350bcc71d7ec2caab60b1e06554fe15ae13\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/de/db49f75f94c2938b054f6e863311be800bedb9\",\"path\":\"Nexus/.git/objects/de/db49f75f94c2938b054f6e863311be800bedb9\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/e7/9007085c317165ff8c004498d35cc40e8b6b01\",\"path\":\"Nexus/.git/objects/e7/9007085c317165ff8c004498d35cc40e8b6b01\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/8e/270bedc957bea810c19c26154e114078c541af\",\"path\":\"Nexus/.git/objects/8e/270bedc957bea810c19c26154e114078c541af\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T11:13:29.916Z"
+    },
+    {
+      "id": 85640,
+      "type": "task_created",
+      "message": "Plotted -- \"Phase 3: Create kronosderet/nexus-marketplace GitHub repo + push plugin\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:13:39.968Z"
+    },
+    {
+      "id": 85641,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] .claude-plugin/marketplace.json added",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".claude-plugin/marketplace.json\",\"path\":\"Nexus/.claude-plugin/marketplace.json\"}]}",
+      "created_at": "2026-04-10T11:14:55.353Z"
+    },
+    {
+      "id": 85642,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 8 files changed",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/be/1b334a5f05a61a18389524f118b39a3d42f2ec\",\"path\":\"Nexus/.git/objects/be/1b334a5f05a61a18389524f118b39a3d42f2ec\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/db/9c4afccad5970cbf95c0b08d82c31e98d54735\",\"path\":\"Nexus/.git/objects/db/9c4afccad5970cbf95c0b08d82c31e98d54735\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/6f/ef52c3066d8c5fa1f0582cb58ad4698e3954db\",\"path\":\"Nexus/.git/objects/6f/ef52c3066d8c5fa1f0582cb58ad4698e3954db\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/af/7a95dc6ab5375b80594673f303ea888abaad7a\",\"path\":\"Nexus/.git/objects/af/7a95dc6ab5375b80594673f303ea888abaad7a\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T11:15:09.909Z"
+    },
+    {
+      "id": 85643,
+      "type": "task_done",
+      "message": "Landmark reached -- \"v4.0 Phase 3: Create kronosderet/nexus-marketplace GitHub repo with marketplace.json\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:15:19.234Z"
+    },
+    {
+      "id": 85644,
+      "type": "task_done",
+      "message": "Landmark reached -- \"Phase 3: Create kronosderet/nexus-marketplace GitHub repo + push plugin\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:15:19.248Z"
+    },
+    {
+      "id": 85645,
+      "type": "file_change",
+      "message": "Terrain shift -- [.claude] settings.local.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\".claude\",\"file\":\"settings.local.json\",\"path\":\".claude/settings.local.json\"}]}",
+      "created_at": "2026-04-10T11:16:16.684Z"
+    },
+    {
+      "id": 85646,
+      "type": "decision",
+      "message": "Decision recorded -- [Nexus] Nexus marketplace uses the existing kronosderet/Nexus repo (",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:16:37.965Z"
+    },
+    {
+      "id": 85647,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:17:04.214Z"
+    },
+    {
+      "id": 85648,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:17:04.225Z"
+    },
+    {
+      "id": 85649,
+      "type": "file_change",
+      "message": "Terrain shift -- [.claude] settings.local.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\".claude\",\"file\":\"settings.local.json\",\"path\":\".claude/settings.local.json\"}]}",
+      "created_at": "2026-04-10T11:20:35.077Z"
+    },
+    {
+      "id": 85650,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] README.md modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"README.md\",\"path\":\"Nexus/README.md\"}]}",
+      "created_at": "2026-04-10T11:21:27.638Z"
+    },
+    {
+      "id": 85651,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] ROADMAP.md modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"ROADMAP.md\",\"path\":\"Nexus/ROADMAP.md\"}]}",
+      "created_at": "2026-04-10T11:22:13.778Z"
+    },
+    {
+      "id": 85652,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] .gitignore modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".gitignore\",\"path\":\"Nexus/.gitignore\"}]}",
+      "created_at": "2026-04-10T11:23:00.844Z"
+    },
+    {
+      "id": 85653,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 9 files changed",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/51/f85986b314f5ab635b5b9d525b990c59f499de\",\"path\":\"Nexus/.git/objects/51/f85986b314f5ab635b5b9d525b990c59f499de\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/94/ab197b1a592f3f9373cda1958b5e0b0220a7b7\",\"path\":\"Nexus/.git/objects/94/ab197b1a592f3f9373cda1958b5e0b0220a7b7\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/4c/e5280892bd8e59eb39bdeec0e76cfc5863d2a1\",\"path\":\"Nexus/.git/objects/4c/e5280892bd8e59eb39bdeec0e76cfc5863d2a1\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/78/4558e2cdb858c2c61c844039406d4135142d22\",\"path\":\"Nexus/.git/objects/78/4558e2cdb858c2c61c844039406d4135142d22\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/1b/a5f4c18095e6a1c9391aeead25d65c7fa0f88b\",\"path\":\"Nexus/.git/objects/1b/a5f4c18095e6a1c9391aeead25d65c7fa0f88b\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T11:24:02.640Z"
+    },
+    {
+      "id": 85654,
+      "type": "session",
+      "message": "Session logged -- [Nexus] Nexus is PUBLIC. Repo set to public, README and ROADMAP comp...",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:24:45.387Z"
+    },
+    {
+      "id": 85655,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:25:04.893Z"
+    },
+    {
+      "id": 85656,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:25:04.903Z"
+    },
+    {
+      "id": 85657,
+      "type": "task_created",
+      "message": "Plotted -- \"Fix fuel estimation: derive per-prompt and per-task cost from actual usage data\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:29:29.145Z"
+    },
+    {
+      "id": 85658,
+      "type": "system",
+      "message": "Nexus is online. Setting course.",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:30:37.403Z"
+    },
+    {
+      "id": 85659,
+      "type": "system",
+      "message": "Nexus is online. Setting course.",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:31:19.592Z"
+    },
+    {
+      "id": 85660,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 2 files modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"tests/.test-nexus.json.bak\",\"path\":\"Nexus/tests/.test-nexus.json.bak\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"tests/.test-nexus.json.bak.2\",\"path\":\"Nexus/tests/.test-nexus.json.bak.2\"}]}",
+      "created_at": "2026-04-10T11:31:34.154Z"
+    },
+    {
+      "id": 85661,
+      "type": "task_done",
+      "message": "Landmark reached -- \"Fix fuel estimation: derive per-prompt and per-task cost from actual usage data\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:32:04.463Z"
     }
   ],
   "scratchpads": [
@@ -3469,6 +3652,75 @@
         "auto-summary"
       ],
       "created_at": "2026-04-10T11:07:17.819Z"
+    },
+    {
+      "id": 107,
+      "project": "nexus",
+      "summary": "Completed pre-publish polish including Log module audit and MCPB rebuild, and successfully initialized the Nexus marketplace structure within the main repository.",
+      "decisions": [
+        "Nexus marketplace will reside within the existing kronosderet/Nexus repo",
+        "marketplace.json located at .claude-plugin/ root",
+        "Plugin source code stored in /plugin directory",
+        "Installation workflow defined via /plugin marketplace add and /plugin install commands"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "v4.0-release",
+        "marketplace-setup",
+        "module-audit",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T11:17:04.212Z"
+    },
+    {
+      "id": 108,
+      "project": "Nexus",
+      "summary": "Nexus is PUBLIC. Repo set to public, README and ROADMAP completely rewritten for v4.1. README now leads with 2-line plugin install, lists all 20 MCP tools, 7 dashboard modules, 3 lifecycle hooks, correct architecture stats. ROADMAP documents full version history (v1.0→v4.1) with v4.2 current priorities and v5.0 vision. Removed nexus.json.bak files from git tracking (added to gitignore). Pre-publish polish: deprecated 4 stale decisions via new PATCH endpoint, linked orphans, rebuilt MCPB at v4.1.0, added 7 missing activity type configs to Log module. marketplace.json published — anyone can install via /plugin marketplace add kronosderet/Nexus.",
+      "decisions": [
+        "Nexus is now a public project on GitHub — all code, data, sessions, decisions are visible",
+        "README leads with install command — first thing a visitor sees is how to use it, not what it is",
+        "ROADMAP preserves the full shipped history as documentation of the journey, not just future plans",
+        "Backup files (nexus.json.bak) removed from git — they're runtime artifacts, not source code"
+      ],
+      "blockers": [],
+      "files_touched": [
+        "README.md",
+        "ROADMAP.md",
+        ".gitignore",
+        ".claude-plugin/marketplace.json",
+        "server/routes/ledger.ts",
+        "client/src/modules/Log.jsx",
+        "mcpb/manifest.json"
+      ],
+      "tags": [
+        "v4.1",
+        "public-launch",
+        "readme",
+        "roadmap",
+        "marketplace",
+        "documentation"
+      ],
+      "created_at": "2026-04-10T11:24:45.384Z"
+    },
+    {
+      "id": 109,
+      "project": "nexus",
+      "summary": "Transitioned the Nexus repository to a public status and overhauled core documentation for v4.1.",
+      "decisions": [
+        "Set repository visibility to Public",
+        "Refactored README to prioritize 2-line plugin installation instructions",
+        "Updated ROADMAP to align with v4.1 release goals"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "release",
+        "documentation",
+        "v4.1",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T11:25:04.890Z"
     }
   ],
   "usage": [
@@ -9092,6 +9344,375 @@
       "temperature": 54,
       "power": 18.73,
       "created_at": "2026-04-10T11:12:43.412Z"
+    },
+    {
+      "gpu_util": 33,
+      "mem_util": 14,
+      "vram_used": 7711,
+      "vram_total": 8192,
+      "temperature": 54,
+      "power": 19.85,
+      "created_at": "2026-04-10T11:13:43.418Z"
+    },
+    {
+      "gpu_util": 11,
+      "mem_util": 2,
+      "vram_used": 7726,
+      "vram_total": 8192,
+      "temperature": 55,
+      "power": 49.81,
+      "created_at": "2026-04-10T11:14:43.641Z"
+    },
+    {
+      "gpu_util": 14,
+      "mem_util": 2,
+      "vram_used": 7737,
+      "vram_total": 8192,
+      "temperature": 55,
+      "power": 50.17,
+      "created_at": "2026-04-10T11:15:43.649Z"
+    },
+    {
+      "gpu_util": 0,
+      "mem_util": 51,
+      "vram_used": 7739,
+      "vram_total": 8192,
+      "temperature": 54,
+      "power": 15.18,
+      "created_at": "2026-04-10T11:16:43.650Z"
+    },
+    {
+      "gpu_util": 0,
+      "mem_util": 59,
+      "vram_used": 7757,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 12.3,
+      "created_at": "2026-04-10T11:17:43.646Z"
+    },
+    {
+      "gpu_util": 22,
+      "mem_util": 14,
+      "vram_used": 7757,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 15.13,
+      "created_at": "2026-04-10T11:18:43.652Z"
+    },
+    {
+      "gpu_util": 0,
+      "mem_util": 11,
+      "vram_used": 7743,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 12.4,
+      "created_at": "2026-04-10T11:19:43.668Z"
+    },
+    {
+      "gpu_util": 1,
+      "mem_util": 14,
+      "vram_used": 7726,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 15.49,
+      "created_at": "2026-04-10T11:20:43.677Z"
+    },
+    {
+      "gpu_util": 9,
+      "mem_util": 14,
+      "vram_used": 7742,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 22.8,
+      "created_at": "2026-04-10T11:21:43.684Z"
+    },
+    {
+      "gpu_util": 0,
+      "mem_util": 27,
+      "vram_used": 7724,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 15.55,
+      "created_at": "2026-04-10T11:22:43.680Z"
+    },
+    {
+      "gpu_util": 8,
+      "mem_util": 16,
+      "vram_used": 7756,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 15.87,
+      "created_at": "2026-04-10T11:23:43.687Z"
+    },
+    {
+      "gpu_util": 3,
+      "mem_util": 1,
+      "vram_used": 7729,
+      "vram_total": 8192,
+      "temperature": 55,
+      "power": 48.31,
+      "created_at": "2026-04-10T11:24:43.694Z"
+    },
+    {
+      "gpu_util": 0,
+      "mem_util": 58,
+      "vram_used": 7831,
+      "vram_total": 8192,
+      "temperature": 53,
+      "power": 12.22,
+      "created_at": "2026-04-10T11:25:43.704Z"
+    },
+    {
+      "gpu_util": 0,
+      "mem_util": 0,
+      "vram_used": 7805,
+      "vram_total": 8192,
+      "temperature": 55,
+      "power": 59.81,
+      "created_at": "2026-04-10T11:26:43.723Z"
+    },
+    {
+      "gpu_util": 43,
+      "mem_util": 26,
+      "vram_used": 7772,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 16.93,
+      "created_at": "2026-04-10T11:27:43.710Z"
+    },
+    {
+      "gpu_util": 30,
+      "mem_util": 22,
+      "vram_used": 7722,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 16.85,
+      "created_at": "2026-04-10T11:28:43.717Z"
+    },
+    {
+      "gpu_util": 25,
+      "mem_util": 13,
+      "vram_used": 7819,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 18.91,
+      "created_at": "2026-04-10T11:29:43.725Z"
+    },
+    {
+      "gpu_util": 39,
+      "mem_util": 20,
+      "vram_used": 7780,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 17.8,
+      "created_at": "2026-04-10T11:30:37.461Z"
+    },
+    {
+      "gpu_util": 19,
+      "mem_util": 10,
+      "vram_used": 7786,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 21.02,
+      "created_at": "2026-04-10T11:31:19.658Z"
+    },
+    {
+      "gpu_util": 21,
+      "mem_util": 24,
+      "vram_used": 7717,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 17.76,
+      "created_at": "2026-04-10T11:32:19.704Z"
+    },
+    {
+      "gpu_util": 34,
+      "mem_util": 22,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 17.41,
+      "created_at": "2026-04-10T11:33:19.708Z"
+    },
+    {
+      "gpu_util": 27,
+      "mem_util": 19,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 17.04,
+      "created_at": "2026-04-10T11:34:19.710Z"
+    },
+    {
+      "gpu_util": 22,
+      "mem_util": 17,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 17.58,
+      "created_at": "2026-04-10T11:35:19.715Z"
+    },
+    {
+      "gpu_util": 11,
+      "mem_util": 2,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 54,
+      "power": 49.25,
+      "created_at": "2026-04-10T11:36:19.964Z"
+    },
+    {
+      "gpu_util": 33,
+      "mem_util": 21,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 16.94,
+      "created_at": "2026-04-10T11:37:19.967Z"
+    },
+    {
+      "gpu_util": 28,
+      "mem_util": 20,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 17.42,
+      "created_at": "2026-04-10T11:38:19.971Z"
+    },
+    {
+      "gpu_util": 34,
+      "mem_util": 21,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 17.49,
+      "created_at": "2026-04-10T11:39:19.982Z"
+    },
+    {
+      "gpu_util": 34,
+      "mem_util": 22,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 16.89,
+      "created_at": "2026-04-10T11:40:19.984Z"
+    },
+    {
+      "gpu_util": 19,
+      "mem_util": 17,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 17.19,
+      "created_at": "2026-04-10T11:41:19.984Z"
+    },
+    {
+      "gpu_util": 37,
+      "mem_util": 21,
+      "vram_used": 7736,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 17.35,
+      "created_at": "2026-04-10T11:42:19.990Z"
+    },
+    {
+      "gpu_util": 34,
+      "mem_util": 22,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 16.77,
+      "created_at": "2026-04-10T11:43:19.995Z"
+    },
+    {
+      "gpu_util": 27,
+      "mem_util": 19,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 17.45,
+      "created_at": "2026-04-10T11:44:20.001Z"
+    },
+    {
+      "gpu_util": 38,
+      "mem_util": 23,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 17.59,
+      "created_at": "2026-04-10T11:45:20.007Z"
+    },
+    {
+      "gpu_util": 32,
+      "mem_util": 22,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 16.87,
+      "created_at": "2026-04-10T11:46:20.014Z"
+    },
+    {
+      "gpu_util": 21,
+      "mem_util": 17,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 16.93,
+      "created_at": "2026-04-10T11:47:20.016Z"
+    },
+    {
+      "gpu_util": 37,
+      "mem_util": 21,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 17.57,
+      "created_at": "2026-04-10T11:48:20.025Z"
+    },
+    {
+      "gpu_util": 34,
+      "mem_util": 22,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 16.56,
+      "created_at": "2026-04-10T11:49:20.026Z"
+    },
+    {
+      "gpu_util": 19,
+      "mem_util": 17,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 17.08,
+      "created_at": "2026-04-10T11:50:20.021Z"
+    },
+    {
+      "gpu_util": 38,
+      "mem_util": 22,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 17.55,
+      "created_at": "2026-04-10T11:51:20.026Z"
+    },
+    {
+      "gpu_util": 34,
+      "mem_util": 22,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 16.93,
+      "created_at": "2026-04-10T11:52:20.032Z"
+    },
+    {
+      "gpu_util": 19,
+      "mem_util": 16,
+      "vram_used": 7735,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 17.1,
+      "created_at": "2026-04-10T11:53:20.039Z"
     }
   ],
   "_sessionTiming": {
@@ -10279,6 +10900,15 @@
       "alternatives": [],
       "tags": [],
       "created_at": "2026-04-10T10:25:28.800Z"
+    },
+    {
+      "id": 93,
+      "decision": "Nexus marketplace uses the existing kronosderet/Nexus repo (no separate marketplace repo). marketplace.json at .claude-plugin/ root, plugin source at /plugin directory. Install: /plugin marketplace add kronosderet/Nexus then /plugin install nexus@nexus-marketplace. Repo must be public for this to work.",
+      "context": "",
+      "project": "Nexus",
+      "alternatives": [],
+      "tags": [],
+      "created_at": "2026-04-10T11:16:37.953Z"
     }
   ],
   "graph_edges": [
@@ -11513,6 +12143,46 @@
       "rel": "depends_on",
       "note": "Faction resolution system depends on Campaign Manager spine",
       "created_at": "2026-04-10T11:11:05.832Z"
+    },
+    {
+      "id": 155,
+      "from": 93,
+      "to": 91,
+      "rel": "related",
+      "note": "auto-linked (47% keyword overlap)",
+      "created_at": "2026-04-10T11:16:37.959Z"
+    },
+    {
+      "id": 156,
+      "from": 93,
+      "to": 27,
+      "rel": "related",
+      "note": "semantic-linked (71% cosine similarity)",
+      "created_at": "2026-04-10T11:16:38.279Z"
+    },
+    {
+      "id": 157,
+      "from": 93,
+      "to": 44,
+      "rel": "related",
+      "note": "semantic-linked (70% cosine similarity)",
+      "created_at": "2026-04-10T11:16:38.282Z"
+    },
+    {
+      "id": 158,
+      "from": 93,
+      "to": 34,
+      "rel": "related",
+      "note": "semantic-linked (68% cosine similarity)",
+      "created_at": "2026-04-10T11:16:38.285Z"
+    },
+    {
+      "id": 159,
+      "from": 93,
+      "to": 26,
+      "rel": "related",
+      "note": "semantic-linked (68% cosine similarity)",
+      "created_at": "2026-04-10T11:16:38.288Z"
     }
   ],
   "advice": [
