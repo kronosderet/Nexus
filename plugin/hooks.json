@@ -21,6 +21,17 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_DIR}/server/hooks/prompt-submit.js\""
+          }
+        ]
+      }
     ]
   }
 }
