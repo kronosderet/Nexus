@@ -6,6 +6,7 @@ import type {
   UsageEntry, GpuSnapshot, Decision, GraphEdge, GraphData, SessionTiming,
   Bookmark, AdviceEntry, Thought,
 } from '../types.js';
+import { findSimilar } from '../lib/embeddings.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_PATH = process.env.NEXUS_DB_PATH || join(__dirname, '..', '..', 'nexus.json');
@@ -96,7 +97,15 @@ export class NexusStore {
   // ── Typed accessors for Ledger / Graph / Timing ────────
   // These replace (store as any).data.* casts in route files.
   getAllDecisions(): Decision[] { return this.data.ledger || []; }
+  getActiveDecisions(): Decision[] { return (this.data.ledger || []).filter(d => !d.deprecated); }
   getDecisionById(id: number): Decision | null { return (this.data.ledger || []).find(d => d.id === id) || null; }
+  deprecateDecision(id: number): Decision | null {
+    const d = this.getDecisionById(id);
+    if (!d) return null;
+    d.deprecated = true;
+    this._flush();
+    return d;
+  }
   getDecisionCount(): number { return (this.data.ledger || []).length; }
   getAllEdges(): GraphEdge[] { return this.data.graph_edges || []; }
   getEdgeCount(): number { return (this.data.graph_edges || []).length; }
@@ -325,33 +334,57 @@ export class NexusStore {
     return entry;
   }
 
-  /** Auto-link a new decision to existing ones by keyword similarity. */
+  /** Auto-link a new decision to existing ones via semantic + keyword similarity. */
   private _autoLinkDecision(newDec: Decision): GraphEdge[] {
     const linked: GraphEdge[] = [];
+
+    // Fire-and-forget semantic linking (async, doesn't block recordDecision)
+    this._semanticAutoLink(newDec).catch(() => {});
+
+    // Synchronous keyword fallback (always runs, immediate)
     const newWords = this._significantWords(newDec.decision + ' ' + newDec.context);
     if (newWords.size < 2) return linked;
 
     for (const existing of this.data.ledger) {
-      if (existing.id === newDec.id) continue;
+      if (existing.id === newDec.id || existing.deprecated) continue;
       const existWords = this._significantWords(existing.decision + ' ' + (existing.context || ''));
-      // Count shared significant words
       let shared = 0;
       for (const w of newWords) if (existWords.has(w)) shared++;
       const similarity = shared / Math.max(newWords.size, 1);
-      if (similarity < 0.3) continue; // threshold: 30% word overlap
-      // Check if edge already exists
+      if (similarity < 0.3) continue;
       const alreadyLinked = this.data.graph_edges.some(
         e => (e.from === newDec.id && e.to === existing.id) || (e.from === existing.id && e.to === newDec.id)
       );
       if (alreadyLinked) continue;
-      // Same project? Use 'related'. Different project? Also 'related' (safe default)
       const edge = this.addEdge(newDec.id, existing.id, 'related',
         `auto-linked (${Math.round(similarity * 100)}% keyword overlap)`
       );
       linked.push(edge);
-      if (linked.length >= 5) break; // cap at 5 auto-links per decision
+      if (linked.length >= 5) break;
     }
     return linked;
+  }
+
+  /** Semantic auto-link via embeddings (async, non-blocking). */
+  private async _semanticAutoLink(newDec: Decision): Promise<void> {
+    const others = this.data.ledger.filter(d => d.id !== newDec.id && !d.deprecated);
+    if (others.length === 0) return;
+
+    const queryText = `${newDec.decision} ${newDec.context || ''}`;
+    const candidateTexts = others.map(d => `${d.decision} ${d.context || ''}`);
+
+    const similar = await findSimilar(queryText, candidateTexts, 5, 0.55);
+
+    for (const match of similar) {
+      const existing = others[match.index];
+      const alreadyLinked = this.data.graph_edges.some(
+        e => (e.from === newDec.id && e.to === existing.id) || (e.from === existing.id && e.to === newDec.id)
+      );
+      if (alreadyLinked) continue;
+      this.addEdge(newDec.id, existing.id, 'related',
+        `semantic-linked (${Math.round(match.similarity * 100)}% cosine similarity)`
+      );
+    }
   }
 
   /** Extract significant words (>3 chars, lowercased, deduped) from text. */

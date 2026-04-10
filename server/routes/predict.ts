@@ -81,8 +81,8 @@ interface GapSuggestion {
 
 function detectGaps(store: NexusStore): { suggestions: GapSuggestion[]; stats: any } {
   const suggestions: GapSuggestion[] = [];
-  const ledger = store.data.ledger || [];
-  const edges = store.data.graph_edges || [];
+  const ledger = store.getAllDecisions();
+  const edges = store.getAllEdges();
   const tasks = store.getAllTasks();
   const sessions = store.getSessions({ limit: 20 });
 
@@ -120,6 +120,7 @@ function detectGaps(store: NexusStore): { suggestions: GapSuggestion[]; stats: a
 
   // ── 2. Orphan decisions: no graph connections ─────────
   for (const d of ledger) {
+    if (d.deprecated) continue;
     const connections = edgesByDecision[d.id]?.length ?? 0;
     if (connections === 0) {
       suggestions.push({
@@ -148,6 +149,8 @@ function detectGaps(store: NexusStore): { suggestions: GapSuggestion[]; stats: a
   const topCentral = sortedByCentrality.slice(0, Math.max(3, Math.floor(ledger.length * 0.1)));
 
   for (const d of topCentral) {
+    // Skip deprecated decisions — no point suggesting tests for deleted features
+    if (d.deprecated) continue;
     const hasTestTask = tasks.some(t =>
       t.title.toLowerCase().includes('test') &&
       t.title.toLowerCase().includes(d.decision.toLowerCase().split(' ')[0])

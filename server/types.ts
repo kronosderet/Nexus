@@ -64,6 +64,7 @@ export interface Decision {
   alternatives: string[];
   tags: string[];
   created_at: string;
+  deprecated?: boolean;
 }
 
 export interface GraphEdge {
