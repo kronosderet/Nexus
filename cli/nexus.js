@@ -1764,6 +1764,7 @@ ${JSON.stringify(config, null, 2).split('\n').map(l => '    ' + l).join('\n')}
     const hooksDir = join(__dirname, 'hooks');
     const startScript = join(hooksDir, 'session-start.js').replace(/\\/g, '/');
     const stopScript = join(hooksDir, 'session-stop.js').replace(/\\/g, '/');
+    const promptScript = join(hooksDir, 'prompt-submit.js').replace(/\\/g, '/');
 
     const nexusHooks = {
       SessionStart: [{
@@ -1773,6 +1774,10 @@ ${JSON.stringify(config, null, 2).split('\n').map(l => '    ' + l).join('\n')}
       Stop: [{
         matcher: '',
         hooks: [{ type: 'command', command: `node "${stopScript}"` }],
+      }],
+      UserPromptSubmit: [{
+        matcher: '',
+        hooks: [{ type: 'command', command: `node "${promptScript}"` }],
       }],
     };
 
