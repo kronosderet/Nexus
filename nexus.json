@@ -449,7 +449,7 @@
       "sort_order": 1,
       "linked_files": "[]",
       "created_at": "2026-04-10T12:34:07.532Z",
-      "updated_at": "2026-04-10T12:36:21.895Z"
+      "updated_at": "2026-04-10T12:41:28.182Z"
     }
   ],
   "activity": [
@@ -1726,6 +1726,41 @@
       "message": "Landmark reached -- \"Fix Fuel module session history — data doesn't make sense\"",
       "meta": "{}",
       "created_at": "2026-04-10T12:36:21.898Z"
+    },
+    {
+      "id": 85698,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 14 files changed",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/08/a87f89da5912694c1671725d7a554dfc492bd4\",\"path\":\"Nexus/.git/objects/08/a87f89da5912694c1671725d7a554dfc492bd4\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/f4/7d660d331d07183b488f763c2eaf697e2a005a\",\"path\":\"Nexus/.git/objects/f4/7d660d331d07183b488f763c2eaf697e2a005a\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/53/0ce63e814d7742842734eee2898805ccbe34ec\",\"path\":\"Nexus/.git/objects/53/0ce63e814d7742842734eee2898805ccbe34ec\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/56/163b3c0adc690a16f323ac496c729dbd33728d\",\"path\":\"Nexus/.git/objects/56/163b3c0adc690a16f323ac496c729dbd33728d\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/c0/5f36954a95880922e47498db5d6f8a7436cf7c\",\"path\":\"Nexus/.git/objects/c0/5f36954a95880922e47498db5d6f8a7436cf7c\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/aa/6d4e40ac2a30304da0fa8cafd5a6e7da9d6b29\",\"path\":\"Nexus/.git/objects/aa/6d4e40ac2a30304da0fa8cafd5a6e7da9d6b29\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/a1/0ae01dfbf4a0e8a1d3503f3ec6dee4cc293860\",\"path\":\"Nexus/.git/objects/a1/0ae01dfbf4a0e8a1d3503f3ec6dee4cc293860\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/9a/8f1cf14fc1c32ad834e705e50ea78439a7b632\",\"path\":\"Nexus/.git/objects/9a/8f1cf14fc1c32ad834e705e50ea78439a7b632\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/e0/cdeac13e70e917dc16ecf4f02d5fdec2f8baeb\",\"path\":\"Nexus/.git/objects/e0/cdeac13e70e917dc16ecf4f02d5fdec2f8baeb\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/be/0a302986ad30bbc3fd605206455bc117f631db\",\"path\":\"Nexus/.git/objects/be/0a302986ad30bbc3fd605206455bc117f631db\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T12:36:45.024Z"
+    },
+    {
+      "id": 85699,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:37:01.516Z"
+    },
+    {
+      "id": 85700,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:37:01.528Z"
+    },
+    {
+      "id": 85701,
+      "type": "system",
+      "message": "Nexus is online. Setting course.",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:40:08.009Z"
+    },
+    {
+      "id": 85702,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 3 files changed",
+      "meta": "{\"changes\":[{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"tests/.test-nexus.json.bak\",\"path\":\"Nexus/tests/.test-nexus.json.bak\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"tests/.test-nexus.json.bak.2\",\"path\":\"Nexus/tests/.test-nexus.json.bak.2\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"tests/.test-nexus.json.bak\",\"path\":\"Nexus/tests/.test-nexus.json.bak\"}]}",
+      "created_at": "2026-04-10T12:41:17.839Z"
     }
   ],
   "scratchpads": [
@@ -4089,6 +4124,23 @@
         "auto-summary"
       ],
       "created_at": "2026-04-10T12:30:58.949Z"
+    },
+    {
+      "id": 114,
+      "project": "nexus",
+      "summary": "Resolved data inconsistency issues within the Fuel module by correcting the session history logic in client/src/modules/Fuel.jsx.",
+      "decisions": [
+        "Refactored Fuel module state management to ensure historical data integrity"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "bugfix",
+        "fuel-module",
+        "state-management",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T12:37:01.512Z"
     }
   ],
   "usage": [
@@ -10507,6 +10559,60 @@
       "temperature": 49,
       "power": 16.62,
       "created_at": "2026-04-10T12:36:37.834Z"
+    },
+    {
+      "gpu_util": 6,
+      "mem_util": 1,
+      "vram_used": 7767,
+      "vram_total": 8192,
+      "temperature": 54,
+      "power": 73.61,
+      "created_at": "2026-04-10T12:37:37.835Z"
+    },
+    {
+      "gpu_util": 25,
+      "mem_util": 16,
+      "vram_used": 7726,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 16.17,
+      "created_at": "2026-04-10T12:38:37.840Z"
+    },
+    {
+      "gpu_util": 64,
+      "mem_util": 40,
+      "vram_used": 7717,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 18.38,
+      "created_at": "2026-04-10T12:39:37.851Z"
+    },
+    {
+      "gpu_util": 7,
+      "mem_util": 24,
+      "vram_used": 7722,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 17.29,
+      "created_at": "2026-04-10T12:40:08.067Z"
+    },
+    {
+      "gpu_util": 28,
+      "mem_util": 19,
+      "vram_used": 7733,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 17.6,
+      "created_at": "2026-04-10T12:41:08.122Z"
+    },
+    {
+      "gpu_util": 37,
+      "mem_util": 22,
+      "vram_used": 7736,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 17.73,
+      "created_at": "2026-04-10T12:42:08.122Z"
     }
   ],
   "_sessionTiming": {
