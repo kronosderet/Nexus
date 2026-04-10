@@ -2,8 +2,7 @@ import { Router, Request, Response } from 'express';
 import { execSync } from 'child_process';
 import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
-
-const PROJECTS_DIR = 'C:/Projects';
+import { PROJECTS_DIR } from '../lib/config.ts';
 
 type BroadcastFn = (data: any) => void;
 
@@ -14,8 +13,8 @@ const SAFE_COMMANDS: Record<string, (project: string, param?: string) => { cmd: 
   'git-diff-stat': (project) => ({ cmd: 'git diff --stat', cwd: join(PROJECTS_DIR, project) }),
   'git-log': (project) => ({ cmd: 'git log --oneline -10', cwd: join(PROJECTS_DIR, project) }),
   'git-fetch': (project) => ({ cmd: 'git fetch --quiet', cwd: join(PROJECTS_DIR, project) }),
-  'nexus-task-done': (_, id) => ({ cmd: `node C:/Projects/Nexus/cli/nexus.js done ${id}`, cwd: PROJECTS_DIR }),
-  'nexus-log': (_, msg) => ({ cmd: `node C:/Projects/Nexus/cli/nexus.js log "${msg}"`, cwd: PROJECTS_DIR }),
+  'nexus-task-done': (_, id) => ({ cmd: `npx nexus done ${id}`, cwd: PROJECTS_DIR }),
+  'nexus-log': (_, msg) => ({ cmd: `npx nexus log "${msg}"`, cwd: PROJECTS_DIR }),
 };
 
 export function createRemediateRoutes(store: NexusStore, broadcast: BroadcastFn): Router {

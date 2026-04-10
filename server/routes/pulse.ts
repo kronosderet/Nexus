@@ -4,6 +4,7 @@ import { readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
 import type { NexusStore } from '../db/store.ts';
+import { PROJECTS_DIR } from '../lib/config.ts';
 
 export function createPulseRoutes(store: NexusStore) {
   const router = Router();
@@ -119,7 +120,7 @@ function getSystemInfo() {
 }
 
 function scanProjects() {
-  const projectsDir = 'C:/Projects';
+  const projectsDir = PROJECTS_DIR;
   try {
     return readdirSync(projectsDir)
       .filter(name => {

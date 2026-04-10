@@ -3,8 +3,7 @@ import { readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
 import type { Decision, GraphEdge } from '../types.ts';
-
-const PROJECTS_DIR = 'C:/Projects';
+import { PROJECTS_DIR } from '../lib/config.ts';
 
 /**
  * Predictive Task Generation (v3.0 feature #2)

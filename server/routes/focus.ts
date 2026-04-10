@@ -2,8 +2,7 @@ import { Router, Request, Response } from 'express';
 import { execSync } from 'child_process';
 import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
-
-const PROJECTS_DIR = 'C:/Projects';
+import { PROJECTS_DIR } from '../lib/config.ts';
 
 export function createFocusRoutes(store: NexusStore): Router {
   const router = Router();

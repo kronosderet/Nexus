@@ -5,6 +5,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import os from 'os';
 import type { NexusStore } from '../db/store.ts';
+import { PROJECTS_DIR } from '../lib/config.ts';
 
 type BroadcastFn = (data: any) => void;
 
@@ -76,7 +77,7 @@ function executeAction(command: string, store: NexusStore): any {
 }
 
 function gitSummary() {
-  const projectsDir = 'C:/Projects';
+  const projectsDir = PROJECTS_DIR;
   const results: any[] = [];
 
   for (const name of readdirSync(projectsDir)) {

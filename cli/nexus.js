@@ -55,7 +55,7 @@ async function api(path, options = {}) {
     return await res.json();
   } catch (err) {
     if (err.cause?.code === 'ECONNREFUSED') {
-      console.error('  ◈ Nexus is offline. Start it with: cd C:/Projects/Nexus && npm run dev');
+      console.error('  ◈ Nexus is offline. Start the Nexus server with: nexus-dev.bat or npm run dev');
       process.exit(1);
     }
     throw err;

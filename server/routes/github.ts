@@ -3,10 +3,9 @@ import { execSync } from 'child_process';
 import { readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
+import { PROJECTS_DIR } from '../lib/config.ts';
 
 type BroadcastFn = (data: any) => void;
-
-const PROJECTS_DIR = 'C:/Projects';
 
 export function createGitHubRoutes(store: NexusStore, broadcast: BroadcastFn) {
   const router = Router();
