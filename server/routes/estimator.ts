@@ -158,13 +158,17 @@ function buildEstimate(store: NexusStore) {
 }
 
 function calculateBurnRates(history: any[]) {
+  // Sort by timestamp descending (newest first) — don't assume array order
+  const sorted = [...history].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
   // Calculate from consecutive report pairs
   const sessionRates: number[] = [];
   const weeklyRates: number[] = [];
 
-  for (let i = 0; i < history.length - 1; i++) {
-    const newer = history[i];
-    const older = history[i + 1];
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const newer = sorted[i];
+    const older = sorted[i + 1];
     const minutes = (new Date(newer.created_at).getTime() - new Date(older.created_at).getTime()) / 60000;
 
     if (minutes < 1 || minutes > 360) continue; // skip weird gaps
