@@ -40,6 +40,13 @@ export function startFileWatcher(store: NexusStore, broadcast: BroadcastFn) {
 
   function queueChange(type: string, filePath: string) {
     const rel = relative(PROJECTS_DIR, filePath).replace(/\\/g, '/');
+    const fileName = basename(filePath);
+
+    // Hard filter: skip ALL Nexus data files (the glob ignore isn't catching renames)
+    if (fileName.startsWith('nexus') && (fileName.endsWith('.json') || fileName.includes('.json.'))) return;
+    if (fileName === 'nexus-embeddings.json') return;
+
+
     const project = rel.split('/')[0];
     const file = rel.split('/').slice(1).join('/');
 
