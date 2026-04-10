@@ -84,19 +84,28 @@ async function main() {
   }
 
   // Step 3: Check for in-progress tasks and push a handoff thought
+  // Only push if there isn't already a thought about the same tasks (prevents duplicates)
   try {
     const tasks = await api('/tasks');
     const inProgress = (tasks || []).filter(t => t.status === 'in_progress');
     if (inProgress.length > 0) {
-      const taskList = inProgress.map(t => `#${t.id} ${t.title}`).join(', ');
-      await api('/thoughts', {
-        method: 'POST',
-        body: JSON.stringify({
-          text: `Session ended with ${inProgress.length} task(s) still in progress: ${taskList}`,
-          context: `auto-pushed by session-stop hook for ${project}`,
-          project,
-        }),
-      });
+      // Check existing thoughts to avoid duplicates
+      const existing = await api('/thoughts').catch(() => []);
+      const taskIds = inProgress.map(t => `#${t.id}`).join(', ');
+      const alreadyTracked = (existing || []).some(th =>
+        inProgress.some(t => th.text.includes(`#${t.id}`))
+      );
+      if (!alreadyTracked) {
+        const taskList = inProgress.map(t => `#${t.id} ${t.title}`).join(', ');
+        await api('/thoughts', {
+          method: 'POST',
+          body: JSON.stringify({
+            text: `Session ended with ${inProgress.length} task(s) still in progress: ${taskList}`,
+            context: `auto-pushed by session-stop hook for ${project}`,
+            project,
+          }),
+        });
+      }
     }
   } catch {
     // Non-critical — thoughts are a bonus, not a requirement

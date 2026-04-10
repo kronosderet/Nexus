@@ -952,6 +952,55 @@
       "message": "Landmark reached -- \"v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files\"",
       "meta": "{}",
       "created_at": "2026-04-10T10:52:30.941Z"
+    },
+    {
+      "id": 85600,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:52:48.970Z"
+    },
+    {
+      "id": 85601,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 16 files changed",
+      "meta": "{\"changes\":[{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-Bghuemd0.js\",\"path\":\"Nexus/client/dist/assets/index-Bghuemd0.js\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-C8r-nV8k.css\",\"path\":\"Nexus/client/dist/assets/index-C8r-nV8k.css\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-mkLj_pcf.js\",\"path\":\"Nexus/client/dist/assets/index-mkLj_pcf.js\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/dist/index.html\",\"path\":\"Nexus/client/dist/index.html\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/02/e37f38214ee439412c47329546f0a33acebfe2\",\"path\":\"Nexus/.git/objects/02/e37f38214ee439412c47329546f0a33acebfe2\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/96/7738a06eedabae594c35ad1f462d076f372b23\",\"path\":\"Nexus/.git/objects/96/7738a06eedabae594c35ad1f462d076f372b23\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/72/97e7695fd605cfcd87eda4422e0092eb7f08f8\",\"path\":\"Nexus/.git/objects/72/97e7695fd605cfcd87eda4422e0092eb7f08f8\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/2f/6fd557f277167cf82da2af43cbedf19619d0a8\",\"path\":\"Nexus/.git/objects/2f/6fd557f277167cf82da2af43cbedf19619d0a8\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/31/8377fdd3a7004d5aa23f841408c70ed76b3f82\",\"path\":\"Nexus/.git/objects/31/8377fdd3a7004d5aa23f841408c70ed76b3f82\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/f5/0071d94390b03148b973c9210a56c6c9e8cc93\",\"path\":\"Nexus/.git/objects/f5/0071d94390b03148b973c9210a56c6c9e8cc93\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/60/c46fc2231311d3422abe3667d6d34496a21348\",\"path\":\"Nexus/.git/objects/60/c46fc2231311d3422abe3667d6d34496a21348\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/76/1d745588ceef5ea1cd53b316e6fc5fb5a913c3\",\"path\":\"Nexus/.git/objects/76/1d745588ceef5ea1cd53b316e6fc5fb5a913c3\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T10:53:06.696Z"
+    },
+    {
+      "id": 85602,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:53:30.174Z"
+    },
+    {
+      "id": 85603,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:53:30.185Z"
+    },
+    {
+      "id": 85604,
+      "type": "file_change",
+      "message": "Terrain shift -- [.claude] settings.local.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\".claude\",\"file\":\"settings.local.json\",\"path\":\".claude/settings.local.json\"}]}",
+      "created_at": "2026-04-10T10:55:03.580Z"
+    },
+    {
+      "id": 85605,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] cli/hooks/session-stop.js modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"cli/hooks/session-stop.js\",\"path\":\"Nexus/cli/hooks/session-stop.js\"}]}",
+      "created_at": "2026-04-10T10:55:41.996Z"
+    },
+    {
+      "id": 85606,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] plugin/server/hooks/session-stop.js modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"plugin/server/hooks/session-stop.js\",\"path\":\"Nexus/plugin/server/hooks/session-stop.js\"}]}",
+      "created_at": "2026-04-10T10:55:51.770Z"
     }
   ],
   "scratchpads": [
@@ -3066,6 +3115,24 @@
         "auto-summary"
       ],
       "created_at": "2026-04-10T10:50:46.635Z"
+    },
+    {
+      "id": 101,
+      "project": "nexus",
+      "summary": "Refactored the codebase to replace 17 hardcoded absolute paths with a configurable NEXUS_PROJECTS_DIR environment variable across 12 server files.",
+      "decisions": [
+        "Adopted NEXUS_PROJECTS_DIR environment variable for path abstraction",
+        "Standardized project root referencing via env var to support portable deployments"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "refactor",
+        "configuration",
+        "v4.0-pre-release",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T10:53:30.170Z"
     }
   ],
   "usage": [
@@ -8488,6 +8555,33 @@
       "temperature": 51,
       "power": 73.76,
       "created_at": "2026-04-10T10:52:41.239Z"
+    },
+    {
+      "gpu_util": 29,
+      "mem_util": 18,
+      "vram_used": 7719,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 16.83,
+      "created_at": "2026-04-10T10:53:41.248Z"
+    },
+    {
+      "gpu_util": 19,
+      "mem_util": 10,
+      "vram_used": 7779,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 20.98,
+      "created_at": "2026-04-10T10:54:41.244Z"
+    },
+    {
+      "gpu_util": 32,
+      "mem_util": 23,
+      "vram_used": 7788,
+      "vram_total": 8192,
+      "temperature": 53,
+      "power": 19.26,
+      "created_at": "2026-04-10T10:55:41.247Z"
     }
   ],
   "_sessionTiming": {
@@ -11363,71 +11457,71 @@
     {
       "id": 4,
       "text": "Session ended with 1 task(s) still in progress: #96 v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files",
-      "context": "auto-pushed by session-stop hook for Projects",
+      "context": "auto-pushed by session-stop hook for Projects | abandoned: Stale — task #96 is done, Stop hook pushed this 7 times",
       "project": "Projects",
       "pushed_at": "2026-04-10T10:23:03.326Z",
-      "popped_at": null,
-      "status": "active",
+      "popped_at": "2026-04-10T10:55:02.203Z",
+      "status": "abandoned",
       "related_task_id": null
     },
     {
       "id": 5,
       "text": "Session ended with 1 task(s) still in progress: #96 v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files",
-      "context": "auto-pushed by session-stop hook for nexus",
+      "context": "auto-pushed by session-stop hook for nexus | abandoned: Stale — task #96 is done, Stop hook pushed this 7 times",
       "project": "nexus",
       "pushed_at": "2026-04-10T10:26:11.929Z",
-      "popped_at": null,
-      "status": "active",
+      "popped_at": "2026-04-10T10:55:02.291Z",
+      "status": "abandoned",
       "related_task_id": null
     },
     {
       "id": 6,
       "text": "Session ended with 1 task(s) still in progress: #96 v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files",
-      "context": "auto-pushed by session-stop hook for nexus",
+      "context": "auto-pushed by session-stop hook for nexus | abandoned: Stale — task #96 is done, Stop hook pushed this 7 times",
       "project": "nexus",
       "pushed_at": "2026-04-10T10:33:42.136Z",
-      "popped_at": null,
-      "status": "active",
+      "popped_at": "2026-04-10T10:55:02.381Z",
+      "status": "abandoned",
       "related_task_id": null
     },
     {
       "id": 7,
       "text": "Session ended with 1 task(s) still in progress: #96 v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files",
-      "context": "auto-pushed by session-stop hook for nexus",
+      "context": "auto-pushed by session-stop hook for nexus | abandoned: Stale — task #96 is done, Stop hook pushed this 7 times",
       "project": "nexus",
       "pushed_at": "2026-04-10T10:39:34.216Z",
-      "popped_at": null,
-      "status": "active",
+      "popped_at": "2026-04-10T10:55:02.471Z",
+      "status": "abandoned",
       "related_task_id": null
     },
     {
       "id": 8,
       "text": "Session ended with 1 task(s) still in progress: #96 v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files",
-      "context": "auto-pushed by session-stop hook for nexus",
+      "context": "auto-pushed by session-stop hook for nexus | abandoned: Stale — task #96 is done, Stop hook pushed this 7 times",
       "project": "nexus",
       "pushed_at": "2026-04-10T10:46:48.150Z",
-      "popped_at": null,
-      "status": "active",
+      "popped_at": "2026-04-10T10:55:02.556Z",
+      "status": "abandoned",
       "related_task_id": null
     },
     {
       "id": 9,
       "text": "Session ended with 1 task(s) still in progress: #96 v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files",
-      "context": "auto-pushed by session-stop hook for nexus",
+      "context": "auto-pushed by session-stop hook for nexus | abandoned: Stale — task #96 is done, Stop hook pushed this 7 times",
       "project": "nexus",
       "pushed_at": "2026-04-10T10:48:57.490Z",
-      "popped_at": null,
-      "status": "active",
+      "popped_at": "2026-04-10T10:55:02.642Z",
+      "status": "abandoned",
       "related_task_id": null
     },
     {
       "id": 10,
       "text": "Session ended with 1 task(s) still in progress: #96 v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files",
-      "context": "auto-pushed by session-stop hook for Projects",
+      "context": "auto-pushed by session-stop hook for Projects | abandoned: Stale — task #96 is done, Stop hook pushed this 7 times",
       "project": "Projects",
       "pushed_at": "2026-04-10T10:50:46.663Z",
-      "popped_at": null,
-      "status": "active",
+      "popped_at": "2026-04-10T10:55:02.728Z",
+      "status": "abandoned",
       "related_task_id": null
     }
   ]
