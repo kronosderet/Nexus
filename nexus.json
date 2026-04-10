@@ -362,6 +362,28 @@
       "linked_files": "[]",
       "created_at": "2026-04-10T10:24:58.047Z",
       "updated_at": "2026-04-10T10:37:22.790Z"
+    },
+    {
+      "id": 104,
+      "title": "Testing v4.1 Command module + 3 hooks (SessionStart, Stop, UserPromptSubmit)",
+      "description": "Verifying all hooks fire correctly, prompt logging captures real text, Now panel shows in-progress work, Kanban reflects status flow.",
+      "status": "done",
+      "priority": 0,
+      "sort_order": 1,
+      "linked_files": "[]",
+      "created_at": "2026-04-10T11:04:31.447Z",
+      "updated_at": "2026-04-10T11:05:05.190Z"
+    },
+    {
+      "id": 105,
+      "title": "Pre-publish polish: fix predict noise, link orphans, rebuild MCPB, audit Log module",
+      "description": "",
+      "status": "done",
+      "priority": 2,
+      "sort_order": 1,
+      "linked_files": "[]",
+      "created_at": "2026-04-10T11:08:31.644Z",
+      "updated_at": "2026-04-10T11:13:08.336Z"
     }
   ],
   "activity": [
@@ -1008,6 +1030,223 @@
       "message": "Terrain shift -- [.claude] settings.local.json modified",
       "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\".claude\",\"file\":\"settings.local.json\",\"path\":\".claude/settings.local.json\"}]}",
       "created_at": "2026-04-10T10:56:03.702Z"
+    },
+    {
+      "id": 85608,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 14 files changed",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/e8/0f90a66dbedb7ade091704931493deb5782e04\",\"path\":\"Nexus/.git/objects/e8/0f90a66dbedb7ade091704931493deb5782e04\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/f4/07bb578c9c3c0c503269558f570ef3fc571d2d\",\"path\":\"Nexus/.git/objects/f4/07bb578c9c3c0c503269558f570ef3fc571d2d\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/45/774961d7074a8d7260c86299c2fa3cbebd9060\",\"path\":\"Nexus/.git/objects/45/774961d7074a8d7260c86299c2fa3cbebd9060\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/83/5697c87853f769f2f8ae20a7a936280be76fd7\",\"path\":\"Nexus/.git/objects/83/5697c87853f769f2f8ae20a7a936280be76fd7\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/ca/b8bdf5cd31c7b5a840cb5cd8d2d443f2c5e1af\",\"path\":\"Nexus/.git/objects/ca/b8bdf5cd31c7b5a840cb5cd8d2d443f2c5e1af\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/cc/33dcbd0df48c65356956225cce92f7ee70e74d\",\"path\":\"Nexus/.git/objects/cc/33dcbd0df48c65356956225cce92f7ee70e74d\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/f5/a5e09eb13f86c11c95a5e770f38796042d0bd9\",\"path\":\"Nexus/.git/objects/f5/a5e09eb13f86c11c95a5e770f38796042d0bd9\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/32/7eb6e5e6fc8defab7453afabca5eee05d215ce\",\"path\":\"Nexus/.git/objects/32/7eb6e5e6fc8defab7453afabca5eee05d215ce\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/da/1f2038de2e6a258c7b491e55833c4122a3769e\",\"path\":\"Nexus/.git/objects/da/1f2038de2e6a258c7b491e55833c4122a3769e\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/29/be94b4a33b0ae7dca5bb982b0cab6af1fc95d1\",\"path\":\"Nexus/.git/objects/29/be94b4a33b0ae7dca5bb982b0cab6af1fc95d1\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T10:56:21.992Z"
+    },
+    {
+      "id": 85609,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:56:41.923Z"
+    },
+    {
+      "id": 85610,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:56:41.933Z"
+    },
+    {
+      "id": 85611,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] cli/hooks/prompt-submit.js added",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"cli/hooks/prompt-submit.js\",\"path\":\"Nexus/cli/hooks/prompt-submit.js\"}]}",
+      "created_at": "2026-04-10T10:58:35.544Z"
+    },
+    {
+      "id": 85612,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] cli/nexus.js modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"cli/nexus.js\",\"path\":\"Nexus/cli/nexus.js\"}]}",
+      "created_at": "2026-04-10T10:58:57.300Z"
+    },
+    {
+      "id": 85613,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 14 files changed",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"plugin/server/hooks/prompt-submit.js\",\"path\":\"Nexus/plugin/server/hooks/prompt-submit.js\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/63/1492c9bc9b2d27baea3325ccc1181f5276feed\",\"path\":\"Nexus/.git/objects/63/1492c9bc9b2d27baea3325ccc1181f5276feed\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/5a/23813e6dc17f7d07d634ccb5499e5789705219\",\"path\":\"Nexus/.git/objects/5a/23813e6dc17f7d07d634ccb5499e5789705219\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/e4/de20eaa17522d8219938559ccefb5d70a51c20\",\"path\":\"Nexus/.git/objects/e4/de20eaa17522d8219938559ccefb5d70a51c20\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/1f/1fb85e4d3bb3455c7174adcc5095310d1f1682\",\"path\":\"Nexus/.git/objects/1f/1fb85e4d3bb3455c7174adcc5095310d1f1682\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/cc/06c733b49a3825889f32455d562c985edaec51\",\"path\":\"Nexus/.git/objects/cc/06c733b49a3825889f32455d562c985edaec51\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/2c/2b5a318a7196aaa4edd24d273022ae429daab8\",\"path\":\"Nexus/.git/objects/2c/2b5a318a7196aaa4edd24d273022ae429daab8\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/c2/b745d69caec26ceb43bf4a6e54e9997b42ef7f\",\"path\":\"Nexus/.git/objects/c2/b745d69caec26ceb43bf4a6e54e9997b42ef7f\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/8b/68e2df10d81b2495e15577004ed60af752faaa\",\"path\":\"Nexus/.git/objects/8b/68e2df10d81b2495e15577004ed60af752faaa\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/e9/c12510914859b45ae78026a27ac59443517dd8\",\"path\":\"Nexus/.git/objects/e9/c12510914859b45ae78026a27ac59443517dd8\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T10:59:50.936Z"
+    },
+    {
+      "id": 85614,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:00:11.427Z"
+    },
+    {
+      "id": 85615,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:00:11.438Z"
+    },
+    {
+      "id": 85616,
+      "type": "prompt",
+      "message": "User prompt: {\"session_id\":\"32eccecb-da3b-44fc-a6cf-6b6d6b18a8fb\",\"transcript_path\":\"C:\\\\Users\\\\kronos\\\\.claude\\\\projects\\\\C--Projects\\\\32eccecb-da3b-44fc-a6cf-6b6d6b18a8fb.jsonl\",\"cwd\":\"C:\\\\Projects\",\"permission_...",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:00:56.218Z"
+    },
+    {
+      "id": 85617,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for Projects",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:01:24.750Z"
+    },
+    {
+      "id": 85618,
+      "type": "system",
+      "message": "Session ended (Projects) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:01:24.762Z"
+    },
+    {
+      "id": 85619,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] .git/index modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T11:01:27.318Z"
+    },
+    {
+      "id": 85620,
+      "type": "prompt",
+      "message": "User prompt: {\"session_id\":\"32eccecb-da3b-44fc-a6cf-6b6d6b18a8fb\",\"transcript_path\":\"C:\\\\Users\\\\kronos\\\\.claude\\\\projects\\\\C--Projects\\\\32eccecb-da3b-44fc-a6cf-6b6d6b18a8fb.jsonl\",\"cwd\":\"C:\\\\Projects\",\"permission_...",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:02:42.023Z"
+    },
+    {
+      "id": 85621,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] cli/hooks/prompt-submit.js modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"cli/hooks/prompt-submit.js\",\"path\":\"Nexus/cli/hooks/prompt-submit.js\"}]}",
+      "created_at": "2026-04-10T11:04:06.977Z"
+    },
+    {
+      "id": 85622,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 13 files changed",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"plugin/server/hooks/prompt-submit.js\",\"path\":\"Nexus/plugin/server/hooks/prompt-submit.js\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/e0/5fd5003a2e569dd259988b43d9cbc47ec6f103\",\"path\":\"Nexus/.git/objects/e0/5fd5003a2e569dd259988b43d9cbc47ec6f103\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/d4/d840b7c1635fccbb425df3eb3ab9cb4d4068e0\",\"path\":\"Nexus/.git/objects/d4/d840b7c1635fccbb425df3eb3ab9cb4d4068e0\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/f4/afcfd77e4cded4d9a140b9aa8dcf7044b6fd75\",\"path\":\"Nexus/.git/objects/f4/afcfd77e4cded4d9a140b9aa8dcf7044b6fd75\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/f2/2d04a8dc3665ff0b408d8796fb3d4ed4dcd0c4\",\"path\":\"Nexus/.git/objects/f2/2d04a8dc3665ff0b408d8796fb3d4ed4dcd0c4\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/74/e64b989c9f56960a362caa7d50fccf8fef9484\",\"path\":\"Nexus/.git/objects/74/e64b989c9f56960a362caa7d50fccf8fef9484\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/72/b7ad3f6017f521700bc11929c1ecd3ba1cee12\",\"path\":\"Nexus/.git/objects/72/b7ad3f6017f521700bc11929c1ecd3ba1cee12\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/eb/76fab5f26eadd460beaec27d4ad5161e6765da\",\"path\":\"Nexus/.git/objects/eb/76fab5f26eadd460beaec27d4ad5161e6765da\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/51/821421306fcc3df1b7b0c1ec4cdf8281cd40d1\",\"path\":\"Nexus/.git/objects/51/821421306fcc3df1b7b0c1ec4cdf8281cd40d1\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T11:04:19.559Z"
+    },
+    {
+      "id": 85623,
+      "type": "task_created",
+      "message": "Plotted -- \"Testing v4.1 Command module + 3 hooks (SessionStart, Stop, UserPromptSubmit)\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:04:31.450Z"
+    },
+    {
+      "id": 85624,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] .git/index modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T11:04:44.324Z"
+    },
+    {
+      "id": 85625,
+      "type": "task_done",
+      "message": "Landmark reached -- \"Testing v4.1 Command module + 3 hooks (SessionStart, Stop, UserPromptSubmit)\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:05:05.193Z"
+    },
+    {
+      "id": 85626,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:05:31.625Z"
+    },
+    {
+      "id": 85627,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:05:31.636Z"
+    },
+    {
+      "id": 85628,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for Projects",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:07:17.822Z"
+    },
+    {
+      "id": 85629,
+      "type": "system",
+      "message": "Session ended (Projects) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:07:17.834Z"
+    },
+    {
+      "id": 85630,
+      "type": "task_created",
+      "message": "Plotted -- \"Pre-publish polish: fix predict noise, link orphans, rebuild MCPB, audit Log module\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:08:31.646Z"
+    },
+    {
+      "id": 85631,
+      "type": "system",
+      "message": "Nexus is online. Setting course.",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:09:43.295Z"
+    },
+    {
+      "id": 85632,
+      "type": "file_change",
+      "message": "Terrain shift -- [.claude] settings.local.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\".claude\",\"file\":\"settings.local.json\",\"path\":\".claude/settings.local.json\"}]}",
+      "created_at": "2026-04-10T11:09:56.142Z"
+    },
+    {
+      "id": 85633,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] mcpb/manifest.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"mcpb/manifest.json\",\"path\":\"Nexus/mcpb/manifest.json\"}]}",
+      "created_at": "2026-04-10T11:11:27.785Z"
+    },
+    {
+      "id": 85634,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 2 files modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"mcpb/server/index.js\",\"path\":\"Nexus/mcpb/server/index.js\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"mcpb/nexus.mcpb\",\"path\":\"Nexus/mcpb/nexus.mcpb\"}]}",
+      "created_at": "2026-04-10T11:11:40.252Z"
+    },
+    {
+      "id": 85635,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Log.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Log.jsx\",\"path\":\"Nexus/client/src/modules/Log.jsx\"}]}",
+      "created_at": "2026-04-10T11:12:31.235Z"
+    },
+    {
+      "id": 85636,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 2 files modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"tests/.test-nexus.json.bak.2\",\"path\":\"Nexus/tests/.test-nexus.json.bak.2\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"tests/.test-nexus.json.bak\",\"path\":\"Nexus/tests/.test-nexus.json.bak\"}]}",
+      "created_at": "2026-04-10T11:12:45.769Z"
+    },
+    {
+      "id": 85637,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 6 files changed",
+      "meta": "{\"changes\":[{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-C8r-nV8k.css\",\"path\":\"Nexus/client/dist/assets/index-C8r-nV8k.css\"},{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-mkLj_pcf.js\",\"path\":\"Nexus/client/dist/assets/index-mkLj_pcf.js\"},{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/index.html\",\"path\":\"Nexus/client/dist/index.html\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-BM0jXHg3.js\",\"path\":\"Nexus/client/dist/assets/index-BM0jXHg3.js\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-C8r-nV8k.css\",\"path\":\"Nexus/client/dist/assets/index-C8r-nV8k.css\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/index.html\",\"path\":\"Nexus/client/dist/index.html\"}]}",
+      "created_at": "2026-04-10T11:12:48.083Z"
+    },
+    {
+      "id": 85638,
+      "type": "task_done",
+      "message": "Landmark reached -- \"Pre-publish polish: fix predict noise, link orphans, rebuild MCPB, audit Log module\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:13:08.339Z"
     }
   ],
   "scratchpads": [
@@ -3140,6 +3379,96 @@
         "auto-summary"
       ],
       "created_at": "2026-04-10T10:53:30.170Z"
+    },
+    {
+      "id": 102,
+      "project": "nexus",
+      "summary": "Completed the refactoring of 12 server files to replace hardcoded absolute paths with a centralized NEXUS_PROJECTS_DIR environment variable.",
+      "decisions": [
+        "Adopted NEXUS_PROJECTS_DIR as the single source of truth for project path resolution",
+        "Standardized path construction across both plugin and CLI session-stop hooks"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "refactoring",
+        "environment-config",
+        "path-resolution",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T10:56:41.920Z"
+    },
+    {
+      "id": 103,
+      "project": "nexus",
+      "summary": "Implemented a terrain shift update by modifying the Nexus CLI and introducing a new prompt submission hook.",
+      "decisions": [
+        "Integrated cli/hooks/prompt-submit.js into the CLI workflow",
+        "Updated cli/nexus.js to support terrain shift logic"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "cli-update",
+        "terrain-shift",
+        "hook-implementation",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T11:00:11.423Z"
+    },
+    {
+      "id": 104,
+      "project": "Projects",
+      "summary": "Successfully refactored the core project pathing logic by replacing 17 hardcoded C:/Projects instances with a dynamic NEXUS_PROJECTS_DIR environment variable across 12 server files.",
+      "decisions": [
+        "Adopted NEXUS_PROJECTS_DIR as the single source of truth for project directory resolution",
+        "Standardized pathing logic across all server-side modules to ensure environment portability"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "refactoring",
+        "configuration",
+        "v4.0-pre-release",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T11:01:24.747Z"
+    },
+    {
+      "id": 105,
+      "project": "nexus",
+      "summary": "Successfully validated the v4.1 Command module and verified the integration of SessionStart, Stop, and UserPromptSubmit hooks.",
+      "decisions": [
+        "Adopted a three-hook architecture (SessionStart, Stop, UserPromptSubmit) for lifecycle management",
+        "Integrated prompt submission logic directly into the cli/hooks/prompt-submit.js module"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "testing",
+        "cli-v4.1",
+        "lifecycle-hooks",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T11:05:31.622Z"
+    },
+    {
+      "id": 106,
+      "project": "Projects",
+      "summary": "Validated the v4.1 Command module functionality and verified the integration of SessionStart, Stop, and UserPromptSubmit hooks.",
+      "decisions": [
+        "Confirmed stability of hook execution within the v4.1 command lifecycle",
+        "Maintained existing directory structure following dynamic pathing refactor"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "testing",
+        "v4.1-module",
+        "hooks",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T11:07:17.819Z"
     }
   ],
   "usage": [
@@ -3628,6 +3957,18 @@
       "weekly_percent": 85,
       "note": "continuing v4.1 P1 tasks",
       "created_at": "2026-04-10T10:34:03.117Z"
+    },
+    {
+      "session_percent": 100,
+      "weekly_percent": 85,
+      "note": "new session — testing all 3 hooks + v4.1 Command module",
+      "created_at": "2026-04-10T11:03:06.216Z"
+    },
+    {
+      "session_percent": 78,
+      "weekly_percent": 83,
+      "note": "checking nexus project status + planning next steps",
+      "created_at": "2026-04-10T11:06:29.542Z"
     }
   ],
   "gpu_history": [
@@ -8589,6 +8930,168 @@
       "temperature": 53,
       "power": 19.26,
       "created_at": "2026-04-10T10:55:41.247Z"
+    },
+    {
+      "gpu_util": 40,
+      "mem_util": 10,
+      "vram_used": 7747,
+      "vram_total": 8192,
+      "temperature": 55,
+      "power": 51.42,
+      "created_at": "2026-04-10T10:56:41.272Z"
+    },
+    {
+      "gpu_util": 32,
+      "mem_util": 15,
+      "vram_used": 7712,
+      "vram_total": 8192,
+      "temperature": 46,
+      "power": 15.63,
+      "created_at": "2026-04-10T10:57:41.249Z"
+    },
+    {
+      "gpu_util": 42,
+      "mem_util": 23,
+      "vram_used": 7711,
+      "vram_total": 8192,
+      "temperature": 48,
+      "power": 16.17,
+      "created_at": "2026-04-10T10:58:41.260Z"
+    },
+    {
+      "gpu_util": 6,
+      "mem_util": 1,
+      "vram_used": 7729,
+      "vram_total": 8192,
+      "temperature": 53,
+      "power": 74.21,
+      "created_at": "2026-04-10T10:59:41.261Z"
+    },
+    {
+      "gpu_util": 31,
+      "mem_util": 15,
+      "vram_used": 7688,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 16.63,
+      "created_at": "2026-04-10T11:00:41.270Z"
+    },
+    {
+      "gpu_util": 8,
+      "mem_util": 20,
+      "vram_used": 7713,
+      "vram_total": 8192,
+      "temperature": 49,
+      "power": 16.4,
+      "created_at": "2026-04-10T11:01:41.259Z"
+    },
+    {
+      "gpu_util": 14,
+      "mem_util": 8,
+      "vram_used": 7795,
+      "vram_total": 8192,
+      "temperature": 47,
+      "power": 38.93,
+      "created_at": "2026-04-10T11:02:41.693Z"
+    },
+    {
+      "gpu_util": 12,
+      "mem_util": 2,
+      "vram_used": 7847,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 46.23,
+      "created_at": "2026-04-10T11:03:41.701Z"
+    },
+    {
+      "gpu_util": 42,
+      "mem_util": 28,
+      "vram_used": 7701,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 18.72,
+      "created_at": "2026-04-10T11:04:41.700Z"
+    },
+    {
+      "gpu_util": 28,
+      "mem_util": 15,
+      "vram_used": 7708,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 20.18,
+      "created_at": "2026-04-10T11:05:41.701Z"
+    },
+    {
+      "gpu_util": 23,
+      "mem_util": 11,
+      "vram_used": 7780,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 18.23,
+      "created_at": "2026-04-10T11:06:41.709Z"
+    },
+    {
+      "gpu_util": 30,
+      "mem_util": 14,
+      "vram_used": 7753,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 16.69,
+      "created_at": "2026-04-10T11:07:41.717Z"
+    },
+    {
+      "gpu_util": 33,
+      "mem_util": 15,
+      "vram_used": 7719,
+      "vram_total": 8192,
+      "temperature": 53,
+      "power": 18.32,
+      "created_at": "2026-04-10T11:08:41.726Z"
+    },
+    {
+      "gpu_util": 27,
+      "mem_util": 14,
+      "vram_used": 7718,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 18.92,
+      "created_at": "2026-04-10T11:09:41.732Z"
+    },
+    {
+      "gpu_util": 28,
+      "mem_util": 11,
+      "vram_used": 7720,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 19.71,
+      "created_at": "2026-04-10T11:09:43.353Z"
+    },
+    {
+      "gpu_util": 46,
+      "mem_util": 28,
+      "vram_used": 7717,
+      "vram_total": 8192,
+      "temperature": 53,
+      "power": 18.96,
+      "created_at": "2026-04-10T11:10:43.402Z"
+    },
+    {
+      "gpu_util": 26,
+      "mem_util": 14,
+      "vram_used": 7795,
+      "vram_total": 8192,
+      "temperature": 54,
+      "power": 20.27,
+      "created_at": "2026-04-10T11:11:43.406Z"
+    },
+    {
+      "gpu_util": 26,
+      "mem_util": 14,
+      "vram_used": 7789,
+      "vram_total": 8192,
+      "temperature": 54,
+      "power": 18.73,
+      "created_at": "2026-04-10T11:12:43.412Z"
     }
   ],
   "_sessionTiming": {
@@ -8752,7 +9255,8 @@
         "cleanup",
         "archive"
       ],
-      "created_at": "2026-04-06T20:35:34.836Z"
+      "created_at": "2026-04-06T20:35:34.836Z",
+      "deprecated": true
     },
     {
       "id": 12,
@@ -9288,7 +9792,8 @@
         "full-build",
         "milestone"
       ],
-      "created_at": "2026-04-06T20:35:34.877Z"
+      "created_at": "2026-04-06T20:35:34.877Z",
+      "deprecated": true
     },
     {
       "id": 48,
@@ -9304,7 +9809,8 @@
         "full-build",
         "milestone"
       ],
-      "created_at": "2026-04-06T20:35:34.878Z"
+      "created_at": "2026-04-06T20:35:34.878Z",
+      "deprecated": true
     },
     {
       "id": 49,
@@ -9365,7 +9871,8 @@
         "usage",
         "gpu-history"
       ],
-      "created_at": "2026-04-06T20:35:34.883Z"
+      "created_at": "2026-04-06T20:35:34.883Z",
+      "deprecated": true
     },
     {
       "id": 53,
@@ -10990,6 +11497,22 @@
       "rel": "related",
       "note": "semantic-linked (74% cosine similarity)",
       "created_at": "2026-04-10T10:25:28.871Z"
+    },
+    {
+      "id": 153,
+      "from": 65,
+      "to": 63,
+      "rel": "depends_on",
+      "note": "SR3 backlog dependencies depend on server-authoritative architecture",
+      "created_at": "2026-04-10T11:11:04.756Z"
+    },
+    {
+      "id": 154,
+      "from": 74,
+      "to": 72,
+      "rel": "depends_on",
+      "note": "Faction resolution system depends on Campaign Manager spine",
+      "created_at": "2026-04-10T11:11:05.832Z"
     }
   ],
   "advice": [

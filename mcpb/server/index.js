@@ -5,6 +5,9 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
@@ -6795,6 +6798,1005 @@ var require_dist = __commonJS({
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = formatsPlugin;
+  }
+});
+
+// server/lib/embeddings.ts
+import { existsSync, readFileSync, writeFileSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+function cosineSim(a, b) {
+  let dot = 0, magA = 0, magB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    magA += a[i] * a[i];
+    magB += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(magA) * Math.sqrt(magB));
+}
+function saveCache() {
+  if (savePending) return;
+  savePending = setTimeout(() => {
+    savePending = null;
+    const keys = Object.keys(cache);
+    if (keys.length > 500) {
+      const sorted = keys.sort((a, b) => (cache[a].ts || 0) - (cache[b].ts || 0));
+      for (const k of sorted.slice(0, keys.length - 400)) delete cache[k];
+    }
+    try {
+      writeFileSync(EMBED_CACHE_PATH, JSON.stringify(cache));
+    } catch {
+    }
+  }, 5e3);
+}
+async function getEmbedding(text) {
+  const key = text.slice(0, 200);
+  if (cache[key]?.vec) return cache[key].vec;
+  try {
+    const res = await fetch(EMBED_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: EMBED_MODEL, input: text.slice(0, 1e3) }),
+      signal: AbortSignal.timeout(5e3)
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const vec = data?.data?.[0]?.embedding;
+    if (vec) {
+      cache[key] = { vec, ts: Date.now() };
+      saveCache();
+    }
+    return vec || null;
+  } catch {
+    return null;
+  }
+}
+async function findSimilar(query, candidates, topN = 5, threshold = 0.5) {
+  const qVec = await getEmbedding(query);
+  if (!qVec) return [];
+  const results = [];
+  for (let i = 0; i < candidates.length; i++) {
+    const cVec = await getEmbedding(candidates[i]);
+    if (!cVec) continue;
+    const sim = cosineSim(qVec, cVec);
+    if (sim >= threshold) results.push({ index: i, similarity: sim });
+  }
+  return results.sort((a, b) => b.similarity - a.similarity).slice(0, topN);
+}
+var __dirname, EMBED_CACHE_PATH, EMBED_MODEL, EMBED_URL, cache, savePending;
+var init_embeddings = __esm({
+  "server/lib/embeddings.ts"() {
+    "use strict";
+    __dirname = dirname(fileURLToPath(import.meta.url));
+    EMBED_CACHE_PATH = join(__dirname, "..", "..", "nexus-embeddings.json");
+    EMBED_MODEL = "text-embedding-nomic-embed-text-v1.5";
+    EMBED_URL = "http://localhost:1234/v1/embeddings";
+    cache = {};
+    if (existsSync(EMBED_CACHE_PATH)) {
+      try {
+        cache = JSON.parse(readFileSync(EMBED_CACHE_PATH, "utf-8"));
+      } catch {
+      }
+    }
+    savePending = null;
+    process.on("exit", () => {
+      if (savePending) {
+        clearTimeout(savePending);
+        try {
+          writeFileSync(EMBED_CACHE_PATH, JSON.stringify(cache));
+        } catch {
+        }
+      }
+    });
+  }
+});
+
+// server/db/store.ts
+var store_exports = {};
+__export(store_exports, {
+  NexusStore: () => NexusStore
+});
+import { readFileSync as readFileSync2, writeFileSync as writeFileSync2, existsSync as existsSync2, renameSync } from "fs";
+import { join as join2, dirname as dirname2 } from "path";
+import { fileURLToPath as fileURLToPath2 } from "url";
+var __dirname2, DB_PATH, BAK_PATH, BAK2_PATH, TMP_PATH, NexusStore;
+var init_store = __esm({
+  "server/db/store.ts"() {
+    "use strict";
+    init_embeddings();
+    __dirname2 = dirname2(fileURLToPath2(import.meta.url));
+    DB_PATH = process.env.NEXUS_DB_PATH || join2(__dirname2, "..", "..", "nexus.json");
+    BAK_PATH = DB_PATH + ".bak";
+    BAK2_PATH = DB_PATH + ".bak.2";
+    TMP_PATH = DB_PATH + ".tmp";
+    NexusStore = class {
+      data;
+      _lastRiskScan;
+      _nextId;
+      constructor() {
+        if (existsSync2(DB_PATH)) {
+          try {
+            this.data = JSON.parse(readFileSync2(DB_PATH, "utf-8"));
+          } catch (err) {
+            console.error(`\u25C8 WARNING: ${DB_PATH} corrupted (${err.message}). Attempting backup recovery...`);
+            if (existsSync2(BAK_PATH)) {
+              try {
+                this.data = JSON.parse(readFileSync2(BAK_PATH, "utf-8"));
+                console.error(`\u25C8 Recovered from ${BAK_PATH}. Data may be slightly behind.`);
+                writeFileSync2(DB_PATH, JSON.stringify(this.data, null, 2));
+              } catch {
+                console.error(`\u25C8 Backup also corrupted. Starting fresh.`);
+                this.data = this._seed();
+              }
+            } else {
+              console.error(`\u25C8 No backup found. Starting fresh.`);
+              this.data = this._seed();
+            }
+          }
+        } else {
+          this.data = this._seed();
+          this._flush();
+        }
+        if (!this.data.sessions) this.data.sessions = [];
+        if (!this.data.usage) this.data.usage = [];
+        if (!this.data.gpu_history) this.data.gpu_history = [];
+        if (!this.data.ledger) this.data.ledger = [];
+        if (!this.data.graph_edges) this.data.graph_edges = [];
+        if (!this.data.bookmarks) this.data.bookmarks = [];
+        if (!this.data.advice) this.data.advice = [];
+        if (!this.data.thoughts) this.data.thoughts = [];
+        this._nextId = {
+          tasks: Math.max(0, ...this.data.tasks.map((t) => t.id)) + 1,
+          activity: Math.max(0, ...this.data.activity.map((a) => a.id)) + 1,
+          sessions: Math.max(0, ...this.data.sessions.map((s) => s.id)) + 1,
+          scratchpads: Math.max(0, ...this.data.scratchpads.map((s) => s.id)) + 1,
+          bookmarks: Math.max(0, ...this.data.bookmarks.map((b) => b.id)) + 1
+        };
+      }
+      _seed() {
+        return {
+          tasks: [],
+          activity: [],
+          sessions: [],
+          usage: [],
+          gpu_history: [],
+          ledger: [],
+          graph_edges: [],
+          advice: [],
+          thoughts: [],
+          scratchpads: [{
+            id: 1,
+            name: "Scratchpad",
+            content: "# Scratchpad\n\nWorking area.\n",
+            language: "markdown",
+            updated_at: (/* @__PURE__ */ new Date()).toISOString()
+          }],
+          bookmarks: []
+        };
+      }
+      _flushing = false;
+      _pendingSemanticLinks = 0;
+      _flush() {
+        if (this._flushing) return;
+        this._flushing = true;
+        try {
+          const json2 = JSON.stringify(this.data, null, 2);
+          writeFileSync2(TMP_PATH, json2);
+          try {
+            if (existsSync2(BAK_PATH)) renameSync(BAK_PATH, BAK2_PATH);
+          } catch {
+          }
+          try {
+            if (existsSync2(DB_PATH)) renameSync(DB_PATH, BAK_PATH);
+          } catch {
+          }
+          renameSync(TMP_PATH, DB_PATH);
+        } finally {
+          this._flushing = false;
+        }
+      }
+      _id(table) {
+        return this._nextId[table]++;
+      }
+      _now() {
+        return (/* @__PURE__ */ new Date()).toISOString();
+      }
+      // ── Typed accessors for Ledger / Graph / Timing ────────
+      // These replace (store as any).data.* casts in route files.
+      getAllDecisions() {
+        return this.data.ledger || [];
+      }
+      getActiveDecisions() {
+        return (this.data.ledger || []).filter((d) => !d.deprecated);
+      }
+      getDecisionById(id) {
+        return (this.data.ledger || []).find((d) => d.id === id) || null;
+      }
+      deprecateDecision(id) {
+        const d = this.getDecisionById(id);
+        if (!d) return null;
+        d.deprecated = true;
+        this._flush();
+        return d;
+      }
+      getDecisionCount() {
+        return (this.data.ledger || []).length;
+      }
+      getAllEdges() {
+        return this.data.graph_edges || [];
+      }
+      getEdgeCount() {
+        return (this.data.graph_edges || []).length;
+      }
+      getSessionTiming() {
+        return this.data._sessionTiming;
+      }
+      setSessionTiming(timing) {
+        this.data._sessionTiming = timing;
+        this._flush();
+      }
+      // ── Tasks ──────────────────────────────────────────────
+      getAllTasks() {
+        return [...this.data.tasks].sort((a, b) => a.sort_order - b.sort_order);
+      }
+      createTask({ title, description = "", status = "backlog", priority = 0 }) {
+        const maxOrder = this.data.tasks.filter((t) => t.status === status).reduce((max, t) => Math.max(max, t.sort_order), 0);
+        const task = {
+          id: this._id("tasks"),
+          title,
+          description,
+          status,
+          priority,
+          sort_order: maxOrder + 1,
+          linked_files: "[]",
+          created_at: this._now(),
+          updated_at: this._now()
+        };
+        this.data.tasks.push(task);
+        this._flush();
+        return task;
+      }
+      updateTask(id, updates) {
+        const idx = this.data.tasks.findIndex((t) => t.id === id);
+        if (idx === -1) return null;
+        const old = { ...this.data.tasks[idx] };
+        this.data.tasks[idx] = { ...old, ...updates, id, updated_at: this._now() };
+        this._flush();
+        return { task: this.data.tasks[idx], old };
+      }
+      deleteTask(id) {
+        const idx = this.data.tasks.findIndex((t) => t.id === id);
+        if (idx === -1) return null;
+        const task = this.data.tasks.splice(idx, 1)[0];
+        this._flush();
+        return task;
+      }
+      // ── Activity ───────────────────────────────────────────
+      getActivity(limit = 50) {
+        return [...this.data.activity].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, limit);
+      }
+      addActivity(type, message, meta3 = {}) {
+        const entry = {
+          id: this._id("activity"),
+          type,
+          message,
+          meta: JSON.stringify(meta3),
+          created_at: this._now()
+        };
+        this.data.activity.push(entry);
+        if (this.data.activity.length > 500) this.data.activity = this.data.activity.slice(-500);
+        this._flush();
+        return entry;
+      }
+      // ── Scratchpads ────────────────────────────────────────
+      getAllScratchpads() {
+        return [...this.data.scratchpads].sort(
+          (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        );
+      }
+      getScratchpad(id) {
+        return this.data.scratchpads.find((s) => s.id === id) || null;
+      }
+      createScratchpad({ name, content = "", language = "markdown" }) {
+        const pad = { id: this._id("scratchpads"), name, content, language, updated_at: this._now() };
+        this.data.scratchpads.push(pad);
+        this._flush();
+        return pad;
+      }
+      updateScratchpad(id, updates) {
+        const idx = this.data.scratchpads.findIndex((s) => s.id === id);
+        if (idx === -1) return null;
+        this.data.scratchpads[idx] = { ...this.data.scratchpads[idx], ...updates, id, updated_at: this._now() };
+        this._flush();
+        return this.data.scratchpads[idx];
+      }
+      deleteScratchpad(id) {
+        const idx = this.data.scratchpads.findIndex((s) => s.id === id);
+        if (idx === -1) return null;
+        const removed = this.data.scratchpads.splice(idx, 1)[0];
+        this._flush();
+        return removed;
+      }
+      // ── Bookmarks ──────────────────────────────────────────
+      getAllBookmarks() {
+        if (!this.data.bookmarks) this.data.bookmarks = [];
+        return [...this.data.bookmarks].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      }
+      createBookmark({ title, url: url2, category = "general" }) {
+        if (!this.data.bookmarks) this.data.bookmarks = [];
+        const bookmark = {
+          id: this._id("bookmarks"),
+          title,
+          url: url2,
+          category,
+          created_at: this._now()
+        };
+        this.data.bookmarks.push(bookmark);
+        this._flush();
+        return bookmark;
+      }
+      updateBookmark(id, updates) {
+        if (!this.data.bookmarks) this.data.bookmarks = [];
+        const idx = this.data.bookmarks.findIndex((b) => b.id === id);
+        if (idx === -1) return null;
+        this.data.bookmarks[idx] = { ...this.data.bookmarks[idx], ...updates, id };
+        this._flush();
+        return this.data.bookmarks[idx];
+      }
+      deleteBookmark(id) {
+        if (!this.data.bookmarks) this.data.bookmarks = [];
+        const idx = this.data.bookmarks.findIndex((b) => b.id === id);
+        if (idx === -1) return null;
+        const bookmark = this.data.bookmarks.splice(idx, 1)[0];
+        this._flush();
+        return bookmark;
+      }
+      // ── Usage ──────────────────────────────────────────────
+      logUsage({ session_percent, weekly_percent, note = "" }) {
+        const entry = { session_percent, weekly_percent, note, created_at: this._now() };
+        this.data.usage.push(entry);
+        const cutoff = Date.now() - 30 * 864e5;
+        this.data.usage = this.data.usage.filter((u) => new Date(u.created_at).getTime() > cutoff);
+        this._flush();
+        return entry;
+      }
+      getUsage(limit = 100) {
+        return [...this.data.usage].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, limit);
+      }
+      getLatestUsage() {
+        return this.data.usage.length > 0 ? this.data.usage[this.data.usage.length - 1] : null;
+      }
+      // ── GPU History ────────────────────────────────────────
+      logGpuSnapshot(snapshot) {
+        const entry = { ...snapshot, created_at: this._now() };
+        this.data.gpu_history.push(entry);
+        const cutoff = Date.now() - 24 * 36e5;
+        this.data.gpu_history = this.data.gpu_history.filter((g) => new Date(g.created_at).getTime() > cutoff);
+        this._flush();
+        return entry;
+      }
+      getGpuHistory(hours = 1) {
+        const cutoff = Date.now() - hours * 36e5;
+        return this.data.gpu_history.filter((g) => new Date(g.created_at).getTime() > cutoff);
+      }
+      // ── Sessions ───────────────────────────────────────────
+      getSessions({ project, limit = 20 } = {}) {
+        let sessions = [...this.data.sessions];
+        if (project) sessions = sessions.filter((s) => s.project.toLowerCase() === project.toLowerCase());
+        return sessions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, limit);
+      }
+      getSession(id) {
+        return this.data.sessions.find((s) => s.id === id) || null;
+      }
+      createSession({ project, summary, decisions = [], blockers = [], files_touched = [], tags = [] }) {
+        const session = {
+          id: this._id("sessions"),
+          project,
+          summary,
+          decisions,
+          blockers,
+          files_touched,
+          tags,
+          created_at: this._now()
+        };
+        this.data.sessions.push(session);
+        this._flush();
+        return session;
+      }
+      getSessionContext(project, limit = 5) {
+        const sessions = this.getSessions({ project, limit });
+        const tasks = this.data.tasks.filter((t) => t.status !== "done" && t.title.toLowerCase().includes(project.toLowerCase()));
+        return { sessions, activeTasks: tasks };
+      }
+      // ── Ledger ─────────────────────────────────────────────
+      getLedger({ project, tag, limit = 50 } = {}) {
+        let entries = [...this.data.ledger];
+        if (project) entries = entries.filter((e) => e.project.toLowerCase() === project.toLowerCase());
+        if (tag) entries = entries.filter((e) => (e.tags || []).includes(tag));
+        return entries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, limit);
+      }
+      recordDecision({ decision, context = "", project = "general", alternatives = [], tags = [] }) {
+        if (!this.data.ledger) this.data.ledger = [];
+        const entry = {
+          id: (this.data.ledger.length > 0 ? Math.max(...this.data.ledger.map((e) => e.id)) : 0) + 1,
+          decision,
+          context,
+          project,
+          alternatives,
+          tags,
+          created_at: this._now()
+        };
+        this.data.ledger.push(entry);
+        const linked = this._autoLinkDecision(entry);
+        this._flush();
+        return entry;
+      }
+      /** Auto-link a new decision to existing ones via semantic + keyword similarity. */
+      _autoLinkDecision(newDec) {
+        const linked = [];
+        if (this._pendingSemanticLinks < 3) {
+          this._pendingSemanticLinks++;
+          this._semanticAutoLink(newDec).catch(() => {
+          }).finally(() => {
+            this._pendingSemanticLinks--;
+          });
+        }
+        const newWords = this._significantWords(newDec.decision + " " + newDec.context);
+        if (newWords.size < 2) return linked;
+        for (const existing of this.data.ledger) {
+          if (existing.id === newDec.id || existing.deprecated) continue;
+          const existWords = this._significantWords(existing.decision + " " + (existing.context || ""));
+          let shared = 0;
+          for (const w of newWords) if (existWords.has(w)) shared++;
+          const similarity = shared / Math.max(newWords.size, 1);
+          if (similarity < 0.3) continue;
+          const alreadyLinked = this.data.graph_edges.some(
+            (e) => e.from === newDec.id && e.to === existing.id || e.from === existing.id && e.to === newDec.id
+          );
+          if (alreadyLinked) continue;
+          const edge = this.addEdge(
+            newDec.id,
+            existing.id,
+            "related",
+            `auto-linked (${Math.round(similarity * 100)}% keyword overlap)`
+          );
+          linked.push(edge);
+          if (linked.length >= 5) break;
+        }
+        return linked;
+      }
+      /** Semantic auto-link via embeddings (async, non-blocking). */
+      async _semanticAutoLink(newDec) {
+        const others = this.data.ledger.filter((d) => d.id !== newDec.id && !d.deprecated);
+        if (others.length === 0) return;
+        const queryText = `${newDec.decision} ${newDec.context || ""}`;
+        const candidateTexts = others.map((d) => `${d.decision} ${d.context || ""}`);
+        const similar = await findSimilar(queryText, candidateTexts, 5, 0.55);
+        for (const match of similar) {
+          const existing = others[match.index];
+          const alreadyLinked = this.data.graph_edges.some(
+            (e) => e.from === newDec.id && e.to === existing.id || e.from === existing.id && e.to === newDec.id
+          );
+          if (alreadyLinked) continue;
+          this.addEdge(
+            newDec.id,
+            existing.id,
+            "related",
+            `semantic-linked (${Math.round(match.similarity * 100)}% cosine similarity)`
+          );
+        }
+      }
+      /** Extract significant words (>3 chars, lowercased, deduped) from text. */
+      _significantWords(text) {
+        const stopwords = /* @__PURE__ */ new Set(["this", "that", "with", "from", "have", "been", "will", "should", "could", "would", "about", "into", "more", "also", "than", "them", "then", "each", "when", "which", "their", "does", "were", "what", "some", "other", "over", "only", "very", "just", "because", "through", "after", "before", "between", "under"]);
+        return new Set(
+          text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 3 && !stopwords.has(w))
+        );
+      }
+      // ── Knowledge Graph ────────────────────────────────────
+      addEdge(fromId, toId, relationship = "related", note = "") {
+        const exists = this.data.graph_edges.find((e) => e.from === fromId && e.to === toId && e.rel === relationship);
+        if (exists) return exists;
+        const edge = { id: this.data.graph_edges.length + 1, from: fromId, to: toId, rel: relationship, note, created_at: this._now() };
+        this.data.graph_edges.push(edge);
+        this._flush();
+        return edge;
+      }
+      removeEdge(id) {
+        const idx = this.data.graph_edges.findIndex((e) => e.id === id);
+        if (idx === -1) return null;
+        return this.data.graph_edges.splice(idx, 1)[0];
+      }
+      getEdgesFrom(id) {
+        return this.data.graph_edges.filter((e) => e.from === id);
+      }
+      getEdgesTo(id) {
+        return this.data.graph_edges.filter((e) => e.to === id);
+      }
+      getEdgesFor(id) {
+        return this.data.graph_edges.filter((e) => e.from === id || e.to === id);
+      }
+      traverse(startId, maxDepth = 3) {
+        const visited = /* @__PURE__ */ new Set();
+        const result = [];
+        const queue = [{ id: startId, depth: 0, path: [] }];
+        while (queue.length > 0) {
+          const { id, depth, path } = queue.shift();
+          if (visited.has(id) || depth > maxDepth) continue;
+          visited.add(id);
+          const decision = this.data.ledger.find((d) => d.id === id);
+          if (decision) result.push({ ...decision, depth, path });
+          for (const edge of this.getEdgesFor(id)) {
+            const nextId = edge.from === id ? edge.to : edge.from;
+            if (!visited.has(nextId)) queue.push({ id: nextId, depth: depth + 1, path: [...path, { edge: edge.rel, from: id, to: nextId }] });
+          }
+        }
+        return result;
+      }
+      getGraph() {
+        return {
+          nodes: this.data.ledger.map((d) => ({ id: d.id, label: d.decision.slice(0, 50), project: d.project, tags: d.tags || [] })),
+          edges: this.data.graph_edges.map((e) => ({ id: e.id, from: e.from, to: e.to, rel: e.rel, note: e.note }))
+        };
+      }
+      // ── Search ─────────────────────────────────────────────
+      search(query, limit = 30) {
+        const q = query.toLowerCase();
+        const results = [];
+        for (const t of this.data.tasks) {
+          if (t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q))
+            results.push({ type: "task", id: t.id, title: t.title, sub: t.status, score: t.title.toLowerCase().includes(q) ? 2 : 1, created_at: t.created_at });
+        }
+        for (const a of this.data.activity) {
+          if (a.message.toLowerCase().includes(q))
+            results.push({ type: "activity", id: a.id, title: a.message, sub: a.type, score: 1, created_at: a.created_at });
+        }
+        for (const l of this.data.ledger) {
+          if (l.decision.toLowerCase().includes(q) || l.context.toLowerCase().includes(q) || l.project.toLowerCase().includes(q))
+            results.push({ type: "decision", id: l.id, title: `[${l.project}] ${l.decision.slice(0, 80)}`, sub: l.project, score: 3, created_at: l.created_at });
+        }
+        for (const s of this.data.sessions) {
+          const match = s.summary.toLowerCase().includes(q) || s.project.toLowerCase().includes(q) || s.tags.some((t) => t.toLowerCase().includes(q));
+          if (match) results.push({ type: "session", id: s.id, title: `[${s.project}] ${s.summary.slice(0, 80)}`, sub: s.project, score: 2, created_at: s.created_at });
+        }
+        for (const p of this.data.scratchpads) {
+          if (p.name.toLowerCase().includes(q) || p.content.toLowerCase().includes(q))
+            results.push({ type: "scratchpad", id: p.id, title: p.name, sub: p.language, score: p.name.toLowerCase().includes(q) ? 2 : 1, created_at: p.updated_at });
+        }
+        return results.sort((a, b) => b.score - a.score || new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, limit);
+      }
+      // ── Advice Journal ─────────────────────────────────────
+      recordAdvice(opts) {
+        if (!this.data.advice) this.data.advice = [];
+        const hash2 = opts.recommendation.slice(0, 100).toLowerCase().replace(/\s+/g, " ").trim();
+        const oneHourAgo = Date.now() - 36e5;
+        const recentDuplicate = this.data.advice.find(
+          (a) => a.recommendation_hash === hash2 && new Date(a.created_at).getTime() > oneHourAgo
+        );
+        if (recentDuplicate) return null;
+        const snapshot = opts.context_snapshot ?? {
+          session_fuel: this.getLatestUsage()?.session_percent ?? null,
+          weekly_fuel: this.getLatestUsage()?.weekly_percent ?? null,
+          open_tasks: this.data.tasks.filter((t) => t.status !== "done").length,
+          in_progress_tasks: this.data.tasks.filter((t) => t.status === "in_progress").length,
+          recent_decisions: this.data.ledger.filter(
+            (d) => Date.now() - new Date(d.created_at).getTime() < 864e5
+          ).length
+        };
+        const entry = {
+          id: (this.data.advice.length > 0 ? Math.max(...this.data.advice.map((a) => a.id)) : 0) + 1,
+          created_at: this._now(),
+          source: opts.source,
+          question: opts.question,
+          recommendation: opts.recommendation,
+          recommendation_hash: hash2,
+          context_snapshot: snapshot,
+          accepted: null,
+          outcome: null,
+          notes: "",
+          measured_fuel_cost: null
+        };
+        this.data.advice.push(entry);
+        if (this.data.advice.length > 500) {
+          this.data.advice = this.data.advice.slice(-500);
+        }
+        this._flush();
+        return entry;
+      }
+      getAdvice(opts = {}) {
+        let entries = [...this.data.advice || []];
+        if (opts.source) entries = entries.filter((e) => e.source === opts.source);
+        if (opts.onlyUnjudged) entries = entries.filter((e) => e.accepted === null);
+        return entries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, opts.limit ?? 20);
+      }
+      updateAdviceVerdict(id, updates) {
+        const idx = (this.data.advice || []).findIndex((a) => a.id === id);
+        if (idx === -1) return null;
+        this.data.advice[idx] = { ...this.data.advice[idx], ...updates };
+        this._flush();
+        return this.data.advice[idx];
+      }
+      // Aggregate patterns: how often was Overseer right?
+      getAdvicePatterns() {
+        const all = this.data.advice || [];
+        const judged = all.filter((a) => a.accepted !== null);
+        const accepted = all.filter((a) => a.accepted === true);
+        const rejected = all.filter((a) => a.accepted === false);
+        const bySource = {};
+        for (const a of all) {
+          if (!bySource[a.source]) bySource[a.source] = { total: 0, accepted: 0, worked: 0, wrong: 0 };
+          bySource[a.source].total++;
+          if (a.accepted === true) bySource[a.source].accepted++;
+          if (a.outcome === "worked") bySource[a.source].worked++;
+          if (a.outcome === "wrong") bySource[a.source].wrong++;
+        }
+        const outcomes = {
+          worked: all.filter((a) => a.outcome === "worked").length,
+          partial: all.filter((a) => a.outcome === "partial").length,
+          wrong: all.filter((a) => a.outcome === "wrong").length
+        };
+        return {
+          total: all.length,
+          judged: judged.length,
+          unjudged: all.length - judged.length,
+          acceptanceRate: judged.length > 0 ? Math.round(accepted.length / judged.length * 100) : null,
+          accepted: accepted.length,
+          rejected: rejected.length,
+          outcomes,
+          accuracyRate: outcomes.worked + outcomes.partial + outcomes.wrong > 0 ? Math.round(outcomes.worked / (outcomes.worked + outcomes.partial + outcomes.wrong) * 100) : null,
+          bySource
+        };
+      }
+      // ── Thought Stack ──────────────────────────────────────
+      // Working memory for interrupt-recovery: push when distracted, pop when returning.
+      pushThought(opts) {
+        if (!this.data.thoughts) this.data.thoughts = [];
+        const thought = {
+          id: (this.data.thoughts.length > 0 ? Math.max(...this.data.thoughts.map((t) => t.id)) : 0) + 1,
+          text: opts.text,
+          context: opts.context ?? "",
+          project: opts.project ?? "general",
+          pushed_at: this._now(),
+          popped_at: null,
+          status: "active",
+          related_task_id: opts.related_task_id ?? null
+        };
+        this.data.thoughts.push(thought);
+        this._flush();
+        return thought;
+      }
+      popThought(id) {
+        const thoughts = this.data.thoughts || [];
+        let target;
+        if (id != null) {
+          target = thoughts.find((t) => t.id === id && t.status === "active");
+        } else {
+          const active = thoughts.filter((t) => t.status === "active");
+          target = active.sort((a, b) => new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime())[0];
+        }
+        if (!target) return null;
+        target.popped_at = this._now();
+        target.status = "resolved";
+        this._flush();
+        return target;
+      }
+      abandonThought(id, reason = "") {
+        const thought = (this.data.thoughts || []).find((t) => t.id === id);
+        if (!thought) return null;
+        thought.status = "abandoned";
+        thought.popped_at = this._now();
+        if (reason) thought.context = thought.context ? `${thought.context} | abandoned: ${reason}` : `abandoned: ${reason}`;
+        this._flush();
+        return thought;
+      }
+      getActiveThoughts(project) {
+        let thoughts = (this.data.thoughts || []).filter((t) => t.status === "active");
+        if (project) thoughts = thoughts.filter((t) => t.project.toLowerCase() === project.toLowerCase());
+        return thoughts.sort((a, b) => new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime());
+      }
+      getAllThoughts(opts = {}) {
+        let thoughts = [...this.data.thoughts || []];
+        if (opts.project) thoughts = thoughts.filter((t) => t.project.toLowerCase() === opts.project.toLowerCase());
+        if (opts.status) thoughts = thoughts.filter((t) => t.status === opts.status);
+        return thoughts.sort((a, b) => new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime()).slice(0, opts.limit ?? 50);
+      }
+      // ── Self-Critique: pattern detection on task completion times ─────
+      // Returns insights about which task types are slow / fast / stuck
+      getSelfCritique() {
+        const tasks = this.data.tasks || [];
+        const completed = tasks.filter(
+          (t) => t.status === "done" && t.created_at && t.updated_at && t.created_at !== t.updated_at
+        );
+        const withDuration = completed.map((t) => ({
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          minutes: Math.round((new Date(t.updated_at).getTime() - new Date(t.created_at).getTime()) / 6e4)
+        })).filter((t) => t.minutes >= 0 && t.minutes < 24 * 60);
+        if (withDuration.length === 0) {
+          return { slowTasks: [], fastTasks: [], stuckTasks: [], averageCompletionMinutes: null, insights: ["Insufficient data for self-critique. Complete more tasks."] };
+        }
+        const sorted = [...withDuration].sort((a, b) => b.minutes - a.minutes);
+        const avg = withDuration.reduce((s, t) => s + t.minutes, 0) / withDuration.length;
+        const stuck = tasks.filter((t) => t.status === "in_progress").map((t) => ({
+          id: t.id,
+          title: t.title,
+          ageHours: Math.round((Date.now() - new Date(t.created_at).getTime()) / 36e5)
+        })).filter((t) => t.ageHours > 24);
+        const insights = [];
+        insights.push(`Average completion time: ${Math.round(avg)} min across ${withDuration.length} completed tasks.`);
+        if (sorted.length >= 3) {
+          const slowest = sorted[0];
+          if (slowest.minutes > avg * 2) {
+            insights.push(`Slowest task (${slowest.minutes}m) was ${Math.round(slowest.minutes / avg)}x average \u2014 investigate what made it hard.`);
+          }
+        }
+        if (stuck.length > 0) {
+          insights.push(`${stuck.length} task${stuck.length > 1 ? "s" : ""} stuck in progress >24h. Either complete or abandon.`);
+        }
+        const byCategory = {};
+        for (const t of withDuration) {
+          const cat = this.categorizeTaskTitle(t.title);
+          if (!byCategory[cat]) byCategory[cat] = [];
+          byCategory[cat].push(t.minutes);
+        }
+        const categoryAvgs = Object.entries(byCategory).map(([cat, times]) => ({ cat, avg: times.reduce((s, t) => s + t, 0) / times.length, count: times.length })).filter((c) => c.count >= 2).sort((a, b) => b.avg - a.avg);
+        if (categoryAvgs.length > 0) {
+          const slowest = categoryAvgs[0];
+          insights.push(`Slowest category: "${slowest.cat}" averages ${Math.round(slowest.avg)}m (${slowest.count} samples).`);
+        }
+        return {
+          slowTasks: sorted.slice(0, 5),
+          fastTasks: sorted.slice(-5).reverse(),
+          stuckTasks: stuck,
+          averageCompletionMinutes: Math.round(avg),
+          insights
+        };
+      }
+      // Helper: categorize a task title (matches estimator categorization)
+      categorizeTaskTitle(title) {
+        const t = title.toLowerCase();
+        if (t.includes("typescript") || t.includes("migration") || t.includes("convert")) return "TypeScript/Migration";
+        if (t.includes("test") || t.includes("vitest")) return "Testing";
+        if (t.includes("fix") || t.includes("bug") || t.includes("patch")) return "Bug Fix";
+        if (t.includes("overseer") || t.includes("ai") || t.includes("llm")) return "AI/Overseer";
+        if (t.includes("graph") || t.includes("ledger") || t.includes("decision")) return "Knowledge Graph";
+        if (t.includes("search") || t.includes("embed")) return "Search";
+        if (t.includes("fuel") || t.includes("usage") || t.includes("estimator")) return "Fuel Management";
+        if (t.includes("git") || t.includes("commit") || t.includes("push")) return "Git Operations";
+        if (t.includes("dashboard") || t.includes("ui") || t.includes("widget")) return "Dashboard/UI";
+        if (t.includes("audit")) return "Audit";
+        return "Feature Build";
+      }
+      // ── Decision Guard: warn before creating redundant tasks ───────
+      // Returns existing similar work that might overlap with a proposed task title
+      checkForRedundancy(taskTitle) {
+        const lower = taskTitle.toLowerCase();
+        const words = lower.split(/\s+/).filter((w) => w.length > 3);
+        if (words.length === 0) {
+          return { similarTasks: [], relatedDecisions: [], pastSessions: [], warning: null };
+        }
+        const score = (text) => {
+          const t = text.toLowerCase();
+          let count = 0;
+          for (const w of words) {
+            if (t.includes(w)) count++;
+          }
+          return count / words.length;
+        };
+        const similarTasks = (this.data.tasks || []).map((t) => ({ id: t.id, title: t.title, status: t.status, similarity: score(t.title) })).filter((t) => t.similarity >= 0.4).sort((a, b) => b.similarity - a.similarity).slice(0, 5);
+        const relatedDecisions = (this.data.ledger || []).map((d) => ({ id: d.id, decision: d.decision, project: d.project, similarity: score(d.decision + " " + (d.context || "")) })).filter((d) => d.similarity >= 0.3).sort((a, b) => b.similarity - a.similarity).slice(0, 5).map(({ similarity, ...rest }) => rest);
+        const pastSessions = (this.data.sessions || []).map((s) => ({ id: s.id, project: s.project, summary: s.summary, similarity: score(s.summary + " " + s.tags.join(" ")) })).filter((s) => s.similarity >= 0.3).sort((a, b) => b.similarity - a.similarity).slice(0, 3).map(({ similarity, ...rest }) => rest);
+        let warning = null;
+        if (similarTasks.length > 0 && similarTasks[0].similarity >= 0.7) {
+          warning = `Very similar existing task: #${similarTasks[0].id} "${similarTasks[0].title}" (${similarTasks[0].status})`;
+        } else if (relatedDecisions.length > 0 || similarTasks.length > 0) {
+          warning = `Related work exists. Review before creating.`;
+        }
+        return { similarTasks, relatedDecisions, pastSessions, warning };
+      }
+    };
+  }
+});
+
+// server/mcp/localApi.ts
+var localApi_exports = {};
+__export(localApi_exports, {
+  detectAI: () => detectAI,
+  localApiFetch: () => localApiFetch,
+  store: () => store
+});
+import { mkdirSync, existsSync as existsSync3 } from "fs";
+import { join as join3 } from "path";
+import { homedir } from "os";
+async function detectAI() {
+  for (const ep of AI_ENDPOINTS) {
+    try {
+      const url2 = ep.type === "ollama" ? `${ep.base}/api/tags` : `${ep.base}/models`;
+      const res = await fetch(url2, { signal: AbortSignal.timeout(2e3) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const models = ep.type === "ollama" ? (data.models || []).map((m) => m.name) : (data.data || []).filter((m) => !m.id.includes("embed")).map((m) => m.id);
+      if (models.length === 0) continue;
+      return { available: true, provider: ep.name, base: ep.base, type: ep.type, model: models[0] };
+    } catch {
+    }
+  }
+  return { available: false };
+}
+async function localApiFetch(path, init = {}) {
+  const method = init.method || "GET";
+  const body = init.body ? JSON.parse(init.body) : {};
+  const [pathname, qs] = path.split("?");
+  const params = new URLSearchParams(qs || "");
+  if (pathname === "/api/tasks" && method === "GET") {
+    return store.getAllTasks();
+  }
+  if (pathname === "/api/tasks" && method === "POST") {
+    if (!body.title?.trim()) throw new Error("400: Task title required.");
+    const task = store.createTask({ title: body.title.trim(), description: body.description, status: body.status, priority: body.priority });
+    store.addActivity("task_created", `Plotted -- "${body.title}"`);
+    return task;
+  }
+  if (pathname.match(/^\/api\/tasks\/\d+$/) && method === "PATCH") {
+    const id = parseInt(pathname.split("/").pop());
+    const task = store.updateTask(id, body);
+    if (!task) throw new Error("404: Task not found.");
+    return task;
+  }
+  if (pathname.match(/^\/api\/tasks\/\d+$/) && method === "DELETE") {
+    const id = parseInt(pathname.split("/").pop());
+    const task = store.deleteTask(id);
+    if (!task) throw new Error("404: Task not found.");
+    return task;
+  }
+  if (pathname === "/api/activity" && method === "GET") {
+    const limit = Math.min(parseInt(params.get("limit") || "50"), 200);
+    return store.getActivity(limit);
+  }
+  if (pathname === "/api/activity" && method === "POST") {
+    return store.addActivity(body.type || "system", body.message || "");
+  }
+  if (pathname === "/api/sessions" && method === "GET") {
+    const project = params.get("project") || void 0;
+    const limit = Math.min(parseInt(params.get("limit") || "20"), 200);
+    return store.getSessions({ project, limit });
+  }
+  if (pathname === "/api/sessions" && method === "POST") {
+    if (!body.project || !body.summary) throw new Error("400: Project and summary required.");
+    const session = store.createSession(body);
+    store.addActivity("session", `Session logged -- [${body.project}] ${body.summary.slice(0, 60)}`);
+    return session;
+  }
+  if (pathname === "/api/ledger" && method === "GET") {
+    const project = params.get("project") || void 0;
+    const limit = parseInt(params.get("limit") || "50");
+    return store.getLedger({ project, limit });
+  }
+  if (pathname === "/api/ledger" && method === "POST") {
+    if (!body.decision?.trim()) throw new Error("400: Decision text required.");
+    const entry = store.recordDecision({ decision: body.decision, context: body.context || "", project: body.project || "general", tags: body.tags || [] });
+    store.addActivity("decision", `Decision recorded -- [${entry.project}] ${body.decision.slice(0, 60)}`);
+    return entry;
+  }
+  if (pathname === "/api/ledger/link" && method === "POST") {
+    return store.addEdge(body.from, body.to, body.rel || "related", body.note || "");
+  }
+  if (pathname === "/api/ledger/graph/full") {
+    return store.getGraph();
+  }
+  if (pathname === "/api/thoughts" && method === "GET") {
+    const project = params.get("project") || void 0;
+    return store.getActiveThoughts(project);
+  }
+  if (pathname === "/api/thoughts" && method === "POST") {
+    if (!body.text?.trim()) throw new Error("400: Thought text required.");
+    const thought = store.pushThought(body);
+    store.addActivity("thought", `Pushed thought: ${body.text.slice(0, 60)}`);
+    return thought;
+  }
+  if (pathname === "/api/thoughts/pop" && method === "POST") {
+    const thought = store.popThought(body.id);
+    if (!thought) throw new Error("404: No active thoughts to pop.");
+    store.addActivity("thought", `Popped thought #${thought.id}: ${thought.text.slice(0, 60)}`);
+    return thought;
+  }
+  if (pathname.match(/^\/api\/thoughts\/\d+\/abandon$/) && method === "PATCH") {
+    const id = parseInt(pathname.split("/")[3]);
+    const thought = store.abandonThought(id, body.reason || "");
+    if (!thought) throw new Error("404: Thought not found.");
+    return thought;
+  }
+  if (pathname === "/api/usage" && method === "POST") {
+    const entry = store.logUsage({ session_percent: body.session_percent, weekly_percent: body.weekly_percent, note: body.note });
+    return { ...entry, timing: {} };
+  }
+  if (pathname === "/api/estimator") {
+    const history = store.getUsage(50);
+    if (history.length === 0) return { tracked: false };
+    const latest = history[0];
+    return {
+      tracked: true,
+      reported: { session: latest.session_percent, weekly: latest.weekly_percent, at: latest.created_at },
+      estimated: { session: latest.session_percent, weekly: latest.weekly_percent, source: "reported" }
+    };
+  }
+  if (pathname === "/api/guard") {
+    const title = params.get("title") || "";
+    if (!title) throw new Error("400: title required.");
+    return store.checkForRedundancy(title);
+  }
+  if (pathname === "/api/critique") {
+    return store.getSelfCritique();
+  }
+  if (pathname === "/api/predict") {
+    return { suggestions: [] };
+  }
+  if (pathname === "/api/plan") {
+    return { error: "Plan requires AI (LM Studio). Run the full Nexus server for AI features." };
+  }
+  if (pathname === "/api/overseer/risks") {
+    const tasks = store.getAllTasks();
+    const usage = store.getLatestUsage();
+    const risks = [];
+    if (usage?.weekly_percent != null && usage.weekly_percent <= 10) {
+      risks.push({ level: "warning", message: `Weekly Claude usage at ${usage.weekly_percent}% \u2014 ration carefully` });
+    }
+    if (usage?.session_percent != null && usage.session_percent <= 15) {
+      risks.push({ level: "warning", message: `Session fuel low (${usage.session_percent}%) \u2014 consider wrapping up` });
+    }
+    return { risks };
+  }
+  if (pathname === "/api/overseer/ask" && method === "POST") {
+    const ai = await detectAI();
+    if (!ai.available) return { error: "No local AI available. Install LM Studio for Overseer features." };
+    return { error: "Overseer ask requires the full Nexus server. Use nexus_ask_overseer_start for async queries." };
+  }
+  if (pathname === "/api/search" || pathname === "/api/smart-search") {
+    const q = params.get("q") || "";
+    return store.search(q);
+  }
+  if (pathname === "/api/bookmarks" && method === "GET") return store.getAllBookmarks();
+  if (pathname === "/api/bookmarks" && method === "POST") return store.createBookmark(body);
+  if (pathname.match(/^\/api\/bookmarks\/\d+$/) && method === "DELETE") {
+    const id = parseInt(pathname.split("/").pop());
+    return store.deleteBookmark(id);
+  }
+  if (pathname.match(/^\/api\/impact\/blast\/\d+$/)) {
+    const id = parseInt(pathname.split("/").pop());
+    const decision = store.getDecisionById(id);
+    if (!decision) throw new Error("404: Decision not found.");
+    const edges = store.getEdgesFor(id);
+    return { decision, blastRadius: edges.length, affected: [], related: edges, warning: `${edges.length} connections.` };
+  }
+  if (pathname === "/api/impact/centrality") {
+    const decisions = store.getAllDecisions();
+    const edges = store.getAllEdges();
+    const centrality = decisions.map((d) => {
+      const total = edges.filter((e) => e.from === d.id || e.to === d.id).length;
+      return { id: d.id, decision: d.decision, project: d.project, total };
+    }).sort((a, b) => b.total - a.total);
+    return { centrality: centrality.slice(0, 20), averageConnections: centrality.length ? Math.round(centrality.reduce((s, c) => s + c.total, 0) / centrality.length * 10) / 10 : 0 };
+  }
+  if (pathname === "/api/status") return { status: "online", mode: "standalone" };
+  if (pathname === "/api/init") return { checks: {} };
+  throw new Error(`404: Unknown route ${method} ${pathname}`);
+}
+var NEXUS_HOME, NexusStore2, store, AI_ENDPOINTS;
+var init_localApi = __esm({
+  async "server/mcp/localApi.ts"() {
+    "use strict";
+    NEXUS_HOME = process.env.NEXUS_HOME || join3(homedir(), ".nexus");
+    if (!existsSync3(NEXUS_HOME)) mkdirSync(NEXUS_HOME, { recursive: true });
+    process.env.NEXUS_DB_PATH = process.env.NEXUS_DB_PATH || join3(NEXUS_HOME, "nexus.json");
+    ({ NexusStore: NexusStore2 } = await Promise.resolve().then(() => (init_store(), store_exports)));
+    store = new NexusStore2();
+    AI_ENDPOINTS = [
+      { name: "LM Studio", base: "http://localhost:1234/v1", type: "openai" },
+      { name: "Ollama", base: "http://localhost:11434", type: "ollama" }
+    ];
   }
 });
 
@@ -20827,15 +21829,32 @@ var StdioServerTransport = class {
 };
 
 // server/mcp/index.ts
+var STANDALONE = process.env.NEXUS_STANDALONE === "1";
 var NEXUS_BASE = process.env.NEXUS_BASE_URL || "http://localhost:3001";
 var SERVER_NAME = "nexus";
-var SERVER_VERSION = "3.3.0";
+var SERVER_VERSION = "4.0.0";
+var localApiFetch2 = null;
+if (STANDALONE) {
+  try {
+    const mod = await init_localApi().then(() => localApi_exports);
+    localApiFetch2 = mod.localApiFetch;
+    console.error("\u25C8 Standalone mode \u2014 using in-process NexusStore at", process.env.NEXUS_DB_PATH || "~/.nexus/nexus.json");
+  } catch (err) {
+    console.error("\u25C8 Failed to load standalone adapter:", err.message);
+  }
+}
 var SLOW_TOOLS = /* @__PURE__ */ new Set([
   "nexus_ask_overseer",
   "nexus_bridge_session"
 ]);
 var HEARTBEAT_INTERVAL_MS = 8e3;
 async function nexusFetch(path, init = {}) {
+  if (localApiFetch2) {
+    return localApiFetch2(path, {
+      method: init.method,
+      body: init.body ? typeof init.body === "string" ? init.body : JSON.stringify(init.body) : void 0
+    });
+  }
   let res;
   try {
     res = await fetch(`${NEXUS_BASE}${path}`, {
@@ -20844,7 +21863,7 @@ async function nexusFetch(path, init = {}) {
     });
   } catch (err) {
     throw new Error(
-      `Nexus server unreachable at ${NEXUS_BASE}. Start it with: cd C:/Projects/Nexus && npm run dev:server. (${err.message})`
+      `Nexus server unreachable at ${NEXUS_BASE}. Start with: nexus-dev.bat, or set NEXUS_STANDALONE=1 for direct mode. (${err.message})`
     );
   }
   if (!res.ok) {
@@ -21328,14 +22347,20 @@ async function handleTool(name, args) {
         nexusFetch("/api/overseer/risks").catch(() => ({ risks: [] }))
       ]);
       const projectLower = project.toLowerCase();
-      const KNOWN = ["nexus", "firewall-godot", "noosphere", "resonance godot", "resonance-godot", "shadowrun"];
+      const allProjects = /* @__PURE__ */ new Set();
+      for (const s of sessions) allProjects.add((s.project || "").toLowerCase());
+      for (const d of Array.isArray(ledger) ? ledger : []) allProjects.add((d.project || "").toLowerCase());
+      allProjects.delete("");
+      allProjects.delete("general");
       const inProject = (s) => {
         const t = (s || "").toLowerCase();
         if (t.includes(projectLower)) return true;
-        if (projectLower === "nexus") {
-          return !KNOWN.filter((p) => p !== "nexus").some((p) => t.includes(p));
+        const otherProjects = [...allProjects].filter((p) => p !== projectLower);
+        if (otherProjects.length > 0) {
+          const belongsToOther = otherProjects.some((p) => t.includes(p));
+          return !belongsToOther;
         }
-        return false;
+        return true;
       };
       const activeTasks = tasks.filter(
         (t) => t.status !== "done" && inProject(t.title)

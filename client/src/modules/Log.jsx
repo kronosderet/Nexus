@@ -15,6 +15,13 @@ const TYPE_CONFIG = {
   system: { icon: Settings, color: 'text-nexus-purple', label: 'System' },
   file_change: { icon: FileEdit, color: 'text-nexus-amber', label: 'Terrain shift' },
   error: { icon: AlertTriangle, color: 'text-nexus-red', label: 'Uncharted' },
+  auto_summary: { icon: BookOpen, color: 'text-nexus-green', label: 'Auto-summary' },
+  thought: { icon: AlertTriangle, color: 'text-nexus-purple', label: 'Thought' },
+  prompt: { icon: ScrollText, color: 'text-nexus-blue', label: 'Prompt' },
+  session: { icon: BookOpen, color: 'text-nexus-green', label: 'Session' },
+  decision: { icon: Compass, color: 'text-nexus-amber', label: 'Decision' },
+  predict: { icon: AlertTriangle, color: 'text-nexus-blue', label: 'Predict' },
+  deploy: { icon: CheckCircle2, color: 'text-nexus-green', label: 'Deploy' },
 };
 
 function formatTime(dateStr) { return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
