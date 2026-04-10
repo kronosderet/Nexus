@@ -406,6 +406,17 @@
       "linked_files": "[]",
       "created_at": "2026-04-10T11:29:29.142Z",
       "updated_at": "2026-04-10T11:32:04.460Z"
+    },
+    {
+      "id": 108,
+      "title": "Clean up public repo: update all .md files, remove stale files, audit what's tracked",
+      "description": "",
+      "status": "done",
+      "priority": 2,
+      "sort_order": 1,
+      "linked_files": "[]",
+      "created_at": "2026-04-10T11:57:19.683Z",
+      "updated_at": "2026-04-10T12:06:37.659Z"
     }
   ],
   "activity": [
@@ -1430,6 +1441,76 @@
       "message": "Landmark reached -- \"Fix fuel estimation: derive per-prompt and per-task cost from actual usage data\"",
       "meta": "{}",
       "created_at": "2026-04-10T11:32:04.463Z"
+    },
+    {
+      "id": 85662,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 10 files changed",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/f5/db2a5dc8152a71247fca1b6eafc83c0c5e8609\",\"path\":\"Nexus/.git/objects/f5/db2a5dc8152a71247fca1b6eafc83c0c5e8609\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/f3/e7beec428632bd6324ad14625c9930e19a4829\",\"path\":\"Nexus/.git/objects/f3/e7beec428632bd6324ad14625c9930e19a4829\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/f2/4f6c2a4bc1c6dbbf066b53fd1c84c3691dbdde\",\"path\":\"Nexus/.git/objects/f2/4f6c2a4bc1c6dbbf066b53fd1c84c3691dbdde\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/1d/66712626d4f5b443ef68255341d87cdb841f39\",\"path\":\"Nexus/.git/objects/1d/66712626d4f5b443ef68255341d87cdb841f39\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/f2/2f43237d7d9c5009518bd133d12afb0304e5f0\",\"path\":\"Nexus/.git/objects/f2/2f43237d7d9c5009518bd133d12afb0304e5f0\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/d5/863078671a0dc6704c99347863e81460b71459\",\"path\":\"Nexus/.git/objects/d5/863078671a0dc6704c99347863e81460b71459\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T11:53:41.614Z"
+    },
+    {
+      "id": 85663,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:54:00.300Z"
+    },
+    {
+      "id": 85664,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:54:00.313Z"
+    },
+    {
+      "id": 85665,
+      "type": "task_created",
+      "message": "Plotted -- \"Clean up public repo: update all .md files, remove stale files, audit what's tracked\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T11:57:19.686Z"
+    },
+    {
+      "id": 85666,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] CONCEPT.md modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"CONCEPT.md\",\"path\":\"Nexus/CONCEPT.md\"}]}",
+      "created_at": "2026-04-10T11:59:05.613Z"
+    },
+    {
+      "id": 85667,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] mcpb/README.md modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"mcpb/README.md\",\"path\":\"Nexus/mcpb/README.md\"}]}",
+      "created_at": "2026-04-10T11:59:41.571Z"
+    },
+    {
+      "id": 85668,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] tests/.test-nexus.json removed",
+      "meta": "{\"changes\":[{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"tests/.test-nexus.json\",\"path\":\"Nexus/tests/.test-nexus.json\"}]}",
+      "created_at": "2026-04-10T12:04:11.630Z"
+    },
+    {
+      "id": 85669,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] .git/index modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T12:06:15.893Z"
+    },
+    {
+      "id": 85670,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 2 files modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"tests/.test-nexus.json.bak.2\",\"path\":\"Nexus/tests/.test-nexus.json.bak.2\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"tests/.test-nexus.json.bak\",\"path\":\"Nexus/tests/.test-nexus.json.bak\"}]}",
+      "created_at": "2026-04-10T12:06:29.449Z"
+    },
+    {
+      "id": 85671,
+      "type": "task_done",
+      "message": "Landmark reached -- \"Clean up public repo: update all .md files, remove stale files, audit what's tracked\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:06:37.662Z"
     }
   ],
   "scratchpads": [
@@ -3721,6 +3802,24 @@
         "auto-summary"
       ],
       "created_at": "2026-04-10T11:25:04.890Z"
+    },
+    {
+      "id": 110,
+      "project": "nexus",
+      "summary": "Implemented a precise fuel estimation logic that calculates costs based on real-time per-prompt and per-task usage data.",
+      "decisions": [
+        "Shifted from static cost estimates to dynamic derivation from actual usage metrics",
+        "Standardized cost tracking at both the prompt and task granularities"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "cost-optimization",
+        "telemetry",
+        "v4.1",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T11:54:00.295Z"
     }
   ],
   "usage": [
@@ -4221,6 +4320,12 @@
       "weekly_percent": 83,
       "note": "checking nexus project status + planning next steps",
       "created_at": "2026-04-10T11:06:29.542Z"
+    },
+    {
+      "session_percent": 73,
+      "weekly_percent": 83,
+      "note": "cleaning up repo for public — update docs, remove stale files",
+      "created_at": "2026-04-10T11:57:18.264Z"
     }
   ],
   "gpu_history": [
@@ -9713,6 +9818,123 @@
       "temperature": 50,
       "power": 17.1,
       "created_at": "2026-04-10T11:53:20.039Z"
+    },
+    {
+      "gpu_util": 30,
+      "mem_util": 15,
+      "vram_used": 7750,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 16.4,
+      "created_at": "2026-04-10T11:54:20.063Z"
+    },
+    {
+      "gpu_util": 33,
+      "mem_util": 15,
+      "vram_used": 7708,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 16.41,
+      "created_at": "2026-04-10T11:55:20.048Z"
+    },
+    {
+      "gpu_util": 9,
+      "mem_util": 2,
+      "vram_used": 7797,
+      "vram_total": 8192,
+      "temperature": 53,
+      "power": 48.83,
+      "created_at": "2026-04-10T11:56:20.049Z"
+    },
+    {
+      "gpu_util": 13,
+      "mem_util": 2,
+      "vram_used": 7729,
+      "vram_total": 8192,
+      "temperature": 53,
+      "power": 50.4,
+      "created_at": "2026-04-10T11:57:20.058Z"
+    },
+    {
+      "gpu_util": 14,
+      "mem_util": 2,
+      "vram_used": 7758,
+      "vram_total": 8192,
+      "temperature": 54,
+      "power": 49.64,
+      "created_at": "2026-04-10T11:58:20.062Z"
+    },
+    {
+      "gpu_util": 30,
+      "mem_util": 14,
+      "vram_used": 7839,
+      "vram_total": 8192,
+      "temperature": 53,
+      "power": 24.74,
+      "created_at": "2026-04-10T11:59:20.072Z"
+    },
+    {
+      "gpu_util": 28,
+      "mem_util": 14,
+      "vram_used": 7820,
+      "vram_total": 8192,
+      "temperature": 53,
+      "power": 19.42,
+      "created_at": "2026-04-10T12:00:20.065Z"
+    },
+    {
+      "gpu_util": 33,
+      "mem_util": 15,
+      "vram_used": 7725,
+      "vram_total": 8192,
+      "temperature": 53,
+      "power": 18.25,
+      "created_at": "2026-04-10T12:01:20.075Z"
+    },
+    {
+      "gpu_util": 18,
+      "mem_util": 10,
+      "vram_used": 7724,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 19.01,
+      "created_at": "2026-04-10T12:02:20.080Z"
+    },
+    {
+      "gpu_util": 31,
+      "mem_util": 15,
+      "vram_used": 7724,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 19.07,
+      "created_at": "2026-04-10T12:03:20.083Z"
+    },
+    {
+      "gpu_util": 28,
+      "mem_util": 14,
+      "vram_used": 7713,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 18.88,
+      "created_at": "2026-04-10T12:04:20.085Z"
+    },
+    {
+      "gpu_util": 18,
+      "mem_util": 31,
+      "vram_used": 7725,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 17.3,
+      "created_at": "2026-04-10T12:05:20.087Z"
+    },
+    {
+      "gpu_util": 26,
+      "mem_util": 13,
+      "vram_used": 7714,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 21.04,
+      "created_at": "2026-04-10T12:06:20.086Z"
     }
   ],
   "_sessionTiming": {
