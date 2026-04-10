@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "nexus": {
+      "command": "node",
+      "args": ["${PLUGIN_DIR}/server/index.js"],
+      "env": {
+        "NEXUS_STANDALONE": "1"
+      }
+    }
+  }
+}
