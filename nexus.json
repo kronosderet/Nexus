@@ -290,78 +290,78 @@
       "id": 97,
       "title": "v4.1 [CMD-1] Always show session stats counters (done/review/active) even at 0 + show priority badges on task cards",
       "description": "Now panel: session stats grid only renders when doneToday > 0 || review > 0 — vanishes on fresh day. Always show (0 is valid data). Kanban: task.priority (0/1/2) exists in data but never displayed. Add color-coded priority dot or badge on TaskCard. Remove dead Fuel+Zap imports.",
-      "status": "backlog",
+      "status": "done",
       "priority": 2,
       "sort_order": 27,
       "linked_files": "[]",
       "created_at": "2026-04-10T10:24:39.689Z",
-      "updated_at": "2026-04-10T10:24:39.689Z"
+      "updated_at": "2026-04-10T10:31:59.512Z"
     },
     {
       "id": 98,
       "title": "v4.1 [CMD-2] Add project filter dropdown in Command header — scope all panels + kanban to one project",
       "description": "All tasks from all projects are mixed. Add a project selector in the header that filters tasks/backlog/done across both strategic and kanban views. Derive project list from task titles + sessions. 'All' as default option.",
-      "status": "backlog",
+      "status": "done",
       "priority": 2,
       "sort_order": 28,
       "linked_files": "[]",
       "created_at": "2026-04-10T10:24:42.976Z",
-      "updated_at": "2026-04-10T10:24:42.976Z"
+      "updated_at": "2026-04-10T10:32:00.200Z"
     },
     {
       "id": 99,
       "title": "v4.1 [CMD-3] Kanban: limit Done column to last 20 + add search/filter bar above columns",
       "description": "Done column shows all 93+ tasks ever. Limit to 20 most recent with 'show more' toggle. Add search input above the 4 columns that filters visible tasks by title. Status dots should be w-3 h-3 for mobile.",
-      "status": "backlog",
+      "status": "done",
       "priority": 2,
       "sort_order": 29,
       "linked_files": "[]",
       "created_at": "2026-04-10T10:24:45.782Z",
-      "updated_at": "2026-04-10T10:24:45.782Z"
+      "updated_at": "2026-04-10T10:32:00.214Z"
     },
     {
       "id": 100,
       "title": "v4.1 [CMD-4] Later panel: add sort controls (priority/date/title) + expand/collapse per project group",
       "description": "Currently 4-task cap per group, no sort, completely read-only. Add: sort toggle (priority desc, newest first, alpha). Expand/collapse per project group (default collapsed at 4, expand shows all). Add quick-action: click task → move to in_progress.",
-      "status": "backlog",
+      "status": "done",
       "priority": 1,
       "sort_order": 30,
       "linked_files": "[]",
       "created_at": "2026-04-10T10:24:47.758Z",
-      "updated_at": "2026-04-10T10:24:47.758Z"
+      "updated_at": "2026-04-10T10:37:21.537Z"
     },
     {
       "id": 101,
       "title": "v4.1 [CMD-5] Next panel: cache last plan in localStorage + make gap items actionable (create task from gap)",
       "description": "Plan is empty on every page load — user must click Plan each time. Cache the last AI plan in localStorage with timestamp so it persists across reloads. Show 'Generated Xm ago' label. Gaps: add a '+' button per gap to create a task from it directly.",
-      "status": "backlog",
+      "status": "done",
       "priority": 1,
       "sort_order": 31,
       "linked_files": "[]",
       "created_at": "2026-04-10T10:24:50.685Z",
-      "updated_at": "2026-04-10T10:24:50.685Z"
+      "updated_at": "2026-04-10T10:37:22.237Z"
     },
     {
       "id": 102,
       "title": "v4.1 [CMD-6] Done panel: show actual task duration (created→done) not just 'Xm ago' + fix critique to show today not all-time",
       "description": "Done panel shows 'Xm ago' (when finished) but not 'took Ym' (how long). Calculate created_at→updated_at duration. 'Took Longest' shows all-time slowest (#95 at 612m from weeks ago) — filter to this session or today. 24h window is arbitrary — use 'this session' as default.",
-      "status": "backlog",
+      "status": "done",
       "priority": 1,
       "sort_order": 32,
       "linked_files": "[]",
       "created_at": "2026-04-10T10:24:54.060Z",
-      "updated_at": "2026-04-10T10:24:54.060Z"
+      "updated_at": "2026-04-10T10:37:22.486Z"
     },
     {
       "id": 103,
       "title": "v4.1 [CMD-7] Delete confirmation dialog + progress bar per-task difficulty (not global avg)",
       "description": "Kanban delete button has no confirmation — one misclick deletes. Add a simple 'Are you sure?' or 2-click pattern. Progress bar in Now uses global 35m avg for all tasks — should estimate based on task title tags ([CRITICAL] = longer, fix: = shorter) using critique category patterns.",
-      "status": "backlog",
+      "status": "done",
       "priority": 0,
       "sort_order": 33,
       "linked_files": "[]",
       "created_at": "2026-04-10T10:24:58.047Z",
-      "updated_at": "2026-04-10T10:24:58.047Z"
+      "updated_at": "2026-04-10T10:37:22.790Z"
     }
   ],
   "activity": [
@@ -574,6 +574,251 @@
       "message": "Decision recorded -- [Nexus] v4.1 scope: 7 Command module fixes queued (#97-#103). Priori",
       "meta": "{}",
       "created_at": "2026-04-10T10:25:28.806Z"
+    },
+    {
+      "id": 85546,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 8 files changed",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/8a/1726dfae206e7e3e3bce2ff523e76d572ce32f\",\"path\":\"Nexus/.git/objects/8a/1726dfae206e7e3e3bce2ff523e76d572ce32f\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/cc/4d5e10e034195e081981d1feb78f613e178bd2\",\"path\":\"Nexus/.git/objects/cc/4d5e10e034195e081981d1feb78f613e178bd2\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/8d/b2b08d06acd811c9fdf3eb966f7d3810f5f971\",\"path\":\"Nexus/.git/objects/8d/b2b08d06acd811c9fdf3eb966f7d3810f5f971\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/d9/a4d92f86e7b49e6e65d2016879de7ef6e9bde2\",\"path\":\"Nexus/.git/objects/d9/a4d92f86e7b49e6e65d2016879de7ef6e9bde2\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T10:25:45.599Z"
+    },
+    {
+      "id": 85547,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:26:11.911Z"
+    },
+    {
+      "id": 85548,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:26:11.922Z"
+    },
+    {
+      "id": 85549,
+      "type": "thought",
+      "message": "Pushed thought: Session ended with 1 task(s) still in progress: #96 v4.0 Pre",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:26:11.932Z"
+    },
+    {
+      "id": 85550,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:29:17.308Z"
+    },
+    {
+      "id": 85551,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:29:32.781Z"
+    },
+    {
+      "id": 85552,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:29:51.750Z"
+    },
+    {
+      "id": 85553,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:30:05.531Z"
+    },
+    {
+      "id": 85554,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:30:20.534Z"
+    },
+    {
+      "id": 85555,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:30:41.840Z"
+    },
+    {
+      "id": 85556,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:31:05.330Z"
+    },
+    {
+      "id": 85557,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:31:19.372Z"
+    },
+    {
+      "id": 85558,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:31:36.772Z"
+    },
+    {
+      "id": 85559,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 5 files changed",
+      "meta": "{\"changes\":[{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-BJ3wJwoM.js\",\"path\":\"Nexus/client/dist/assets/index-BJ3wJwoM.js\"},{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-CsIYYOyy.css\",\"path\":\"Nexus/client/dist/assets/index-CsIYYOyy.css\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-C0zAWvMO.css\",\"path\":\"Nexus/client/dist/assets/index-C0zAWvMO.css\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-0DWnWZgd.js\",\"path\":\"Nexus/client/dist/assets/index-0DWnWZgd.js\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/dist/index.html\",\"path\":\"Nexus/client/dist/index.html\"}]}",
+      "created_at": "2026-04-10T10:31:51.907Z"
+    },
+    {
+      "id": 85560,
+      "type": "task_done",
+      "message": "Landmark reached -- \"v4.1 [CMD-1] Always show session stats counters (done/review/active) even at 0 + show priority badges on task cards\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:31:59.515Z"
+    },
+    {
+      "id": 85561,
+      "type": "task_done",
+      "message": "Landmark reached -- \"v4.1 [CMD-2] Add project filter dropdown in Command header — scope all panels + kanban to one project\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:32:00.203Z"
+    },
+    {
+      "id": 85562,
+      "type": "task_done",
+      "message": "Landmark reached -- \"v4.1 [CMD-3] Kanban: limit Done column to last 20 + add search/filter bar above columns\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:32:00.217Z"
+    },
+    {
+      "id": 85563,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 10 files changed",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/85/229e4728e5f9f3d76a17f595ab78fc34b95c43\",\"path\":\"Nexus/.git/objects/85/229e4728e5f9f3d76a17f595ab78fc34b95c43\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/66/e23feb1ccadd1b16d88a5efd0f9674c0e38ba6\",\"path\":\"Nexus/.git/objects/66/e23feb1ccadd1b16d88a5efd0f9674c0e38ba6\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/04/d9d48f298e87a85c9eead100a0ed38637f719d\",\"path\":\"Nexus/.git/objects/04/d9d48f298e87a85c9eead100a0ed38637f719d\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/59/cc46bf0ab9546204cf60e126da413d486d13b3\",\"path\":\"Nexus/.git/objects/59/cc46bf0ab9546204cf60e126da413d486d13b3\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/f5/506663504fe1355707548a08960c77630f241b\",\"path\":\"Nexus/.git/objects/f5/506663504fe1355707548a08960c77630f241b\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/8e/a9df356be9e5b296636076df6c97361cee4e33\",\"path\":\"Nexus/.git/objects/8e/a9df356be9e5b296636076df6c97361cee4e33\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T10:33:02.834Z"
+    },
+    {
+      "id": 85564,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:33:42.118Z"
+    },
+    {
+      "id": 85565,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:33:42.128Z"
+    },
+    {
+      "id": 85566,
+      "type": "thought",
+      "message": "Pushed thought: Session ended with 1 task(s) still in progress: #96 v4.0 Pre",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:33:42.139Z"
+    },
+    {
+      "id": 85567,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:34:49.315Z"
+    },
+    {
+      "id": 85568,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:35:03.030Z"
+    },
+    {
+      "id": 85569,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:35:20.110Z"
+    },
+    {
+      "id": 85570,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:35:38.254Z"
+    },
+    {
+      "id": 85571,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:36:02.432Z"
+    },
+    {
+      "id": 85572,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:36:15.445Z"
+    },
+    {
+      "id": 85573,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:36:27.485Z"
+    },
+    {
+      "id": 85574,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:36:42.021Z"
+    },
+    {
+      "id": 85575,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:36:59.416Z"
+    },
+    {
+      "id": 85576,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 5 files changed",
+      "meta": "{\"changes\":[{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-0DWnWZgd.js\",\"path\":\"Nexus/client/dist/assets/index-0DWnWZgd.js\"},{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-C0zAWvMO.css\",\"path\":\"Nexus/client/dist/assets/index-C0zAWvMO.css\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-C8r-nV8k.css\",\"path\":\"Nexus/client/dist/assets/index-C8r-nV8k.css\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/dist/index.html\",\"path\":\"Nexus/client/dist/index.html\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-BZqrfkdq.js\",\"path\":\"Nexus/client/dist/assets/index-BZqrfkdq.js\"}]}",
+      "created_at": "2026-04-10T10:37:11.023Z"
+    },
+    {
+      "id": 85577,
+      "type": "task_done",
+      "message": "Landmark reached -- \"v4.1 [CMD-4] Later panel: add sort controls (priority/date/title) + expand/collapse per project group\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:37:21.539Z"
+    },
+    {
+      "id": 85578,
+      "type": "task_done",
+      "message": "Landmark reached -- \"v4.1 [CMD-5] Next panel: cache last plan in localStorage + make gap items actionable (create task from gap)\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:37:22.240Z"
+    },
+    {
+      "id": 85579,
+      "type": "task_done",
+      "message": "Landmark reached -- \"v4.1 [CMD-6] Done panel: show actual task duration (created→done) not just 'Xm ago' + fix critique to show today not all-time\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:37:22.489Z"
+    },
+    {
+      "id": 85580,
+      "type": "task_done",
+      "message": "Landmark reached -- \"v4.1 [CMD-7] Delete confirmation dialog + progress bar per-task difficulty (not global avg)\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:37:22.793Z"
     }
   ],
   "scratchpads": [
@@ -2574,6 +2819,45 @@
         "command-audit"
       ],
       "created_at": "2026-04-10T10:25:24.163Z"
+    },
+    {
+      "id": 95,
+      "project": "nexus",
+      "summary": "Finalized the transition from v3.6 to v4.0 and established the development roadmap for v4.1 focused on Command module debt reduction.",
+      "decisions": [
+        "Prioritized v4.1 scope into P2 quick wins, P1 structural improvements, and P0 polish",
+        "Queued 7 specific Command module fixes (#97-#103) for the next development cycle",
+        "Defined session stats visibility and project filtering as immediate priority targets"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "v4.1-roadmap",
+        "frontend-refactor",
+        "command-module",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T10:26:11.908Z"
+    },
+    {
+      "id": 96,
+      "project": "nexus",
+      "summary": "Implemented core UI enhancements for the Command module in v4.1, including persistent session statistics, project-wide filtering, and Kanban board optimizations.",
+      "decisions": [
+        "Enforce zero-state visibility for session counters (done/review/active)",
+        "Implement global project scoping via a new header dropdown",
+        "Restrict 'Done' column capacity to the 20 most recent items to maintain performance",
+        "Introduce search and filter capabilities directly above Kanban columns"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "v4.1",
+        "Command Module",
+        "UI/UX Refactor",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T10:33:42.115Z"
     }
   ],
   "usage": [
@@ -3050,6 +3334,18 @@
       "weekly_percent": 83,
       "note": "queuing full Command audit fixes + planning with nexus",
       "created_at": "2026-04-10T10:24:36.409Z"
+    },
+    {
+      "session_percent": 21,
+      "weekly_percent": 85,
+      "note": "new session window — checking nexus plan + starting v4.1 implementation",
+      "created_at": "2026-04-10T10:28:36.907Z"
+    },
+    {
+      "session_percent": 19,
+      "weekly_percent": 85,
+      "note": "continuing v4.1 P1 tasks",
+      "created_at": "2026-04-10T10:34:03.117Z"
     }
   ],
   "gpu_history": [
@@ -7741,6 +8037,123 @@
       "temperature": 50,
       "power": 18.98,
       "created_at": "2026-04-10T10:25:41.054Z"
+    },
+    {
+      "gpu_util": 30,
+      "mem_util": 15,
+      "vram_used": 7833,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 16.83,
+      "created_at": "2026-04-10T10:26:41.058Z"
+    },
+    {
+      "gpu_util": 27,
+      "mem_util": 14,
+      "vram_used": 7776,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 17.01,
+      "created_at": "2026-04-10T10:27:41.091Z"
+    },
+    {
+      "gpu_util": 18,
+      "mem_util": 10,
+      "vram_used": 7797,
+      "vram_total": 8192,
+      "temperature": 54,
+      "power": 20.53,
+      "created_at": "2026-04-10T10:28:41.071Z"
+    },
+    {
+      "gpu_util": 34,
+      "mem_util": 22,
+      "vram_used": 7786,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 18.61,
+      "created_at": "2026-04-10T10:29:41.083Z"
+    },
+    {
+      "gpu_util": 24,
+      "mem_util": 9,
+      "vram_used": 7808,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 18.45,
+      "created_at": "2026-04-10T10:30:41.082Z"
+    },
+    {
+      "gpu_util": 34,
+      "mem_util": 21,
+      "vram_used": 7784,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 17.69,
+      "created_at": "2026-04-10T10:31:41.084Z"
+    },
+    {
+      "gpu_util": 37,
+      "mem_util": 22,
+      "vram_used": 7804,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 17.87,
+      "created_at": "2026-04-10T10:32:41.082Z"
+    },
+    {
+      "gpu_util": 24,
+      "mem_util": 8,
+      "vram_used": 7798,
+      "vram_total": 8192,
+      "temperature": 55,
+      "power": 51.54,
+      "created_at": "2026-04-10T10:33:41.124Z"
+    },
+    {
+      "gpu_util": 26,
+      "mem_util": 14,
+      "vram_used": 7819,
+      "vram_total": 8192,
+      "temperature": 46,
+      "power": 15.71,
+      "created_at": "2026-04-10T10:34:41.096Z"
+    },
+    {
+      "gpu_util": 14,
+      "mem_util": 10,
+      "vram_used": 7796,
+      "vram_total": 8192,
+      "temperature": 48,
+      "power": 43.4,
+      "created_at": "2026-04-10T10:35:41.106Z"
+    },
+    {
+      "gpu_util": 13,
+      "mem_util": 15,
+      "vram_used": 7812,
+      "vram_total": 8192,
+      "temperature": 48,
+      "power": 14.11,
+      "created_at": "2026-04-10T10:36:41.125Z"
+    },
+    {
+      "gpu_util": 1,
+      "mem_util": 32,
+      "vram_used": 7788,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 15.62,
+      "created_at": "2026-04-10T10:37:41.138Z"
+    },
+    {
+      "gpu_util": 23,
+      "mem_util": 23,
+      "vram_used": 7826,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 18.8,
+      "created_at": "2026-04-10T10:38:41.139Z"
     }
   ],
   "_sessionTiming": {
@@ -10619,6 +11032,26 @@
       "context": "auto-pushed by session-stop hook for Projects",
       "project": "Projects",
       "pushed_at": "2026-04-10T10:23:03.326Z",
+      "popped_at": null,
+      "status": "active",
+      "related_task_id": null
+    },
+    {
+      "id": 5,
+      "text": "Session ended with 1 task(s) still in progress: #96 v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files",
+      "context": "auto-pushed by session-stop hook for nexus",
+      "project": "nexus",
+      "pushed_at": "2026-04-10T10:26:11.929Z",
+      "popped_at": null,
+      "status": "active",
+      "related_task_id": null
+    },
+    {
+      "id": 6,
+      "text": "Session ended with 1 task(s) still in progress: #96 v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files",
+      "context": "auto-pushed by session-stop hook for nexus",
+      "project": "nexus",
+      "pushed_at": "2026-04-10T10:33:42.136Z",
       "popped_at": null,
       "status": "active",
       "related_task_id": null

@@ -112,10 +112,21 @@ export default function Command({ ws }) {
 
   async function fetchPlan() {
     setLoadingPlan(true);
-    try { setPlan(await api.getPlan()); } catch {} finally { setLoadingPlan(false); }
+    try {
+      const p = await api.getPlan();
+      setPlan(p);
+      try { localStorage.setItem('nexus-plan-cache', JSON.stringify(p)); } catch {}
+    } catch {} finally { setLoadingPlan(false); }
   }
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    fetchAll();
+    // Restore cached plan so Next panel isn't empty on load
+    try {
+      const cached = localStorage.getItem('nexus-plan-cache');
+      if (cached) setPlan(JSON.parse(cached));
+    } catch {}
+  }, []);
 
   useEffect(() => {
     if (!ws?.subscribe) return;
@@ -250,6 +261,7 @@ export default function Command({ ws }) {
           thoughts={thoughts} plan={plan} predict={predict} critique={critique}
           fuel={fuel} workload={workload} recentActivity={recentActivity}
           loadingPlan={loadingPlan} onRefreshPlan={fetchPlan} onRefresh={fetchAll}
+          onUpdate={handleUpdate}
         />
       ) : (
         <KanbanView
@@ -284,6 +296,16 @@ function EmptyState({ icon: Icon, message }) {
   return <div className="text-center py-4 text-nexus-text-faint"><Icon size={14} className="mx-auto mb-1.5 opacity-40" /><p className="text-[10px] font-mono">{message}</p></div>;
 }
 
+function estimateMinutes(title, globalAvg = 35) {
+  const t = (title || '').toLowerCase();
+  if (t.includes('critical') || t.includes('major') || t.includes('refactor') || t.includes('rewrite')) return Math.round(globalAvg * 2.5);
+  if (t.includes('phase') || t.includes('audit') || t.includes('restructure')) return Math.round(globalAvg * 2);
+  if (t.includes('important') || t.includes('feature') || t.includes('build')) return Math.round(globalAvg * 1.3);
+  if (t.includes('fix') || t.includes('polish') || t.includes('update') || t.includes('bump')) return Math.round(globalAvg * 0.5);
+  if (t.includes('typo') || t.includes('rename') || t.includes('cleanup')) return Math.round(globalAvg * 0.3);
+  return globalAvg;
+}
+
 function elapsedSince(iso) {
   if (!iso) return '';
   const ms = Date.now() - new Date(iso).getTime();
@@ -293,7 +315,52 @@ function elapsedSince(iso) {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predict, critique, fuel, workload, recentActivity, loadingPlan, onRefreshPlan }) {
+function LaterPanel({ backlog, onUpdate }) {
+  const [expanded, setExpanded] = useState({});
+  const toggle = (p) => setExpanded(prev => ({ ...prev, [p]: !prev[p] }));
+
+  return (
+    <Panel title="Later" icon={Layers} accent="text-nexus-purple" count={backlog.length}>
+      {backlog.length === 0 ? <EmptyState icon={Package} message="Empty backlog." /> : (
+        <div className="space-y-3">
+          {groupByProject(backlog).map(([project, tasks]) => {
+            const isExpanded = expanded[project];
+            const visible = isExpanded ? tasks : tasks.slice(0, 4);
+            return (
+              <div key={project}>
+                <button onClick={() => toggle(project)} className="flex items-center gap-2 mb-1 w-full text-left">
+                  <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-nexus-purple/10 text-nexus-purple border border-nexus-purple/20">{project}</span>
+                  <span className="text-[10px] font-mono text-nexus-text-faint">{tasks.length}</span>
+                  <span className="text-[9px] text-nexus-text-faint ml-auto">{isExpanded ? '▾' : '▸'}</span>
+                </button>
+                {visible.map(t => {
+                  const prio = PRIORITY_STYLE[t.priority] || PRIORITY_STYLE[0];
+                  return (
+                    <div key={t.id} className="flex items-center gap-2 px-2 py-1 rounded text-xs text-nexus-text-dim hover:bg-nexus-bg/50 group">
+                      {prio.label && <span className={`text-[7px] font-mono ${prio.text}`}>{prio.label}</span>}
+                      <span className="flex-1 min-w-0 truncate">{t.title}</span>
+                      <button onClick={() => onUpdate(t.id, { status: 'in_progress' })}
+                        className="opacity-0 group-hover:opacity-100 text-[9px] font-mono text-nexus-amber hover:text-nexus-text transition-all" title="Start working">
+                        Start
+                      </button>
+                    </div>
+                  );
+                })}
+                {!isExpanded && tasks.length > 4 && (
+                  <button onClick={() => toggle(project)} className="text-[10px] font-mono text-nexus-text-faint pl-4 hover:text-nexus-amber">
+                    +{tasks.length - 4} more
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predict, critique, fuel, workload, recentActivity, loadingPlan, onRefreshPlan, onUpdate }) {
   const gaps = predict?.suggestions || [];
   const planTasks = parsePlanTasks(plan?.aiPlan);
   const focus = planFocus(plan?.aiPlan);
@@ -315,9 +382,9 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
             <div className="space-y-2">
               {inProgress.map(t => {
                 const elapsed = elapsedSince(t.updated_at);
-                const avgMin = critique?.averageCompletionMinutes || 35;
+                const estMin = estimateMinutes(t.title, critique?.averageCompletionMinutes || 35);
                 const elapsedMin = t.updated_at ? Math.floor((Date.now() - new Date(t.updated_at).getTime()) / 60000) : 0;
-                const progress = Math.min(95, Math.round((elapsedMin / avgMin) * 100));
+                const progress = Math.min(95, Math.round((elapsedMin / estMin) * 100));
                 return (
                   <div key={t.id} className="px-2.5 py-2.5 rounded-lg bg-nexus-amber/5 border border-nexus-amber/20">
                     <div className="flex items-start gap-2">
@@ -327,8 +394,8 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
                         {t.description && <p className="text-[10px] font-mono text-nexus-text-faint line-clamp-1 mt-0.5">{t.description}</p>}
                         <div className="flex gap-3 mt-1.5 text-[9px] font-mono text-nexus-text-faint">
                           {elapsed && <span className="flex items-center gap-1"><Clock size={8} /> {elapsed}</span>}
-                          <span>~{avgMin}m avg</span>
-                          {fuel?.rates?.sessionPerHour > 0 && <span>~{Math.round(avgMin * fuel.rates.sessionPerHour / 60)}% fuel est.</span>}
+                          <span>~{estMin}m est.</span>
+                          {fuel?.rates?.sessionPerHour > 0 && <span>~{Math.round(estMin * fuel.rates.sessionPerHour / 60)}% fuel</span>}
                         </div>
                         {/* Progress bar based on avg completion time */}
                         <div className="h-1 bg-nexus-bg rounded-full overflow-hidden mt-1.5">
@@ -416,17 +483,18 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
         )}
       </Panel>
 
-      {/* NEXT */}
+      {/* NEXT — with localStorage plan cache (#101) */}
       <Panel title="Next" icon={TrendingUp} accent="text-nexus-blue" count={planTasks.length + gaps.length}>
         <div className="flex items-center justify-between mb-1">
           <span className="text-[10px] font-mono text-nexus-text-faint flex items-center gap-1"><Sparkles size={9} /> Session Plan</span>
           <button onClick={onRefreshPlan} disabled={loadingPlan} className="text-[10px] font-mono text-nexus-text-faint hover:text-nexus-amber disabled:opacity-40 flex items-center gap-1">
-            {loadingPlan ? <Loader2 size={9} className="animate-spin" /> : <RefreshCw size={9} />} Plan
+            {loadingPlan ? <Loader2 size={9} className="animate-spin" /> : <RefreshCw size={9} />} {plan ? 'Refresh' : 'Plan'}
           </button>
         </div>
         {!plan ? <EmptyState icon={Sparkles} message="Click Plan to generate." /> : (
           <>
             {focus && <p className="text-xs text-nexus-blue italic mb-2 px-2 py-1 bg-nexus-blue/5 border border-nexus-blue/20 rounded">{focus}</p>}
+            {plan.generatedAt && <p className="text-[9px] font-mono text-nexus-text-faint mb-1">Generated {minutesAgo(plan.generatedAt)}</p>}
             <ol className="space-y-1">
               {planTasks.map((t, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs text-nexus-text-dim px-2 py-1 rounded hover:bg-nexus-bg/50">
@@ -441,65 +509,67 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
           <div className="pt-2 mt-2 border-t border-nexus-border">
             <span className="text-[10px] font-mono text-nexus-text-faint mb-1 block"><AlertTriangle size={9} className="inline mr-1" />Gaps ({gaps.length})</span>
             {gaps.slice(0, 4).map((g, i) => (
-              <div key={i} className="px-2 py-1 rounded border border-nexus-border mb-1">
-                <span className={`text-[9px] font-mono uppercase ${CATEGORY_COLOR[g.category] || 'text-nexus-text-faint'}`}>{CATEGORY_LABEL[g.category] || g.category}</span>
-                <p className="text-xs text-nexus-text-dim truncate">{g.title}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </Panel>
-
-      {/* LATER */}
-      <Panel title="Later" icon={Layers} accent="text-nexus-purple" count={backlog.length}>
-        {backlog.length === 0 ? <EmptyState icon={Package} message="Empty backlog." /> : (
-          <div className="space-y-3">
-            {groupByProject(backlog).map(([project, tasks]) => (
-              <div key={project}>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-nexus-purple/10 text-nexus-purple border border-nexus-purple/20">{project}</span>
-                  <span className="text-[10px] font-mono text-nexus-text-faint">{tasks.length}</span>
+              <div key={i} className="flex items-center gap-1 px-2 py-1 rounded border border-nexus-border mb-1">
+                <div className="flex-1 min-w-0">
+                  <span className={`text-[9px] font-mono uppercase ${CATEGORY_COLOR[g.category] || 'text-nexus-text-faint'}`}>{CATEGORY_LABEL[g.category] || g.category}</span>
+                  <p className="text-xs text-nexus-text-dim truncate">{g.title}</p>
                 </div>
-                {tasks.slice(0, 4).map(t => (
-                  <div key={t.id} className="flex items-start gap-2 px-2 py-1 rounded text-xs text-nexus-text-dim hover:bg-nexus-bg/50">
-                    <ArrowRight size={10} className="text-nexus-text-faint mt-0.5 shrink-0" />
-                    <span className="flex-1 min-w-0 truncate">{t.title}</span>
-                  </div>
-                ))}
-                {tasks.length > 4 && <p className="text-[10px] font-mono text-nexus-text-faint pl-4">+{tasks.length - 4} more</p>}
+                <button onClick={() => { api.createTask({ title: g.title, description: g.reason, priority: g.priority || 1 }).catch(() => {}); }}
+                  className="text-nexus-text-faint hover:text-nexus-amber shrink-0" title="Create task from gap"><Plus size={10} /></button>
               </div>
             ))}
           </div>
         )}
       </Panel>
 
-      {/* DONE */}
+      {/* LATER — with expand/collapse + start action (#100) */}
+      <LaterPanel backlog={backlog} onUpdate={handleUpdate} />
+
+      {/* DONE — with actual duration + today's stats (#102) */}
       <Panel title="Done" icon={CheckCircle2} accent="text-nexus-amber" count={recentDone.length}>
-        {recentDone.length === 0 ? <EmptyState icon={CheckCircle2} message="Nothing completed in last 24h." /> : (
+        {recentDone.length === 0 ? <EmptyState icon={CheckCircle2} message="Nothing completed recently." /> : (
           <div className="space-y-1">
-            {recentDone.slice(0, 6).map(t => (
-              <div key={t.id} className="flex items-start gap-2 px-2 py-1 rounded hover:bg-nexus-bg/50">
-                <CheckCircle2 size={10} className="text-nexus-green mt-0.5 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-nexus-text-dim truncate">{t.title}</p>
-                  <p className="text-[9px] font-mono text-nexus-text-faint">{minutesAgo(t.updated_at)}</p>
+            {recentDone.slice(0, 8).map(t => {
+              // Calculate actual duration: created_at → updated_at
+              const dur = (t.created_at && t.updated_at)
+                ? Math.round((new Date(t.updated_at).getTime() - new Date(t.created_at).getTime()) / 60000)
+                : null;
+              return (
+                <div key={t.id} className="flex items-start gap-2 px-2 py-1 rounded hover:bg-nexus-bg/50">
+                  <CheckCircle2 size={10} className="text-nexus-green mt-0.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-nexus-text-dim truncate">{t.title}</p>
+                    <div className="flex gap-2 text-[9px] font-mono text-nexus-text-faint">
+                      <span>{minutesAgo(t.updated_at)}</span>
+                      {dur != null && dur > 0 && <span>· took {dur < 60 ? `${dur}m` : `${Math.floor(dur/60)}h ${dur%60}m`}</span>}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
-        {critique?.slowTasks?.length > 0 && (
-          <div className="pt-2 mt-2 border-t border-nexus-border">
-            <span className="text-[10px] font-mono text-nexus-text-faint flex items-center gap-1 mb-1"><Clock size={9} /> Took Longest</span>
-            {critique.slowTasks.filter(t => t.status === 'done').slice(0, 3).map(t => (
-              <div key={t.id} className="flex items-center gap-2 text-[11px] font-mono">
-                <span className="text-nexus-amber shrink-0">⏱</span>
-                <span className="text-nexus-text-dim truncate flex-1">{t.title}</span>
-                <span className="text-nexus-text-faint shrink-0">{t.minutes}m</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Today's slowest (not all-time) */}
+        {(() => {
+          const today = new Date().toDateString();
+          const todayDone = done
+            .filter(t => t.updated_at && t.created_at && new Date(t.updated_at).toDateString() === today)
+            .map(t => ({ ...t, dur: Math.round((new Date(t.updated_at).getTime() - new Date(t.created_at).getTime()) / 60000) }))
+            .filter(t => t.dur > 0)
+            .sort((a, b) => b.dur - a.dur);
+          return todayDone.length > 1 ? (
+            <div className="pt-2 mt-2 border-t border-nexus-border">
+              <span className="text-[10px] font-mono text-nexus-text-faint flex items-center gap-1 mb-1"><Clock size={9} /> Slowest Today</span>
+              {todayDone.slice(0, 3).map(t => (
+                <div key={t.id} className="flex items-center gap-2 text-[11px] font-mono">
+                  <span className="text-nexus-amber shrink-0">⏱</span>
+                  <span className="text-nexus-text-dim truncate flex-1">{t.title}</span>
+                  <span className="text-nexus-text-faint shrink-0">{t.dur}m</span>
+                </div>
+              ))}
+            </div>
+          ) : null;
+        })()}
       </Panel>
     </div>
   );
