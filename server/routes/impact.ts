@@ -67,24 +67,37 @@ export function createImpactRoutes(store: NexusStore) {
       }
     }
 
-    // Strategy 2: Find decisions with opposing keywords in same project
+    // Strategy 2: Find decisions with genuinely opposing choices
+    // Rules to prevent false positives:
+    // - Skip deprecated decisions
+    // - Skip if EITHER decision contains BOTH words (it's the resolution, not a conflict)
+    // - Skip if they're already linked (led_to, depends_on = same thread)
+    // - Only flag if the two words appear in DIFFERENT decisions, not as part of the same sentence
     const opposites: [string, string][] = [
-      ['sqlite', 'json'], ['sync', 'async'], ['cloud', 'local'],
-      ['typescript', 'javascript'], ['monolith', 'microservice'],
+      ['cloud', 'local'],
+      ['typescript', 'javascript'],
+      ['monolith', 'microservice'],
+      ['relational', 'document'],
+      ['rest', 'graphql'],
     ];
     for (let i = 0; i < decisions.length; i++) {
+      if (decisions[i].deprecated) continue;
       for (let j = i + 1; j < decisions.length; j++) {
+        if (decisions[j].deprecated) continue;
         if (decisions[i].project !== decisions[j].project) continue;
         const textA = decisions[i].decision.toLowerCase();
         const textB = decisions[j].decision.toLowerCase();
         for (const [a, b] of opposites) {
+          // Skip if either decision mentions BOTH terms (it's a comparison/resolution, not a conflict)
+          if ((textA.includes(a) && textA.includes(b)) || (textB.includes(a) && textB.includes(b))) continue;
+
           if ((textA.includes(a) && textB.includes(b)) || (textA.includes(b) && textB.includes(a))) {
-            // Check if they're already linked as 'replaced' or 'contradicts'
+            // Skip if already linked in any way (same decision thread)
             const alreadyLinked = store.getAllEdges().find((e: any) =>
               (e.from === decisions[i].id && e.to === decisions[j].id) ||
               (e.from === decisions[j].id && e.to === decisions[i].id)
             );
-            if (alreadyLinked?.rel === 'replaced' || alreadyLinked?.rel === 'contradicts') continue;
+            if (alreadyLinked) continue;
             contradictions.push({
               type: 'potential_conflict',
               a: { id: decisions[i].id, decision: decisions[i].decision },
