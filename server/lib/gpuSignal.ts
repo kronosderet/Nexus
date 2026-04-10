@@ -13,9 +13,18 @@ import { execSync } from 'child_process';
  * depends on context size × offload ratio × model size, which can
  * range from 30 seconds to 40+ minutes. No fixed timeout works for
  * all configurations. The GPU IS the signal.
+ *
+ * IMPORTANT: at large context sizes (>30k tokens) with low GPU offload,
+ * token generation becomes extremely CPU-bound (0.3 tok/s observed at
+ * 75k context / 25% offload). In this mode the GPU is mostly idle
+ * BETWEEN tokens — each token takes ~3s, mostly CPU attention work.
+ * Thresholds must be low enough to detect this "slow but working" state:
+ *   - Power > 25W (vs ~17W true idle, ~30-40W CPU-bound generation)
+ *   - Utilization > 10% (brief GPU spikes during each token)
+ *   - Idle window 120s (long enough to span multiple slow tokens)
  */
 export function createGpuAwareSignal(
-  idleThresholdMs = 60_000,
+  idleThresholdMs = 120_000,
   absoluteMaxMs = 3_600_000
 ): { signal: AbortSignal; cleanup: () => void } {
   const controller = new AbortController();
@@ -32,8 +41,11 @@ export function createGpuAwareSignal(
       const util = parseFloat(utilStr);
       const power = parseFloat(powerStr);
 
-      // GPU is "active" if util > 30% or power > 50W
-      if (util > 30 || power > 50) {
+      // GPU is "active" if showing ANY work above true-idle baseline.
+      // True idle: ~17W, 0% util. CPU-bound generation: ~30-40W, 5-15% util.
+      // Active prefill/generation: 80-120W, 50-100% util.
+      // Threshold is intentionally LOW to avoid killing CPU-bound generation.
+      if (util > 10 || power > 25) {
         lastActiveAt = Date.now();
       }
     } catch {
@@ -44,7 +56,7 @@ export function createGpuAwareSignal(
     const idleMs = Date.now() - lastActiveAt;
     const totalMs = Date.now() - startedAt;
 
-    // Abort if GPU idle for threshold
+    // Abort if GPU truly idle for threshold (120s of consecutive low readings)
     if (idleMs > idleThresholdMs) {
       controller.abort(new Error(`GPU idle for ${Math.round(idleMs / 1000)}s — inference likely complete or failed`));
       clearInterval(interval);

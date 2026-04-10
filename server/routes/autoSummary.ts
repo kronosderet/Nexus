@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
 import { createGpuAwareSignal } from '../lib/gpuSignal.ts';
+import { acquireAiLock } from '../lib/aiSemaphore.ts';
 
 /**
  * Auto-Summary: The Overseer writes session logs for you.
@@ -31,7 +32,8 @@ async function detectAI(): Promise<{ available: boolean; base?: string; model?: 
 }
 
 async function askAI(ai: any, system: string, prompt: string, maxTokens = 1000): Promise<string> {
-  const { signal, cleanup } = createGpuAwareSignal(60_000, 3_600_000);
+  const releaseLock = await acquireAiLock();
+  const { signal, cleanup } = createGpuAwareSignal();
   try {
     const res = await fetch(`${ai.base}/messages`, {
       method: 'POST',
@@ -49,6 +51,7 @@ async function askAI(ai: any, system: string, prompt: string, maxTokens = 1000):
     return (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
   } finally {
     cleanup();
+    releaseLock();
   }
 }
 

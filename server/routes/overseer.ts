@@ -4,6 +4,7 @@ import { readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
 import { createGpuAwareSignal } from '../lib/gpuSignal.ts';
+import { acquireAiLock } from '../lib/aiSemaphore.ts';
 
 type BroadcastFn = (data: any) => void;
 
@@ -33,8 +34,10 @@ async function detectAI() {
 }
 
 async function ask(ai: any, system: string, prompt: string, maxTokens = 1500) {
-  // GPU-aware signal: waits as long as GPU is computing, aborts when idle 60s
-  const { signal, cleanup } = createGpuAwareSignal(60_000, 3_600_000);
+  // Semaphore: only one AI inference at a time (prevents slot contention on 8GB VRAM)
+  const releaseLock = await acquireAiLock();
+  // GPU-aware signal: waits as long as GPU is computing, aborts when idle
+  const { signal, cleanup } = createGpuAwareSignal();
 
   try {
     // ── Anthropic Messages API (preferred) ──
@@ -82,6 +85,7 @@ async function ask(ai: any, system: string, prompt: string, maxTokens = 1500) {
     return '';
   } finally {
     cleanup(); // Always stop the GPU watchdog
+    releaseLock(); // Release the AI semaphore for the next queued request
   }
 }
 
@@ -313,9 +317,27 @@ export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) 
     const ai = await detectAI();
     if (!ai.available) return res.json({ error: 'No local AI available.' });
 
-    const { focus = 'full' } = req.body || {}; // full | server | client
+    const { focus = 'core' } = req.body || {}; // core | server | client | full
     const root = join(PROJECTS_DIR, 'Nexus');
     const files: { path: string; content: string }[] = [];
+
+    // Core files: the most important ~25k tokens for a focused audit
+    const CORE_FILES = [
+      'server/db/store.ts', 'server/types.ts', 'server/index.ts',
+      'server/mcp/index.ts', 'server/lib/gpuSignal.ts', 'server/lib/embeddings.ts',
+      'server/routes/tasks.ts', 'server/routes/sessions.ts', 'server/routes/ledger.ts',
+      'server/routes/usage.ts', 'server/routes/thoughts.ts', 'server/routes/impact.ts',
+      'server/routes/estimator.ts', 'server/routes/guard.ts', 'server/routes/predict.ts',
+    ];
+
+    if (focus === 'core') {
+      for (const rel of CORE_FILES) {
+        try {
+          const content = readFileSync(join(root, rel), 'utf-8');
+          files.push({ path: rel, content });
+        } catch {}
+      }
+    }
 
     function readDir(dir: string, ext: string[], prefix = '') {
       try {
