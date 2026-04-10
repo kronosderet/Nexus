@@ -5,6 +5,7 @@ import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
 import { createGpuAwareSignal } from '../lib/gpuSignal.ts';
 import { acquireAiLock } from '../lib/aiSemaphore.ts';
+import { aiFetch } from '../lib/aiFetch.ts';
 
 type BroadcastFn = (data: any) => void;
 
@@ -42,38 +43,24 @@ async function ask(ai: any, system: string, prompt: string, maxTokens = 1500) {
   try {
     // ── Anthropic Messages API (preferred) ──
     if (ai.type === 'anthropic') {
-      const body = {
+      const payload = {
         model: ai.model,
         max_tokens: maxTokens,
         system,
         messages: [{ role: 'user', content: prompt }],
       };
-      const res = await fetch(`${ai.base}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': 'none' },
-        body: JSON.stringify(body),
-        signal,
-      });
-      if (!res.ok) throw new Error(`AI ${res.status}`);
-      const data: any = await res.json();
+      const data = await aiFetch(`${ai.base}/messages`, payload, signal);
       return (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
     }
 
     // ── OpenAI / Ollama ──
     const url = ai.type === 'ollama' ? `${ai.base}/api/chat` : `${ai.base}/chat/completions`;
     const messages = [{ role: 'system', content: system }, { role: 'user', content: prompt }];
-    const body = ai.type === 'ollama'
+    const payload = ai.type === 'ollama'
       ? { model: ai.model, messages, stream: false }
       : { model: ai.model, messages, max_tokens: maxTokens + 2048, temperature: 0.4 };
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal,
-    });
-    if (!res.ok) throw new Error(`AI ${res.status}`);
-    const data: any = await res.json();
+    const data = await aiFetch(url, payload, signal);
 
     if (ai.type === 'ollama') return data.message?.content || '';
     const choice = data.choices?.[0]?.message;
