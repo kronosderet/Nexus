@@ -25,7 +25,7 @@ import { execSync } from 'child_process';
  */
 export function createGpuAwareSignal(
   idleThresholdMs = 120_000,
-  absoluteMaxMs = 3_600_000
+  absoluteMaxMs = 0 // 0 = no absolute limit (user kills manually if needed)
 ): { signal: AbortSignal; cleanup: () => void } {
   const controller = new AbortController();
   let lastActiveAt = Date.now();
@@ -63,8 +63,8 @@ export function createGpuAwareSignal(
       return;
     }
 
-    // Absolute safety valve
-    if (totalMs > absoluteMaxMs) {
+    // Absolute safety valve (disabled by default — user kills manually)
+    if (absoluteMaxMs > 0 && totalMs > absoluteMaxMs) {
       controller.abort(new Error(`Absolute timeout (${Math.round(absoluteMaxMs / 60_000)}min) reached`));
       clearInterval(interval);
     }
