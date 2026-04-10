@@ -1,17 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Activity, Compass, ScrollText, BookOpen, Bookmark, Search, Brain, Terminal, GitBranch, Fuel, Target, Menu, X } from 'lucide-react';
+import { Activity, Compass, ScrollText, Search, Brain, Terminal, GitBranch, Fuel, Menu, X } from 'lucide-react';
 
 const ICON_MAP = {
   activity: Activity,
   compass: Compass,
   'scroll-text': ScrollText,
-  'book-open': BookOpen,
-  'bookmark': Bookmark,
   'brain': Brain,
   'fuel': Fuel,
   'git-branch': GitBranch,
   'terminal': Terminal,
-  'target': Target,
 };
 
 export default function Sidebar({ modules, active, onSelect, connected, onSearchClick }) {

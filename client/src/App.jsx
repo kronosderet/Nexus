@@ -2,38 +2,32 @@ import { useState, useEffect } from 'react';
 import { useWebSocket } from './hooks/useWebSocket.js';
 import Sidebar from './components/Sidebar.jsx';
 import SearchModal from './components/SearchModal.jsx';
+import Command from './modules/Command.jsx';
 import Pulse from './modules/Pulse.jsx';
-import Compass from './modules/Compass.jsx';
-import MissionBoard from './modules/MissionBoard.jsx';
-import ActivityStream from './modules/ActivityStream.jsx';
-import Sessions from './modules/Sessions.jsx';
-import Overseer from './modules/Overseer.jsx';
-import TerminalModule from './modules/Terminal.jsx';
 import FuelModule from './modules/Fuel.jsx';
 import GraphModule from './modules/Graph.jsx';
-import BookmarksModule from './modules/Bookmarks.jsx';
+import Overseer from './modules/Overseer.jsx';
+import Log from './modules/Log.jsx';
+import TerminalModule from './modules/Terminal.jsx';
 import WelcomeScreen from './components/WelcomeScreen.jsx';
 import ToastOverlay from './components/ToastOverlay.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import ThoughtStackModal from './components/ThoughtStackModal.jsx';
 import ShortcutHelpModal from './components/ShortcutHelpModal.jsx';
 
-const MODULE_KEYS = ['compass', 'pulse', 'fuel', 'graph', 'overseer', 'missions', 'activity', 'sessions', 'bookmarks', 'terminal'];
+const MODULE_KEYS = ['command', 'pulse', 'fuel', 'graph', 'overseer', 'log', 'terminal'];
 const MODULES = {
-  compass: { label: 'Compass', icon: 'compass', component: Compass, shortcut: '1' },
-  pulse: { label: 'System Pulse', icon: 'activity', component: Pulse, shortcut: '2' },
+  command: { label: 'Command', icon: 'compass', component: Command, shortcut: '1' },
+  pulse: { label: 'Dashboard', icon: 'activity', component: Pulse, shortcut: '2' },
   fuel: { label: 'Fuel', icon: 'fuel', component: FuelModule, shortcut: '3' },
   graph: { label: 'Graph', icon: 'git-branch', component: GraphModule, shortcut: '4' },
   overseer: { label: 'Overseer', icon: 'brain', component: Overseer, shortcut: '5' },
-  missions: { label: 'Missions', icon: 'target', component: MissionBoard, shortcut: '6' },
-  activity: { label: 'Activity', icon: 'scroll-text', component: ActivityStream, shortcut: '7' },
-  sessions: { label: 'Sessions', icon: 'book-open', component: Sessions, shortcut: '8' },
-  bookmarks: { label: 'Bookmarks', icon: 'bookmark', component: BookmarksModule, shortcut: '9' },
-  terminal: { label: 'Terminal', icon: 'terminal', component: TerminalModule, shortcut: '0' },
+  log: { label: 'Log', icon: 'scroll-text', component: Log, shortcut: '6' },
+  terminal: { label: 'Terminal', icon: 'terminal', component: TerminalModule, shortcut: '7' },
 };
 
 export default function App() {
-  const [activeModule, setActiveModule] = useState('compass');
+  const [activeModule, setActiveModule] = useState('command');
   const [showWelcome, setShowWelcome] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [thoughtsOpen, setThoughtsOpen] = useState(false);
@@ -74,9 +68,9 @@ export default function App() {
   function handleSearchNavigate(result) {
     // Navigate to the relevant module based on result type
     const typeModuleMap = {
-      task: 'missions',
-      activity: 'activity',
-      session: 'sessions',
+      task: 'command',
+      activity: 'log',
+      session: 'log',
     };
     const target = typeModuleMap[result.type];
     if (target) setActiveModule(target);
