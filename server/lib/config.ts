@@ -1,4 +1,5 @@
 import { homedir } from 'os';
+import { existsSync } from 'fs';
 import { join } from 'path';
 
 /**
@@ -6,24 +7,24 @@ import { join } from 'path';
  *
  * All server files import from here instead of hardcoding paths.
  * Users override via environment variables:
- *   NEXUS_PROJECTS_DIR — where git repos live (default: ~/Projects or C:/Projects)
+ *   NEXUS_PROJECTS_DIR — where git repos live (auto-detected or set manually)
  *   NEXUS_HOME         — where Nexus stores data (default: ~/.nexus)
  *   NEXUS_DB_PATH      — JSON store path (default: NEXUS_HOME/nexus.json)
  */
 
-// Detect sensible default for projects directory
+// Detect projects directory — check common locations, use first that exists
 function defaultProjectsDir(): string {
-  if (process.platform === 'win32') {
-    // Common Windows dev directories
-    const candidates = [
-      join(homedir(), 'Projects'),
-      join(homedir(), 'repos'),
-      join(homedir(), 'src'),
-      'C:/Projects',
-    ];
-    // Just use ~/Projects as default — it's the most common
-    return candidates[0];
+  const candidates = [
+    'C:/Projects',                    // Common Windows root-level dev dir
+    join(homedir(), 'Projects'),      // ~/Projects
+    join(homedir(), 'repos'),         // ~/repos
+    join(homedir(), 'src'),           // ~/src
+    join(homedir(), 'Developer'),     // macOS convention
+  ];
+  for (const dir of candidates) {
+    if (existsSync(dir)) return dir;
   }
+  // Nothing found — use ~/Projects as fallback
   return join(homedir(), 'Projects');
 }
 
