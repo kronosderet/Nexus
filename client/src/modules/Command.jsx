@@ -227,13 +227,13 @@ function EmptyState({ icon: Icon, message }) {
   return <div className="text-center py-4 text-nexus-text-faint"><Icon size={14} className="mx-auto mb-1.5 opacity-40" /><p className="text-[10px] font-mono">{message}</p></div>;
 }
 
-function FuelBar({ percent, className = '' }) {
-  const color = percent <= 15 ? 'bg-nexus-red' : percent <= 40 ? 'bg-nexus-amber' : 'bg-nexus-green';
-  return (
-    <div className={`h-1.5 bg-nexus-bg rounded-full overflow-hidden ${className}`}>
-      <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${Math.max(2, percent)}%` }} />
-    </div>
-  );
+function elapsedSince(iso) {
+  if (!iso) return '';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 0) return '';
+  const m = Math.floor(ms / 60000);
+  if (m < 60) return `${m}m`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
 function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predict, critique, fuel, workload, recentActivity, loadingPlan, onRefreshPlan }) {
@@ -249,70 +249,95 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-      {/* NOW — live cockpit */}
+      {/* NOW — what CC is actually doing */}
       <Panel title="Now" icon={Activity} accent="text-nexus-green">
-        {/* Fuel gauges */}
-        {fuel?.tracked && (
-          <div className="space-y-2 mb-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono text-nexus-text-faint flex items-center gap-1"><Fuel size={9} /> Session</span>
-              <span className={`text-xs font-mono ${fuel.estimated.session <= 15 ? 'text-nexus-red' : fuel.estimated.session <= 40 ? 'text-nexus-amber' : 'text-nexus-green'}`}>{fuel.estimated.session}%</span>
-            </div>
-            <FuelBar percent={fuel.estimated.session} />
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono text-nexus-text-faint">Weekly</span>
-              <span className={`text-xs font-mono ${fuel.estimated.weekly <= 15 ? 'text-nexus-red' : fuel.estimated.weekly <= 40 ? 'text-nexus-amber' : 'text-nexus-green'}`}>{fuel.estimated.weekly}%</span>
-            </div>
-            <FuelBar percent={fuel.estimated.weekly} />
-            <div className="flex gap-3 text-[9px] font-mono text-nexus-text-faint mt-1">
-              {fuel.rates?.sessionPerHour > 0 && <span>Burn: {fuel.rates.sessionPerHour}%/h</span>}
-              {fuel.session?.chunksRemaining != null && <span>~{fuel.session.chunksRemaining} chunks left</span>}
-              {fuel.session?.resetWindow && <span>Reset: {Math.floor(fuel.session.resetWindow / 60)}h {fuel.session.resetWindow % 60}m</span>}
-            </div>
-          </div>
-        )}
-
-        {/* Workload advisor */}
-        {workload?.currentSession?.recommendation && (
-          <div className={`px-2.5 py-2 rounded-lg mb-3 border ${
-            workload.currentSession.recommendation.action === 'wrap_up' ? 'bg-nexus-red/5 border-nexus-red/20' :
-            workload.currentSession.recommendation.action === 'small_tasks' ? 'bg-nexus-amber/5 border-nexus-amber/20' :
-            'bg-nexus-green/5 border-nexus-green/20'
-          }`}>
-            <div className="flex items-center gap-1.5">
-              <Zap size={10} className={
-                workload.currentSession.recommendation.action === 'wrap_up' ? 'text-nexus-red' :
-                workload.currentSession.recommendation.action === 'small_tasks' ? 'text-nexus-amber' : 'text-nexus-green'
-              } />
-              <span className="text-[10px] font-mono uppercase tracking-wider text-nexus-text-faint">
-                {workload.currentSession.recommendation.action.replace(/_/g, ' ')}
-              </span>
-            </div>
-            <p className="text-[10px] text-nexus-text-dim mt-1">{workload.currentSession.recommendation.message}</p>
-          </div>
-        )}
-
-        {/* In-progress tasks */}
-        {inProgress.length > 0 && (
+        {/* In-progress tasks with elapsed time + estimated cost */}
+        {inProgress.length > 0 ? (
           <div className="mb-3">
-            <span className="text-[10px] font-mono text-nexus-text-faint mb-1 block">In Progress ({inProgress.length})</span>
-            <div className="space-y-1.5">
-              {inProgress.map(t => (
-                <div key={t.id} className="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-nexus-amber/5 border border-nexus-amber/20">
-                  <div className="w-1.5 h-1.5 rounded-full bg-nexus-amber mt-1.5 shrink-0 animate-pulse" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs text-nexus-text truncate">{t.title}</p>
-                    {t.description && <p className="text-[10px] font-mono text-nexus-text-faint line-clamp-1 mt-0.5">{t.description}</p>}
+            <span className="text-[10px] font-mono text-nexus-text-faint mb-1.5 block">Working On ({inProgress.length})</span>
+            <div className="space-y-2">
+              {inProgress.map(t => {
+                const elapsed = elapsedSince(t.updated_at);
+                const avgMin = critique?.averageCompletionMinutes || 35;
+                const elapsedMin = t.updated_at ? Math.floor((Date.now() - new Date(t.updated_at).getTime()) / 60000) : 0;
+                const progress = Math.min(95, Math.round((elapsedMin / avgMin) * 100));
+                return (
+                  <div key={t.id} className="px-2.5 py-2.5 rounded-lg bg-nexus-amber/5 border border-nexus-amber/20">
+                    <div className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-nexus-amber mt-1.5 shrink-0 animate-pulse" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-nexus-text">{t.title}</p>
+                        {t.description && <p className="text-[10px] font-mono text-nexus-text-faint line-clamp-1 mt-0.5">{t.description}</p>}
+                        <div className="flex gap-3 mt-1.5 text-[9px] font-mono text-nexus-text-faint">
+                          {elapsed && <span className="flex items-center gap-1"><Clock size={8} /> {elapsed}</span>}
+                          <span>~{avgMin}m avg</span>
+                          {fuel?.rates?.sessionPerHour > 0 && <span>~{Math.round(avgMin * fuel.rates.sessionPerHour / 60)}% fuel est.</span>}
+                        </div>
+                        {/* Progress bar based on avg completion time */}
+                        <div className="h-1 bg-nexus-bg rounded-full overflow-hidden mt-1.5">
+                          <div className={`h-full rounded-full transition-all duration-1000 ${progress > 80 ? 'bg-nexus-amber' : 'bg-nexus-green'}`} style={{ width: `${progress}%` }} />
+                        </div>
+                      </div>
+                    </div>
                   </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="px-2.5 py-3 rounded-lg bg-nexus-bg/50 border border-nexus-border mb-3 text-center">
+            <p className="text-[10px] font-mono text-nexus-text-faint">No tasks in progress</p>
+            <p className="text-[9px] font-mono text-nexus-text-faint mt-0.5">Move a task to "In Progress" in Kanban view to track it here</p>
+          </div>
+        )}
+
+        {/* Session work summary */}
+        {(() => {
+          const today = new Date().toDateString();
+          const doneToday = done.filter(t => t.updated_at && new Date(t.updated_at).toDateString() === today);
+          const review = tasks.filter(t => t.status === 'review');
+          return (doneToday.length > 0 || review.length > 0) ? (
+            <div className="mb-3 grid grid-cols-3 gap-2">
+              <div className="bg-nexus-bg rounded-lg px-2 py-1.5 text-center">
+                <p className="text-lg font-light text-nexus-green">{doneToday.length}</p>
+                <p className="text-[9px] font-mono text-nexus-text-faint">done today</p>
+              </div>
+              <div className="bg-nexus-bg rounded-lg px-2 py-1.5 text-center">
+                <p className="text-lg font-light text-nexus-blue">{review.length}</p>
+                <p className="text-[9px] font-mono text-nexus-text-faint">in review</p>
+              </div>
+              <div className="bg-nexus-bg rounded-lg px-2 py-1.5 text-center">
+                <p className="text-lg font-light text-nexus-amber">{inProgress.length}</p>
+                <p className="text-[9px] font-mono text-nexus-text-faint">active</p>
+              </div>
+            </div>
+          ) : null;
+        })()}
+
+        {/* Recent completions with duration */}
+        {(() => {
+          const today = new Date().toDateString();
+          const recentDoneToday = done
+            .filter(t => t.updated_at && new Date(t.updated_at).toDateString() === today)
+            .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+            .slice(0, 4);
+          return recentDoneToday.length > 0 ? (
+            <div className="mb-3">
+              <span className="text-[10px] font-mono text-nexus-text-faint mb-1 block">Completed Today</span>
+              {recentDoneToday.map(t => (
+                <div key={t.id} className="flex items-center gap-2 px-2 py-1 text-[11px]">
+                  <CheckCircle2 size={10} className="text-nexus-green shrink-0" />
+                  <span className="text-nexus-text-dim truncate flex-1">{t.title}</span>
+                  <span className="text-nexus-text-faint shrink-0 font-mono">{minutesAgo(t.updated_at)}</span>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : null;
+        })()}
 
         {/* Thought stack */}
         {thoughts.length > 0 && (
-          <div className="mb-3">
+          <div className="mb-3 pt-2 border-t border-nexus-border">
             <span className="text-[10px] font-mono text-nexus-text-faint flex items-center gap-1 mb-1"><Brain size={9} /> Thoughts ({thoughts.length})</span>
             {thoughts.slice(0, 3).map((t, i) => (
               <div key={t.id} className={`flex items-start gap-1.5 px-2 py-1 rounded text-[11px] ${i === 0 ? 'bg-nexus-purple/5 border border-nexus-purple/20' : ''}`}>
@@ -323,12 +348,12 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
           </div>
         )}
 
-        {/* Recent activity pulse */}
+        {/* Live activity feed */}
         {recentActivity.length > 0 && (
           <div className="pt-2 border-t border-nexus-border">
-            <span className="text-[10px] font-mono text-nexus-text-faint mb-1 block">Live Activity</span>
+            <span className="text-[10px] font-mono text-nexus-text-faint mb-1 block">Live</span>
             <div className="space-y-0.5">
-              {recentActivity.slice(0, 5).map((a, i) => (
+              {recentActivity.slice(0, 4).map((a, i) => (
                 <div key={a.id || i} className="flex items-start gap-2 text-[10px]">
                   <span className="text-nexus-text-faint w-10 shrink-0 font-mono">
                     {new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -338,11 +363,6 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
               ))}
             </div>
           </div>
-        )}
-
-        {/* Empty state only if truly nothing */}
-        {!fuel?.tracked && inProgress.length === 0 && thoughts.length === 0 && recentActivity.length === 0 && (
-          <EmptyState icon={Target} message="No data yet. Log fuel and start working." />
         )}
       </Panel>
 
