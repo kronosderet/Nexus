@@ -7,3 +7,6 @@ nexus.db
 Thumbs.db
 tests/.test-nexus.*
 nexus-embeddings.json
+nexus.json.bak
+nexus.json.bak.*
+nexus.json.tmp

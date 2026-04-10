@@ -1,46 +1,45 @@
-# ◈ Nexus
+# ◈ Nexus — The Cartographer
 
-**The Cartographer — AI Cowork Mission Control**
+**AI Cowork Metabrain for Claude Code**
 
-A local-first workspace dashboard that turns scattered AI-assisted sessions into a navigable map: decisions, fuel, and code.
+A local-first metabrain that gives every Claude Code instance persistent memory, a Knowledge Graph, and a strategic AI advisor. 20 native MCP tools. Zero cloud dependencies.
 
----
+## Install as Claude Code Plugin
 
-## What is Nexus?
+```bash
+/plugin marketplace add kronosderet/Nexus
+/plugin install nexus@nexus-marketplace
+```
 
-Nexus is the operations bridge for working with AI agents across many projects at once. Where most chat tools forget what happened yesterday, Nexus remembers — every decision, every session, every gram of session fuel — and projects that history forward into the next move.
+That's it. Every conversation now has access to the Nexus metabrain.
 
-It is written end-to-end in TypeScript and React 19, runs entirely on your machine, and pairs a small dashboard UI with a 47-command CLI. There is nothing in the cloud. The only network call it ever makes is to the local language model loaded inside LM Studio.
+## What It Does
 
-The metaphor is navigation. Sessions are voyages. Decisions are bearings. Tasks are missions. The Overseer — the local Gemma model — is the lookout in the crow's nest. The whole thing speaks in compass icons and amber on navy because the captain deserves a proper bridge.
+Nexus solves the biggest problem with AI-assisted development: **Claude forgets everything between conversations.** Nexus doesn't.
 
-## Features
+- **Session Memory** — every conversation is automatically logged with decisions, blockers, and outcomes
+- **Knowledge Graph** — 90+ architectural decisions with typed edges (led_to, depends_on, contradicts, replaced, related) and blast-radius analysis
+- **Thought Stack** — push context before interruptions, pop when you return. Works across Claude instances.
+- **Decision Guard** — checks for redundant work before you start
+- **Fuel Intelligence** — tracks Claude usage, burn rates, and session planning
+- **Self-Critique** — identifies slow tasks, stuck items, completion patterns
+- **Local AI Overseer** (optional) — strategic analysis via LM Studio with up to 200k context
 
-The dashboard ships with nine modules, each accessible via `Ctrl+1` through `Ctrl+9`:
+## 20 Native MCP Tools
 
-- **Pulse** — system overview, GPU telemetry, recent activity
-- **Fuel** — session and weekly Claude budget with rolling 5-hour windows
-- **Graph** — knowledge graph of decisions with blast-radius, centrality, conflict detection, structural holes, and a force-directed visual view
-- **Overseer** — the local AI strategist; ask it anything about your workspace
-- **Missions** — Kanban board for tasks with priorities and links
-- **Activity** — chronological feed of every meaningful event
-- **Sessions** — voyage log; the bridge between agent runs
-- **Bookmarks** — curated links grouped by category
-- **Terminal** — embedded shell for the brave
+After installing, Claude Code can call these directly — no shell-outs, no CLI:
 
-## The Knowledge Graph
+**Read:** `nexus_brief`, `nexus_get_plan`, `nexus_check_guard`, `nexus_search`, `nexus_get_critique`, `nexus_predict_gaps`, `nexus_get_blast_radius`, `nexus_ask_overseer`
 
-The Ledger holds every architectural decision Nexus has ever been told about — currently **76 decisions** wired together with **129 typed edges** (`led_to`, `replaced`, `depends_on`, `contradicts`, `related`). The Graph module visualizes that web and answers questions you cannot answer in a chat scrollback: *if I rip out SQLite, what breaks?* *which decisions are loadbearing?* *where are two projects making opposing bets?*
+**Write:** `nexus_create_task`, `nexus_complete_task`, `nexus_log_activity`, `nexus_log_session`, `nexus_log_usage`, `nexus_record_decision`, `nexus_link_decisions`, `nexus_push_thought`, `nexus_pop_thought`
 
-## The Overseer
+**Async AI:** `nexus_ask_overseer_start`, `nexus_get_overseer_result`
 
-The Overseer is Gemma 4 26B running locally inside LM Studio. It reads the dashboard's state — fuel, tasks, decisions, recent activity — and gives strategic answers in seconds, without sending a byte off the box. It also drives the AI-narrated impact forecast: feed it a decision id and it tells you, in three or four sentences, what would actually break if you reversed it.
+**Composite:** `nexus_bridge_session`
 
-## Smart Fuel Intelligence
+## Dashboard (Optional)
 
-Nexus tracks your Claude usage as a rolling 5-hour session window with a separate weekly cap. The Fuel module estimates remaining minutes from observed burn rate, predicts the empty-time, and the Workload Planner translates "you have 35% session fuel and 4h on the clock" into concrete task slots: how many small refactors, how many big features, how many code reviews fit before reset.
-
-## Quick Start
+The plugin works standalone — no server needed. For visualization, run the dashboard:
 
 ```bash
 git clone https://github.com/kronosderet/Nexus
@@ -49,43 +48,70 @@ npm install && cd server && npm install && cd ../client && npm install && cd ..
 npm run dev
 ```
 
-Then open [http://localhost:5173](http://localhost:5173).
+Open [http://localhost:5173](http://localhost:5173). Seven modules:
 
-The server runs on `:3001`, the Vite dev server on `:5173`, and the WebSocket bridge piggybacks on the API port.
+| Module | Key | What it shows |
+|---|---|---|
+| **Command** | ^1 | Strategic view (Now/Next/Later/Done) + Kanban board with drag-drop |
+| **Dashboard** | ^2 | System pulse, GPU telemetry, calendar, digest, quick actions |
+| **Fuel** | ^3 | Session + weekly fuel gauges, burn rate, workload planner |
+| **Graph** | ^4 | Knowledge Graph: blast radius, centrality, conflicts, holes, visual |
+| **Overseer** | ^5 | Local AI strategist with auto-remediation |
+| **Log** | ^6 | Activity stream + Session history with search/filter |
+| **Terminal** | ^7 | Embedded PowerShell shell |
 
-## CLI Commands
+Plus: `Ctrl+K` search, `Ctrl+T` thought stack, `Ctrl+/` keyboard shortcuts.
 
-The `nexus` CLI ships with **47 commands** — log activity, create tasks, record decisions, forecast impact, or talk to the Overseer from any project directory. Run `nexus help` for the full list, or `nexus onboard` to generate complete agent-facing documentation.
+## Claude Code Lifecycle Hooks
 
-```bash
-nexus brief                       # full agent briefing
-nexus task "Add caching layer"    # create a backlog task
-nexus record "Switched to JSON"   # record a decision
-nexus impact forecast 44          # AI-narrated downstream impact
-nexus overseer "what should I do next?"
-```
+Three hooks fire automatically:
+
+- **SessionStart** — injects metabrain context (fuel, tasks, sessions, decisions, risks, git status)
+- **UserPromptSubmit** — logs each prompt to the activity stream
+- **Stop** — auto-generates session summary + pushes handoff thought for the next instance
+
+Install hooks: `nexus hooks install` (from the CLI).
+
+## Local AI (Optional)
+
+For AI-powered features (Overseer, session plan, code audit), install [LM Studio](https://lmstudio.ai) and load a model. Recommended: Gemma 4 26B A4B (Q4_K_M). Nexus auto-detects LM Studio at `localhost:1234`. GPU-aware inference signal adapts to any hardware — no fixed timeouts.
+
+Without LM Studio, all 20 non-AI tools work normally.
 
 ## Architecture
 
-| Layer    | Stack                                       |
-| -------- | ------------------------------------------- |
-| Server   | Express 5 + TypeScript (tsx watch runtime)  |
-| Client   | React 19 + Vite + Tailwind CSS 4            |
-| Store    | JSON file (`nexus.json`)                    |
-| AI       | LM Studio + Gemma 4 26B (Anthropic API)     |
-| Tests    | 114 Vitest tests                            |
-| CLI      | Pure Node, zero dependencies                |
+| Layer | Stack |
+|---|---|
+| Server | Express 5 + TypeScript (tsx watch) |
+| Client | React 19 + Vite + Tailwind CSS 4 |
+| Store | JSON file at `~/.nexus/nexus.json` (with 3-gen backup rotation) |
+| AI | LM Studio / Ollama (optional, auto-detected) |
+| MCP | 20 tools via @modelcontextprotocol/sdk, stdio transport |
+| Tests | 153 Vitest tests (store + route-level integration) |
+| CLI | 46 commands, ESM, zero external deps |
 
-## Built In 2 Nights
+## Data & Privacy
 
-Nexus was built from scratch in two sessions. The first night went from `npm init` to v1.0 — Pulse, Missions, Activity, Sessions, the CLI, the WebSocket bridge, the JSON store. The second night the Overseer came online and started directing its own development: from v0.7 onward, every architectural decision was first run past Gemma, recorded in The Ledger, and then implemented.
+All data stored locally at `~/.nexus/`. No cloud, no external services, no telemetry. The MCP server runs in-process. The only network call is to the optional local AI model at localhost.
 
-That recursion is the real story. The dashboard that tracks decisions was built by an AI making decisions about itself. Forty-seven plus commits, version history climbing from `v0.1` to `v1.0` on night one and `v1.1` to `v3.0-alpha2` on night two.
+## CLI
 
-## The Cartographer Personality
+```bash
+nexus brief                       # full metabrain briefing
+nexus task "Add caching layer"    # create a backlog task
+nexus record "Switched to JSON"   # record a decision to the Ledger
+nexus overseer "what's risky?"    # ask the local AI strategist
+nexus hooks install               # install Claude Code lifecycle hooks
+nexus mcp                         # print MCP server config
+nexus help                        # full command list (46 commands)
+```
 
-Nexus speaks like a navigator on a long voyage. The brand mark is the compass rose `◈`. The palette is amber on navy — the warm glow of an instrument panel against a cold sea. Empty states say things like "Nothing on the charts." Loading messages say "Setting course." It is a small thing, but it is the difference between a tool you use and a bridge you stand on.
+## The Story
+
+Nexus was built as an answer to: *"What tool would you want if you could build anything for your own development?"* It started as a dashboard, became an MCP server, then a Claude Code plugin with lifecycle hooks. The Overseer — a local AI model — audits its own source code and proposes fixes. The Knowledge Graph auto-links decisions by semantic similarity. The metabrain grows passively through hooks that fire on every conversation start and end.
+
+The recursion is the real story. The tool that tracks decisions was built by an AI making decisions about itself, recorded in the tool it was building.
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT — see [LICENSE](./plugin/LICENSE).

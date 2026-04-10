@@ -1,128 +1,86 @@
 # Nexus Roadmap
 
-## v0.2 — The Bridge (Session Continuity)
+## Shipped
 
-**The single biggest problem I have**: context dies between sessions. Every new
-conversation starts from zero. Nexus sits between sessions -- it should be the
-bridge that carries context forward.
+### v1.0-v2.0 — The Foundation
+- Express + React + Tailwind dashboard, JSON store, WebSocket bridge
+- 46-command CLI, 9 dashboard modules
+- Full TypeScript migration (100% server)
+- GPU telemetry, git fleet monitoring, project health
 
-### Session Log API
-- `POST /api/sessions` — log a session summary (what was done, decisions made, blockers)
-- `GET /api/sessions?project=Firewall` — retrieve recent session context
-- CLI: `nexus session "Refactored narrator system, switched from sync to async event loop"`
-- CLAUDE.md tells the agent to `nexus session` at end, and read sessions at start
-- This is the **highest value feature** -- it turns Nexus from a dashboard into a memory
+### v3.0 — The Autonomous Architect
+- Knowledge Graph (90+ decisions, 5 typed edge types, blast radius, centrality)
+- Local AI Overseer (Gemma 4 26B via LM Studio)
+- Self-improving Advice Journal with verdict tracking
+- Smart Fuel Intelligence with session/weekly tracking
+- Predictive Task Generation from graph gaps
+- Autonomous Session Planner
+- Thought Stack (LIFO interrupt-recovery)
+- Self-Critique (task completion patterns)
+- Decision Guard (redundancy check)
 
-### Project Health Dashboard
-- Per-project cards showing: last commit, open task count, activity volume (7d)
-- Heat indicator: hot (active today), warm (this week), cold (dormant)
-- Click a project card to filter all modules to that project
-- Visual at a glance: "where is the work happening?"
+### v3.1-v3.2 — The MCP Server
+- 20 native MCP tools (brief, plan, guard, search, critique, predict, blast_radius, ask_overseer, create_task, complete_task, log_activity, log_session, log_usage, record_decision, link_decisions, push_thought, pop_thought, ask_overseer_start, get_overseer_result, bridge_session)
+- MCPB bundle for one-click Claude Desktop install
+- Async Overseer (start/poll pattern — no timeout issues)
 
-### Search
-- Global search bar (Ctrl+K) across tasks, activity, scratchpads, sessions
-- Fuzzy matching, keyboard navigation
-- Results grouped by module
+### v3.3-v3.5 — Audit & Hardening
+- Full codebase audit via parallel agents + MCP recon
+- 153 route-level integration tests
+- Atomic _flush with 3-generation backup rotation
+- 27 (store as any) casts → typed accessors
+- WebSocket exponential backoff
+- Semantic auto-link via embeddings
+- Static fuel display (reported values, not extrapolated)
 
----
+### v3.6-v3.7 — Intelligence & Restructure
+- GPU-aware abort signal (no fixed AI timeouts)
+- AI inference semaphore (one at a time)
+- aiFetch via undici (no 5min headers timeout)
+- Overseer code-audit endpoint (reads own source)
+- Frontend restructure: 10 → 7 modules (Command, Dashboard, Fuel, Graph, Overseer, Log, Terminal)
 
-## v0.3 — The Lookout (Intelligence)
+### v4.0-v4.1 — The Plugin
+- Self-contained MCP server (in-process NexusStore, no Express needed)
+- Claude Code Plugin package (skills, agents, hooks)
+- Configurable PROJECTS_DIR (no hardcoded paths)
+- 3 lifecycle hooks (SessionStart, Stop, UserPromptSubmit)
+- Command module: project filter, priority badges, search, plan caching, expand/collapse, per-task difficulty estimation
+- Published as Claude Code marketplace plugin
 
-### Smart Activity Digest
-- Daily/weekly summary auto-generated from activity stream
-- "This week: 14 commits across 3 projects, 8 tasks completed, Firewall most active"
-- Surfaced on the Pulse page
+## Current — v4.2
 
-### Project Timeline
-- Visual timeline of task completions and milestones per project
-- Simple horizontal bar chart, color-coded by project
-- Shows momentum and gaps
+### Phase 4: Official Directory Submission
+- Add tool annotations (readOnlyHint/destructiveHint) on all 20 MCP tools
+- Create 512×512 icon
+- Submit to Anthropic MCPB Directory + Claude Code Plugin Directory
+- Meet review requirements: 3+ examples, privacy policy, cross-platform
 
-### Notifications
-- Windows toast notifications via `nexus notify "Deploy complete"`
-- Configurable: which activity types trigger toasts
-- Useful for long-running builds, background agents completing work
+### Dashboard Polish
+- Remaining modules need audit (Fuel, Graph, Overseer, Dashboard, Terminal)
+- Shared React state (modules fetch independently, should share)
+- Log module: debounced session search
 
-### Quick Actions Panel
-- Customizable one-click buttons on the dashboard
-- "Scan Project" — POST to /api/activity with project structure summary
-- "Git Summary" — aggregate recent commits across all repos
-- "Full Health" — combined pulse + GPU + git across fleet
-- User-defined actions stored in nexus.json config
+## Future — v5.0 Vision
 
----
+### Full-Codebase Overseer
+- Load entire project source into 200k context
+- AI-powered code audit, refactor suggestions, test generation
+- Scheduled background audits (daily/weekly)
 
-## v0.4 — The Engine Room (CUDA & Local AI)
+### Cross-Instance Memory
+- Multiple Claude Code instances share the same metabrain
+- Thoughts pushed by one instance are popped by another
+- Session summaries auto-generated per instance
 
-### LM Studio / Ollama Integration
-- You have LM Studio installed + RTX 3070 Ti with 8GB VRAM
-- Nexus could proxy local LLM queries for quick tasks
-- "Summarize today's activity" processed locally, no cloud needed
-- Scratchpad "AI assist" button: highlight code, get local LLM explanation
-
-### GPU Workload Manager
-- Track CUDA processes with history (not just snapshot)
-- VRAM timeline chart (who's eating memory over time)
-- Alert when VRAM exceeds threshold (before OOM kills your training run)
-- One-click process viewer with "gentle kill" option
-
-### Build Monitor
-- Watch for PyInstaller/Nuitka builds across projects
-- Log build start/end/duration to activity stream
-- Track build size over time (are builds growing?)
-
----
-
-## v0.5 — The Observatory (Visualization)
-
-### Project Dependency Map
-- Visual graph of which projects share code/patterns
-- Auto-detected from imports, package.json, CLAUDE.md references
-
-### Activity Heatmap
-- GitHub-style contribution heatmap but for all Nexus activity
-- Shows work patterns across days/hours
-- Identifies productive rhythms
-
-### Scratchpad Evolution
-- CodeMirror collaborative features (though single-user for now)
-- Snippet library: save and tag reusable code blocks
-- Markdown preview pane (split view)
-- Mermaid diagram rendering in preview
-
-### Dashboard Widgets
-- Draggable, resizable widget layout on Pulse page
-- Pin any module as a widget (mini mission board, mini activity feed)
-- Save layout to nexus.json
-
----
-
-## v0.6 — The Fleet (Multi-Machine)
-
-### Network Mode
-- Optional: expose Nexus on LAN (authenticated)
-- Multiple machines log to one Nexus instance
-- Useful if you dev on multiple machines
-
-### Webhook Integrations
-- GitHub webhook receiver: PR merged → activity stream
-- Discord webhook sender: milestone reached → post to channel
-- Generic webhook: trigger on any activity type
-
----
-
-## Priority Order (what I'd build next)
-
-1. **Session Log** (v0.2) — highest impact, solves my core limitation
-2. **Search** (v0.2) — quality of life, makes everything findable
-3. **Project Health Cards** (v0.2) — makes the dashboard genuinely useful daily
-4. **Notifications** (v0.3) — connects Nexus to the OS
-5. **GPU timeline** (v0.4) — your 3070 Ti deserves proper monitoring
-6. **LLM integration** (v0.4) — local AI in the dashboard
+### Autonomous Metabrain
+- Auto-link decisions via AI (not just keyword/embedding)
+- Weekly AI-generated digest narrative
+- Proactive risk detection (the Overseer flags problems before you ask)
+- The metabrain improves itself without being asked
 
 ## Non-Goals
-- Nexus is NOT trying to become Jira/Linear/Notion
-- No user accounts, no teams, no permissions
 - No cloud sync (local-first forever)
-- No mobile app (it's a workstation tool)
-- Stays fast, stays simple, stays opinionated
+- No user accounts or teams
+- No mobile app (workstation tool)
+- Stays fast, stays opinionated
