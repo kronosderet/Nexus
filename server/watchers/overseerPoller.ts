@@ -2,7 +2,7 @@ import { execSync } from 'child_process';
 import { readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
-import { PROJECTS_DIR } from '../../lib/config.ts';
+import { PROJECTS_DIR } from '../lib/config.ts';
 
 type BroadcastFn = (data: any) => void;
 
