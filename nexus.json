@@ -279,12 +279,89 @@
       "id": 96,
       "title": "v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files",
       "description": "Pre-release audit found C:/Projects hardcoded in: actions.ts, focus.ts, github.ts, init.ts, overseer.ts (3x), predict.ts, pulse.ts, remediate.ts (3x), scratchpad.ts, terminal.ts (2x), fileWatcher.ts, overseerPoller.ts, cli/nexus.js. All need process.env.NEXUS_PROJECTS_DIR || homedir() fallback. Critical for plugin distribution — other users don't have C:/Projects.",
-      "status": "backlog",
+      "status": "in_progress",
       "priority": 2,
       "sort_order": 27,
       "linked_files": "[]",
       "created_at": "2026-04-10T09:41:15.301Z",
-      "updated_at": "2026-04-10T09:41:15.301Z"
+      "updated_at": "2026-04-10T10:20:08.580Z"
+    },
+    {
+      "id": 97,
+      "title": "v4.1 [CMD-1] Always show session stats counters (done/review/active) even at 0 + show priority badges on task cards",
+      "description": "Now panel: session stats grid only renders when doneToday > 0 || review > 0 — vanishes on fresh day. Always show (0 is valid data). Kanban: task.priority (0/1/2) exists in data but never displayed. Add color-coded priority dot or badge on TaskCard. Remove dead Fuel+Zap imports.",
+      "status": "backlog",
+      "priority": 2,
+      "sort_order": 27,
+      "linked_files": "[]",
+      "created_at": "2026-04-10T10:24:39.689Z",
+      "updated_at": "2026-04-10T10:24:39.689Z"
+    },
+    {
+      "id": 98,
+      "title": "v4.1 [CMD-2] Add project filter dropdown in Command header — scope all panels + kanban to one project",
+      "description": "All tasks from all projects are mixed. Add a project selector in the header that filters tasks/backlog/done across both strategic and kanban views. Derive project list from task titles + sessions. 'All' as default option.",
+      "status": "backlog",
+      "priority": 2,
+      "sort_order": 28,
+      "linked_files": "[]",
+      "created_at": "2026-04-10T10:24:42.976Z",
+      "updated_at": "2026-04-10T10:24:42.976Z"
+    },
+    {
+      "id": 99,
+      "title": "v4.1 [CMD-3] Kanban: limit Done column to last 20 + add search/filter bar above columns",
+      "description": "Done column shows all 93+ tasks ever. Limit to 20 most recent with 'show more' toggle. Add search input above the 4 columns that filters visible tasks by title. Status dots should be w-3 h-3 for mobile.",
+      "status": "backlog",
+      "priority": 2,
+      "sort_order": 29,
+      "linked_files": "[]",
+      "created_at": "2026-04-10T10:24:45.782Z",
+      "updated_at": "2026-04-10T10:24:45.782Z"
+    },
+    {
+      "id": 100,
+      "title": "v4.1 [CMD-4] Later panel: add sort controls (priority/date/title) + expand/collapse per project group",
+      "description": "Currently 4-task cap per group, no sort, completely read-only. Add: sort toggle (priority desc, newest first, alpha). Expand/collapse per project group (default collapsed at 4, expand shows all). Add quick-action: click task → move to in_progress.",
+      "status": "backlog",
+      "priority": 1,
+      "sort_order": 30,
+      "linked_files": "[]",
+      "created_at": "2026-04-10T10:24:47.758Z",
+      "updated_at": "2026-04-10T10:24:47.758Z"
+    },
+    {
+      "id": 101,
+      "title": "v4.1 [CMD-5] Next panel: cache last plan in localStorage + make gap items actionable (create task from gap)",
+      "description": "Plan is empty on every page load — user must click Plan each time. Cache the last AI plan in localStorage with timestamp so it persists across reloads. Show 'Generated Xm ago' label. Gaps: add a '+' button per gap to create a task from it directly.",
+      "status": "backlog",
+      "priority": 1,
+      "sort_order": 31,
+      "linked_files": "[]",
+      "created_at": "2026-04-10T10:24:50.685Z",
+      "updated_at": "2026-04-10T10:24:50.685Z"
+    },
+    {
+      "id": 102,
+      "title": "v4.1 [CMD-6] Done panel: show actual task duration (created→done) not just 'Xm ago' + fix critique to show today not all-time",
+      "description": "Done panel shows 'Xm ago' (when finished) but not 'took Ym' (how long). Calculate created_at→updated_at duration. 'Took Longest' shows all-time slowest (#95 at 612m from weeks ago) — filter to this session or today. 24h window is arbitrary — use 'this session' as default.",
+      "status": "backlog",
+      "priority": 1,
+      "sort_order": 32,
+      "linked_files": "[]",
+      "created_at": "2026-04-10T10:24:54.060Z",
+      "updated_at": "2026-04-10T10:24:54.060Z"
+    },
+    {
+      "id": 103,
+      "title": "v4.1 [CMD-7] Delete confirmation dialog + progress bar per-task difficulty (not global avg)",
+      "description": "Kanban delete button has no confirmation — one misclick deletes. Add a simple 'Are you sure?' or 2-click pattern. Progress bar in Now uses global 35m avg for all tasks — should estimate based on task title tags ([CRITICAL] = longer, fix: = shorter) using critique category patterns.",
+      "status": "backlog",
+      "priority": 0,
+      "sort_order": 33,
+      "linked_files": "[]",
+      "created_at": "2026-04-10T10:24:58.047Z",
+      "updated_at": "2026-04-10T10:24:58.047Z"
     }
   ],
   "activity": [
@@ -343,6 +420,160 @@
       "message": "Nexus is online. Setting course.",
       "meta": "{}",
       "created_at": "2026-04-10T10:12:40.681Z"
+    },
+    {
+      "id": 85524,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 10 files changed",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/d6/e832ab0945cc775cdcf83c478fc8e009abd045\",\"path\":\"Nexus/.git/objects/d6/e832ab0945cc775cdcf83c478fc8e009abd045\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/36/fc4a5a08c824a97d2818556e7ed9672fd5d8b6\",\"path\":\"Nexus/.git/objects/36/fc4a5a08c824a97d2818556e7ed9672fd5d8b6\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/ba/687d03f96796fbb5ee8949da165d83de02ab2c\",\"path\":\"Nexus/.git/objects/ba/687d03f96796fbb5ee8949da165d83de02ab2c\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/5d/f107f6d9662ab0d0b035f2be84f5bed46f2429\",\"path\":\"Nexus/.git/objects/5d/f107f6d9662ab0d0b035f2be84f5bed46f2429\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/7e/16274271a014588ce865eab9f9038b605e1a1b\",\"path\":\"Nexus/.git/objects/7e/16274271a014588ce865eab9f9038b605e1a1b\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/23/6c57282769624a70026894bf41cc4cd0f30992\",\"path\":\"Nexus/.git/objects/23/6c57282769624a70026894bf41cc4cd0f30992\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T10:12:52.027Z"
+    },
+    {
+      "id": 85525,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:13:09.411Z"
+    },
+    {
+      "id": 85526,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:13:09.423Z"
+    },
+    {
+      "id": 85527,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:18:17.929Z"
+    },
+    {
+      "id": 85528,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:19:07.543Z"
+    },
+    {
+      "id": 85529,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 5 files changed",
+      "meta": "{\"changes\":[{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-CeuIWGiH.js\",\"path\":\"Nexus/client/dist/assets/index-CeuIWGiH.js\"},{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-CghYWCy_.css\",\"path\":\"Nexus/client/dist/assets/index-CghYWCy_.css\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-CsIYYOyy.css\",\"path\":\"Nexus/client/dist/assets/index-CsIYYOyy.css\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/dist/index.html\",\"path\":\"Nexus/client/dist/index.html\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-BJ3wJwoM.js\",\"path\":\"Nexus/client/dist/assets/index-BJ3wJwoM.js\"}]}",
+      "created_at": "2026-04-10T10:19:18.806Z"
+    },
+    {
+      "id": 85530,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 10 files changed",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/a3/a062a0833710f386a270f4b5b76829cdc819d8\",\"path\":\"Nexus/.git/objects/a3/a062a0833710f386a270f4b5b76829cdc819d8\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/2d/15c9db2281ba72a38b3b2a0f4640d015370bb4\",\"path\":\"Nexus/.git/objects/2d/15c9db2281ba72a38b3b2a0f4640d015370bb4\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/69/8f8e59181855ad0313fac552e314f9f712ac0a\",\"path\":\"Nexus/.git/objects/69/8f8e59181855ad0313fac552e314f9f712ac0a\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/26/e00ee1d106e460e25145de1ad329aa3b089584\",\"path\":\"Nexus/.git/objects/26/e00ee1d106e460e25145de1ad329aa3b089584\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/cf/8f1b16e1c1464965d59c1378306d0cf69dace6\",\"path\":\"Nexus/.git/objects/cf/8f1b16e1c1464965d59c1378306d0cf69dace6\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/d5/1ee2e8d76e1fb375fdfc96e6ad895f2a1a8163\",\"path\":\"Nexus/.git/objects/d5/1ee2e8d76e1fb375fdfc96e6ad895f2a1a8163\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"}]}",
+      "created_at": "2026-04-10T10:19:35.379Z"
+    },
+    {
+      "id": 85531,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:20:00.080Z"
+    },
+    {
+      "id": 85532,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:20:00.091Z"
+    },
+    {
+      "id": 85533,
+      "type": "task_moved",
+      "message": "Course adjusted -- \"v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files\" -> in_progress",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:20:08.583Z"
+    },
+    {
+      "id": 85534,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for Projects",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:23:03.302Z"
+    },
+    {
+      "id": 85535,
+      "type": "system",
+      "message": "Session ended (Projects) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:23:03.312Z"
+    },
+    {
+      "id": 85536,
+      "type": "thought",
+      "message": "Pushed thought: Session ended with 1 task(s) still in progress: #96 v4.0 Pre",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:23:03.328Z"
+    },
+    {
+      "id": 85537,
+      "type": "task_created",
+      "message": "Plotted -- \"v4.1 [CMD-1] Always show session stats counters (done/review/active) even at 0 + show priority badges on task cards\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:24:39.691Z"
+    },
+    {
+      "id": 85538,
+      "type": "task_created",
+      "message": "Plotted -- \"v4.1 [CMD-2] Add project filter dropdown in Command header — scope all panels + kanban to one project\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:24:42.978Z"
+    },
+    {
+      "id": 85539,
+      "type": "task_created",
+      "message": "Plotted -- \"v4.1 [CMD-3] Kanban: limit Done column to last 20 + add search/filter bar above columns\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:24:45.785Z"
+    },
+    {
+      "id": 85540,
+      "type": "task_created",
+      "message": "Plotted -- \"v4.1 [CMD-4] Later panel: add sort controls (priority/date/title) + expand/collapse per project group\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:24:47.761Z"
+    },
+    {
+      "id": 85541,
+      "type": "task_created",
+      "message": "Plotted -- \"v4.1 [CMD-5] Next panel: cache last plan in localStorage + make gap items actionable (create task from gap)\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:24:50.688Z"
+    },
+    {
+      "id": 85542,
+      "type": "task_created",
+      "message": "Plotted -- \"v4.1 [CMD-6] Done panel: show actual task duration (created→done) not just 'Xm ago' + fix critique to show today not all-time\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:24:54.063Z"
+    },
+    {
+      "id": 85543,
+      "type": "task_created",
+      "message": "Plotted -- \"v4.1 [CMD-7] Delete confirmation dialog + progress bar per-task difficulty (not global avg)\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:24:58.050Z"
+    },
+    {
+      "id": 85544,
+      "type": "session",
+      "message": "Session logged -- [Nexus] Massive session: v3.6→v4.0 Phase 2 + frontend restructure + ...",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:25:24.166Z"
+    },
+    {
+      "id": 85545,
+      "type": "decision",
+      "message": "Decision recorded -- [Nexus] v4.1 scope: 7 Command module fixes queued (#97-#103). Priori",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:25:28.806Z"
     }
   ],
   "scratchpads": [
@@ -2243,6 +2474,106 @@
         "auto-summary"
       ],
       "created_at": "2026-04-10T10:08:35.430Z"
+    },
+    {
+      "id": 91,
+      "project": "nexus",
+      "summary": "Completed a large-scale terrain shift operation across 10 files to synchronize environmental parameters and updated the nexus.json configuration.",
+      "decisions": [
+        "Standardized environmental parameter distribution via terrain shift",
+        "Updated nexus.json to reflect new synchronized state"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "terrain-shift",
+        "configuration-sync",
+        "nexus-core",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T10:13:09.408Z"
+    },
+    {
+      "id": 92,
+      "project": "nexus",
+      "summary": "Executed a large-scale terrain shift operation across 15 file instances to synchronize environmental parameters and updated the Command.jsx module logic.",
+      "decisions": [
+        "Synchronized environmental parameters across 10+ core files",
+        "Updated nexus.json configuration for terrain consistency",
+        "Refactored client/src/modules/Command.jsx to support new terrain shifts"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "terrain-sync",
+        "configuration-update",
+        "module-refactor",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T10:20:00.077Z"
+    },
+    {
+      "id": 93,
+      "project": "Projects",
+      "summary": "Completed the v4.0 architectural transition by refactoring the MCP server to use a local NexusStore and finalized the Claude Code Plugin package structure.",
+      "decisions": [
+        "Migrated MCP server from HTTP proxy architecture to self-contained in-process execution",
+        "Adopted ~/.nexus/nexus.json as the primary persistent storage location",
+        "Standardized Claude Code Plugin manifest structure including skills, agents, and hooks"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "v4.0-refactor",
+        "MCP-server",
+        "Claude-Plugin",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T10:23:03.299Z"
+    },
+    {
+      "id": 94,
+      "project": "Nexus",
+      "summary": "Massive session: v3.6→v4.0 Phase 2 + frontend restructure + pre-release audit + critical fixes. Shipped: v3.6.1 (5 Overseer self-audit fixes), v3.7 (frontend 10→7 modules with Command+Log merges), first successful Overseer code-audit (46k tokens, 15.7min on local GPU), AI semaphore (prevents LM Studio slot contention), aiFetch via undici (no 5min headers timeout), GPU signal tuning (lowered thresholds for CPU-bound generation, removed absolute timeout), v4.0 Phase 1 (self-contained MCP with in-process NexusStore at ~/.nexus/), v4.0 Phase 2 (Claude Code Plugin package with skills/agents/hooks), configurable PROJECTS_DIR (17 hardcoded paths → shared config.ts), file watcher feedback loop fix (478 spam entries purged), Command Now panel redesign (work metrics not fuel gauges), full Command audit with 7 tasks queued for v4.1.",
+      "decisions": [
+        "Command module Now panel shows actual CC work metrics (elapsed time, progress, session stats) not fuel gauges — fuel belongs in Fuel module",
+        "File watcher needs PROGRAMMATIC filter for nexus data files, not just chokidar globs — rename events bypass glob matching",
+        "AI semaphore (one inference at a time) + aiFetch (undici, no headers timeout) + GPU signal (lowered thresholds) = three-layer protection for local AI calls",
+        "Self-contained MCP uses adapter pattern: localApi.ts mimics HTTP interface, tool handlers unchanged, only transport switches",
+        "PROJECTS_DIR in shared config.ts with auto-detection (check C:/Projects first, then ~/Projects etc) — single source of truth for all 12 server files"
+      ],
+      "blockers": [],
+      "files_touched": [
+        "server/db/store.ts",
+        "server/mcp/index.ts",
+        "server/mcp/localApi.ts",
+        "server/lib/config.ts",
+        "server/lib/gpuSignal.ts",
+        "server/lib/aiSemaphore.ts",
+        "server/lib/aiFetch.ts",
+        "server/lib/embeddings.ts",
+        "server/routes/overseer.ts",
+        "server/routes/autoSummary.ts",
+        "server/routes/estimator.ts",
+        "server/routes/predict.ts",
+        "server/watchers/fileWatcher.ts",
+        "client/src/modules/Command.jsx",
+        "client/src/modules/Log.jsx",
+        "client/src/App.jsx",
+        "plugin/.claude-plugin/plugin.json"
+      ],
+      "tags": [
+        "v3.6",
+        "v3.7",
+        "v4.0",
+        "self-audit",
+        "frontend-restructure",
+        "plugin",
+        "config",
+        "file-watcher",
+        "command-audit"
+      ],
+      "created_at": "2026-04-10T10:25:24.163Z"
     }
   ],
   "usage": [
@@ -2707,6 +3038,18 @@
       "weekly_percent": 86,
       "note": "fixing Command module Now panel — empty state, needs real-time task + fuel data",
       "created_at": "2026-04-10T10:01:36.951Z"
+    },
+    {
+      "session_percent": 20,
+      "weekly_percent": 84,
+      "note": "redesigning Now panel — show actual CC work, fix kanban task status flow",
+      "created_at": "2026-04-10T10:17:27.590Z"
+    },
+    {
+      "session_percent": 15,
+      "weekly_percent": 83,
+      "note": "queuing full Command audit fixes + planning with nexus",
+      "created_at": "2026-04-10T10:24:36.409Z"
     }
   ],
   "gpu_history": [
@@ -7281,6 +7624,123 @@
       "temperature": 55,
       "power": 73.74,
       "created_at": "2026-04-10T10:12:40.733Z"
+    },
+    {
+      "gpu_util": 25,
+      "mem_util": 15,
+      "vram_used": 7795,
+      "vram_total": 8192,
+      "temperature": 48,
+      "power": 16.43,
+      "created_at": "2026-04-10T10:13:40.788Z"
+    },
+    {
+      "gpu_util": 34,
+      "mem_util": 16,
+      "vram_used": 7789,
+      "vram_total": 8192,
+      "temperature": 46,
+      "power": 15.77,
+      "created_at": "2026-04-10T10:14:40.790Z"
+    },
+    {
+      "gpu_util": 29,
+      "mem_util": 18,
+      "vram_used": 7787,
+      "vram_total": 8192,
+      "temperature": 47,
+      "power": 16.11,
+      "created_at": "2026-04-10T10:15:40.792Z"
+    },
+    {
+      "gpu_util": 6,
+      "mem_util": 1,
+      "vram_used": 7806,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 38.46,
+      "created_at": "2026-04-10T10:16:40.800Z"
+    },
+    {
+      "gpu_util": 28,
+      "mem_util": 20,
+      "vram_used": 7810,
+      "vram_total": 8192,
+      "temperature": 49,
+      "power": 16.94,
+      "created_at": "2026-04-10T10:17:41.023Z"
+    },
+    {
+      "gpu_util": 28,
+      "mem_util": 19,
+      "vram_used": 7831,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 16.44,
+      "created_at": "2026-04-10T10:18:41.024Z"
+    },
+    {
+      "gpu_util": 31,
+      "mem_util": 15,
+      "vram_used": 7810,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 23.47,
+      "created_at": "2026-04-10T10:19:41.029Z"
+    },
+    {
+      "gpu_util": 41,
+      "mem_util": 24,
+      "vram_used": 7777,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 18.57,
+      "created_at": "2026-04-10T10:20:41.040Z"
+    },
+    {
+      "gpu_util": 30,
+      "mem_util": 16,
+      "vram_used": 7778,
+      "vram_total": 8192,
+      "temperature": 53,
+      "power": 19.29,
+      "created_at": "2026-04-10T10:21:41.045Z"
+    },
+    {
+      "gpu_util": 27,
+      "mem_util": 14,
+      "vram_used": 7778,
+      "vram_total": 8192,
+      "temperature": 53,
+      "power": 19.11,
+      "created_at": "2026-04-10T10:22:41.042Z"
+    },
+    {
+      "gpu_util": 38,
+      "mem_util": 21,
+      "vram_used": 7764,
+      "vram_total": 8192,
+      "temperature": 46,
+      "power": 16.61,
+      "created_at": "2026-04-10T10:23:41.043Z"
+    },
+    {
+      "gpu_util": 11,
+      "mem_util": 1,
+      "vram_used": 7822,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 73.95,
+      "created_at": "2026-04-10T10:24:41.051Z"
+    },
+    {
+      "gpu_util": 25,
+      "mem_util": 13,
+      "vram_used": 7789,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 18.98,
+      "created_at": "2026-04-10T10:25:41.054Z"
     }
   ],
   "_sessionTiming": {
@@ -8455,6 +8915,15 @@
       "alternatives": [],
       "tags": [],
       "created_at": "2026-04-10T09:14:40.533Z"
+    },
+    {
+      "id": 92,
+      "decision": "v4.1 scope: 7 Command module fixes queued (#97-#103). Priority order: P2 quick wins (session stats always visible, project filter, kanban done limit + search), P1 improvements (later sort/expand, plan caching, done duration tracking), P0 polish (delete confirmation, per-task difficulty estimation). This is the frontend debt payoff before going public.",
+      "context": "Full Command audit revealed the frontend gap — backend has 20 MCP tools, GPU-aware AI, semantic linking, but the dashboard still has empty panels, no project filtering, and stale data displays. v4.1 closes this gap before Phase 3 (marketplace publication).",
+      "project": "Nexus",
+      "alternatives": [],
+      "tags": [],
+      "created_at": "2026-04-10T10:25:28.800Z"
     }
   ],
   "graph_edges": [
@@ -9633,6 +10102,46 @@
       "rel": "related",
       "note": "semantic-linked (73% cosine similarity)",
       "created_at": "2026-04-10T09:14:41.654Z"
+    },
+    {
+      "id": 148,
+      "from": 92,
+      "to": 89,
+      "rel": "related",
+      "note": "semantic-linked (78% cosine similarity)",
+      "created_at": "2026-04-10T10:25:28.859Z"
+    },
+    {
+      "id": 149,
+      "from": 92,
+      "to": 87,
+      "rel": "related",
+      "note": "semantic-linked (76% cosine similarity)",
+      "created_at": "2026-04-10T10:25:28.863Z"
+    },
+    {
+      "id": 150,
+      "from": 92,
+      "to": 30,
+      "rel": "related",
+      "note": "semantic-linked (76% cosine similarity)",
+      "created_at": "2026-04-10T10:25:28.866Z"
+    },
+    {
+      "id": 151,
+      "from": 92,
+      "to": 90,
+      "rel": "related",
+      "note": "semantic-linked (76% cosine similarity)",
+      "created_at": "2026-04-10T10:25:28.869Z"
+    },
+    {
+      "id": 152,
+      "from": 92,
+      "to": 88,
+      "rel": "related",
+      "note": "semantic-linked (74% cosine similarity)",
+      "created_at": "2026-04-10T10:25:28.871Z"
     }
   ],
   "advice": [
@@ -10102,6 +10611,16 @@
       "pushed_at": "2026-04-07T18:50:12.097Z",
       "popped_at": "2026-04-07T18:50:12.104Z",
       "status": "resolved",
+      "related_task_id": null
+    },
+    {
+      "id": 4,
+      "text": "Session ended with 1 task(s) still in progress: #96 v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files",
+      "context": "auto-pushed by session-stop hook for Projects",
+      "project": "Projects",
+      "pushed_at": "2026-04-10T10:23:03.326Z",
+      "popped_at": null,
+      "status": "active",
       "related_task_id": null
     }
   ]
