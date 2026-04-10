@@ -6,10 +6,9 @@ import type { NexusStore } from '../db/store.ts';
 import { createGpuAwareSignal } from '../lib/gpuSignal.ts';
 import { acquireAiLock } from '../lib/aiSemaphore.ts';
 import { aiFetch } from '../lib/aiFetch.ts';
+import { PROJECTS_DIR } from '../lib/config.ts';
 
 type BroadcastFn = (data: any) => void;
-
-const PROJECTS_DIR = 'C:/Projects';
 
 // ── AI connection (same detection as ai.js) ─────────
 const AI_ENDPOINTS = [
@@ -491,14 +490,14 @@ Group by severity. Be terse. Maximum 30 findings.`;
     // Stale repos (no commit in 14+ days)
     for (const r of ctx.repos) {
       if (r.daysSinceCommit > 14) {
-        risks.push({ level: 'warning', category: 'stale', project: r.name, message: `${r.name} has gone cold (${r.daysSinceCommit}d since last commit)`, fix: { cmd: `cd C:/Projects/${r.name} && git log --oneline -5`, label: 'Review history' } });
+        risks.push({ level: 'warning', category: 'stale', project: r.name, message: `${r.name} has gone cold (${r.daysSinceCommit}d since last commit)`, fix: { cmd: `cd "${join(PROJECTS_DIR, r.name)}" && git log --oneline -5`, label: 'Review history' } });
       }
     }
 
     // Dirty repos (uncommitted changes)
     for (const r of ctx.repos) {
       if (r.uncommitted > 5) {
-        risks.push({ level: r.uncommitted > 20 ? 'critical' : 'warning', category: 'uncommitted', project: r.name, message: `${r.name} has ${r.uncommitted} uncommitted changes at risk`, fix: { cmd: `cd C:/Projects/${r.name} && git status`, label: 'Check status' } });
+        risks.push({ level: r.uncommitted > 20 ? 'critical' : 'warning', category: 'uncommitted', project: r.name, message: `${r.name} has ${r.uncommitted} uncommitted changes at risk`, fix: { cmd: `cd "${join(PROJECTS_DIR, r.name)}" && git status`, label: 'Check status' } });
       }
     }
 

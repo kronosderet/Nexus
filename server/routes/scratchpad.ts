@@ -2,8 +2,7 @@ import { Router, Request, Response } from 'express';
 import { readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
-
-const PROJECTS_DIR = 'C:/Projects';
+import { PROJECTS_DIR } from '../lib/config.ts';
 
 export function createScratchpadRoutes(store: NexusStore): Router {
   const router = Router();

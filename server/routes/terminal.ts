@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import type { WebSocketServer, WebSocket } from 'ws';
+import { PROJECTS_DIR } from '../lib/config.ts';
 
 /**
  * Terminal backend via WebSocket.
@@ -12,7 +13,7 @@ export function attachTerminal(wss: WebSocketServer): void {
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: false,
       env: { ...process.env, TERM: 'xterm-256color' },
-      cwd: 'C:/Projects',
+      cwd: PROJECTS_DIR,
     });
 
     // Stream stdout to WebSocket
@@ -52,6 +53,6 @@ export function attachTerminal(wss: WebSocketServer): void {
     });
 
     // Send ready signal
-    ws.send(JSON.stringify({ type: 'terminal_ready', cwd: 'C:/Projects' }));
+    ws.send(JSON.stringify({ type: 'terminal_ready', cwd: PROJECTS_DIR }));
   });
 }
