@@ -430,27 +430,6 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
           </div>
         </div>
 
-        {/* Recent completions with duration */}
-        {(() => {
-          const today = new Date().toDateString();
-          const recentDoneToday = done
-            .filter(t => t.updated_at && new Date(t.updated_at).toDateString() === today)
-            .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-            .slice(0, 4);
-          return recentDoneToday.length > 0 ? (
-            <div className="mb-3">
-              <span className="text-[10px] font-mono text-nexus-text-faint mb-1 block">Completed Today</span>
-              {recentDoneToday.map(t => (
-                <div key={t.id} className="flex items-center gap-2 px-2 py-1 text-[11px]">
-                  <CheckCircle2 size={10} className="text-nexus-green shrink-0" />
-                  <span className="text-nexus-text-dim truncate flex-1">{t.title}</span>
-                  <span className="text-nexus-text-faint shrink-0 font-mono">{minutesAgo(t.updated_at)}</span>
-                </div>
-              ))}
-            </div>
-          ) : null;
-        })()}
-
         {/* Thought stack */}
         {thoughts.length > 0 && (
           <div className="mb-3 pt-2 border-t border-nexus-border">

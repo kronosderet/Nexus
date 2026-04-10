@@ -279,12 +279,12 @@
       "id": 96,
       "title": "v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files",
       "description": "Pre-release audit found C:/Projects hardcoded in: actions.ts, focus.ts, github.ts, init.ts, overseer.ts (3x), predict.ts, pulse.ts, remediate.ts (3x), scratchpad.ts, terminal.ts (2x), fileWatcher.ts, overseerPoller.ts, cli/nexus.js. All need process.env.NEXUS_PROJECTS_DIR || homedir() fallback. Critical for plugin distribution — other users don't have C:/Projects.",
-      "status": "in_progress",
+      "status": "done",
       "priority": 2,
       "sort_order": 27,
       "linked_files": "[]",
       "created_at": "2026-04-10T09:41:15.301Z",
-      "updated_at": "2026-04-10T10:20:08.580Z"
+      "updated_at": "2026-04-10T10:52:30.939Z"
     },
     {
       "id": 97,
@@ -819,6 +819,139 @@
       "message": "Landmark reached -- \"v4.1 [CMD-7] Delete confirmation dialog + progress bar per-task difficulty (not global avg)\"",
       "meta": "{}",
       "created_at": "2026-04-10T10:37:22.793Z"
+    },
+    {
+      "id": 85581,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 12 files changed",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/19/e3fbe55a7bcdbeacf2781499d95eacb0469169\",\"path\":\"Nexus/.git/objects/19/e3fbe55a7bcdbeacf2781499d95eacb0469169\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/47/6dbfdc067fed446bc09b6a64b66d3f16bbaeb5\",\"path\":\"Nexus/.git/objects/47/6dbfdc067fed446bc09b6a64b66d3f16bbaeb5\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/66/88cbfc9184c1f4bb1d109d53f78b7b4f49e09c\",\"path\":\"Nexus/.git/objects/66/88cbfc9184c1f4bb1d109d53f78b7b4f49e09c\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/1b/fdf7f034d3f458074e18281e2109d5e1f1f79e\",\"path\":\"Nexus/.git/objects/1b/fdf7f034d3f458074e18281e2109d5e1f1f79e\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/7b/e6f54d1288491920d66a8043f4f98427734ef4\",\"path\":\"Nexus/.git/objects/7b/e6f54d1288491920d66a8043f4f98427734ef4\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/93/83ecd0f7695845f6b70c32cafa8204e8b4f974\",\"path\":\"Nexus/.git/objects/93/83ecd0f7695845f6b70c32cafa8204e8b4f974\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/d4/1ae1e7a3d73548b16f617521e196d2be35b20b\",\"path\":\"Nexus/.git/objects/d4/1ae1e7a3d73548b16f617521e196d2be35b20b\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/82/0eecc49b5b93b3e31b446b6480e86f854bb1b3\",\"path\":\"Nexus/.git/objects/82/0eecc49b5b93b3e31b446b6480e86f854bb1b3\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T10:39:05.252Z"
+    },
+    {
+      "id": 85582,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:39:34.199Z"
+    },
+    {
+      "id": 85583,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:39:34.209Z"
+    },
+    {
+      "id": 85584,
+      "type": "thought",
+      "message": "Pushed thought: Session ended with 1 task(s) still in progress: #96 v4.0 Pre",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:39:34.219Z"
+    },
+    {
+      "id": 85585,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:45:50.700Z"
+    },
+    {
+      "id": 85586,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 6 files changed",
+      "meta": "{\"changes\":[{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-BZqrfkdq.js\",\"path\":\"Nexus/client/dist/assets/index-BZqrfkdq.js\"},{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-C8r-nV8k.css\",\"path\":\"Nexus/client/dist/assets/index-C8r-nV8k.css\"},{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/index.html\",\"path\":\"Nexus/client/dist/index.html\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-BR66kXpX.js\",\"path\":\"Nexus/client/dist/assets/index-BR66kXpX.js\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/index.html\",\"path\":\"Nexus/client/dist/index.html\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-C8r-nV8k.css\",\"path\":\"Nexus/client/dist/assets/index-C8r-nV8k.css\"}]}",
+      "created_at": "2026-04-10T10:46:04.575Z"
+    },
+    {
+      "id": 85587,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 10 files changed",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/4a/b547f04ef86203e8e532e543bbd994816c9ef5\",\"path\":\"Nexus/.git/objects/4a/b547f04ef86203e8e532e543bbd994816c9ef5\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/b4/f3917f9105aaab28f9a45bc3a31adcd41d3858\",\"path\":\"Nexus/.git/objects/b4/f3917f9105aaab28f9a45bc3a31adcd41d3858\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/dc/0cbe1caea3bc111ec39535a2ae38b5bf1da604\",\"path\":\"Nexus/.git/objects/dc/0cbe1caea3bc111ec39535a2ae38b5bf1da604\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/14/43cb03de9396d7902e7166383b4dddf56e0864\",\"path\":\"Nexus/.git/objects/14/43cb03de9396d7902e7166383b4dddf56e0864\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/9c/c3f550f862612ac13c2a79fce51014d194499c\",\"path\":\"Nexus/.git/objects/9c/c3f550f862612ac13c2a79fce51014d194499c\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/15/ef1948d12b96f91a2b9b2817ef9bc6675f8dac\",\"path\":\"Nexus/.git/objects/15/ef1948d12b96f91a2b9b2817ef9bc6675f8dac\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T10:46:15.942Z"
+    },
+    {
+      "id": 85588,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:46:47.531Z"
+    },
+    {
+      "id": 85589,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:46:48.126Z"
+    },
+    {
+      "id": 85590,
+      "type": "thought",
+      "message": "Pushed thought: Session ended with 1 task(s) still in progress: #96 v4.0 Pre",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:46:48.152Z"
+    },
+    {
+      "id": 85591,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Command.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Command.jsx\",\"path\":\"Nexus/client/src/modules/Command.jsx\"}]}",
+      "created_at": "2026-04-10T10:48:26.055Z"
+    },
+    {
+      "id": 85592,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 16 files changed",
+      "meta": "{\"changes\":[{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-BR66kXpX.js\",\"path\":\"Nexus/client/dist/assets/index-BR66kXpX.js\"},{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-C8r-nV8k.css\",\"path\":\"Nexus/client/dist/assets/index-C8r-nV8k.css\"},{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/index.html\",\"path\":\"Nexus/client/dist/index.html\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-C8r-nV8k.css\",\"path\":\"Nexus/client/dist/assets/index-C8r-nV8k.css\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-Bghuemd0.js\",\"path\":\"Nexus/client/dist/assets/index-Bghuemd0.js\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/index.html\",\"path\":\"Nexus/client/dist/index.html\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/47/42323a18d32239e89d5865b2fec38772616cee\",\"path\":\"Nexus/.git/objects/47/42323a18d32239e89d5865b2fec38772616cee\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/ba/fbc6bac0b938053d80daebbc8fa479a2535b1d\",\"path\":\"Nexus/.git/objects/ba/fbc6bac0b938053d80daebbc8fa479a2535b1d\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/28/51ba217e658e56f5d0b0b6bcc9b5be8d63d5cc\",\"path\":\"Nexus/.git/objects/28/51ba217e658e56f5d0b0b6bcc9b5be8d63d5cc\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/c9/71bf40e9749beee7c53b4e6c9ae62ce770ee51\",\"path\":\"Nexus/.git/objects/c9/71bf40e9749beee7c53b4e6c9ae62ce770ee51\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/e9/5952e43f40cd31330ee8b34f179652b7c6cf79\",\"path\":\"Nexus/.git/objects/e9/5952e43f40cd31330ee8b34f179652b7c6cf79\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/8a/0b49abf15cd680ab4700528c3ffc03e9d483cc\",\"path\":\"Nexus/.git/objects/8a/0b49abf15cd680ab4700528c3ffc03e9d483cc\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T10:48:40.218Z"
+    },
+    {
+      "id": 85593,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:48:57.466Z"
+    },
+    {
+      "id": 85594,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:48:57.478Z"
+    },
+    {
+      "id": 85595,
+      "type": "thought",
+      "message": "Pushed thought: Session ended with 1 task(s) still in progress: #96 v4.0 Pre",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:48:57.494Z"
+    },
+    {
+      "id": 85596,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for Projects",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:50:46.638Z"
+    },
+    {
+      "id": 85597,
+      "type": "system",
+      "message": "Session ended (Projects) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:50:46.650Z"
+    },
+    {
+      "id": 85598,
+      "type": "thought",
+      "message": "Pushed thought: Session ended with 1 task(s) still in progress: #96 v4.0 Pre",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:50:46.666Z"
+    },
+    {
+      "id": 85599,
+      "type": "task_done",
+      "message": "Landmark reached -- \"v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T10:52:30.941Z"
     }
   ],
   "scratchpads": [
@@ -2858,6 +2991,81 @@
         "auto-summary"
       ],
       "created_at": "2026-04-10T10:33:42.115Z"
+    },
+    {
+      "id": 97,
+      "project": "nexus",
+      "summary": "Completed four major UI enhancements for the Command module in v4.1, focusing on panel controls, data persistence, and task metrics.",
+      "decisions": [
+        "Implemented localStorage caching for the 'Next' panel plan to ensure session persistence",
+        "Transitioned task duration display from relative time to absolute duration (created→done)",
+        "Refactored progress bar logic to calculate difficulty on a per-task basis rather than using global averages",
+        "Added sort controls (priority/date/title) and group expansion/collapse for the 'Later' panel"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "v4.1",
+        "Command Module",
+        "UI/UX Refactor",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T10:39:34.196Z"
+    },
+    {
+      "id": 98,
+      "project": "nexus",
+      "summary": "Refactored Command module core logic and implemented terrain shift integration across multiple files.",
+      "decisions": [
+        "Integrated terrain shift mechanics into the Command module",
+        "Updated client/src/modules/Command.jsx to handle new terrain data structures"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "UI Refactor",
+        "Terrain System",
+        "Command Module",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T10:46:47.528Z"
+    },
+    {
+      "id": 99,
+      "project": "nexus",
+      "summary": "Implemented terrain shift integration across 16 files and updated the Command module core logic in client/src/modules/Command.jsx.",
+      "decisions": [
+        "Integrated terrain shift mechanics into existing command execution flow",
+        "Refactored Command.jsx to support dynamic terrain updates"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "terrain-shift",
+        "refactoring",
+        "command-module",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T10:48:57.463Z"
+    },
+    {
+      "id": 100,
+      "project": "Projects",
+      "summary": "Implemented the full suite of v4.1 Command module enhancements, including UI refinements for session stats, project filtering, and Kanban column management.",
+      "decisions": [
+        "Prioritized v4.1 tasks into P2 (quick wins), P1 (improvements), and P0 (polish) to address frontend debt",
+        "Implemented localStorage caching for the 'Next' panel plan to maintain state across sessions",
+        "Shifted task difficulty progress bars from global averages to per-task granularity"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "v4.1",
+        "frontend-refactor",
+        "UI/UX",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T10:50:46.635Z"
     }
   ],
   "usage": [
@@ -8145,6 +8353,141 @@
       "temperature": 50,
       "power": 15.62,
       "created_at": "2026-04-10T10:37:41.138Z"
+    },
+    {
+      "gpu_util": 23,
+      "mem_util": 23,
+      "vram_used": 7826,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 18.8,
+      "created_at": "2026-04-10T10:38:41.139Z"
+    },
+    {
+      "gpu_util": 58,
+      "mem_util": 39,
+      "vram_used": 7831,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 13.48,
+      "created_at": "2026-04-10T10:39:41.161Z"
+    },
+    {
+      "gpu_util": 13,
+      "mem_util": 1,
+      "vram_used": 7834,
+      "vram_total": 8192,
+      "temperature": 48,
+      "power": 42.99,
+      "created_at": "2026-04-10T10:40:41.158Z"
+    },
+    {
+      "gpu_util": 2,
+      "mem_util": 60,
+      "vram_used": 7833,
+      "vram_total": 8192,
+      "temperature": 47,
+      "power": 12.83,
+      "created_at": "2026-04-10T10:41:41.171Z"
+    },
+    {
+      "gpu_util": 2,
+      "mem_util": 11,
+      "vram_used": 7887,
+      "vram_total": 8192,
+      "temperature": 47,
+      "power": 11.53,
+      "created_at": "2026-04-10T10:42:41.168Z"
+    },
+    {
+      "gpu_util": 22,
+      "mem_util": 8,
+      "vram_used": 7712,
+      "vram_total": 8192,
+      "temperature": 48,
+      "power": 17.65,
+      "created_at": "2026-04-10T10:43:41.170Z"
+    },
+    {
+      "gpu_util": 42,
+      "mem_util": 23,
+      "vram_used": 7707,
+      "vram_total": 8192,
+      "temperature": 49,
+      "power": 17.56,
+      "created_at": "2026-04-10T10:44:41.192Z"
+    },
+    {
+      "gpu_util": 17,
+      "mem_util": 10,
+      "vram_used": 7794,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 18.64,
+      "created_at": "2026-04-10T10:45:41.191Z"
+    },
+    {
+      "gpu_util": 96,
+      "mem_util": 2,
+      "vram_used": 7730,
+      "vram_total": 8192,
+      "temperature": 59,
+      "power": 113.11,
+      "created_at": "2026-04-10T10:46:41.222Z"
+    },
+    {
+      "gpu_util": 21,
+      "mem_util": 16,
+      "vram_used": 7733,
+      "vram_total": 8192,
+      "temperature": 46,
+      "power": 15.5,
+      "created_at": "2026-04-10T10:47:41.206Z"
+    },
+    {
+      "gpu_util": 20,
+      "mem_util": 11,
+      "vram_used": 7778,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 20.1,
+      "created_at": "2026-04-10T10:48:41.213Z"
+    },
+    {
+      "gpu_util": 23,
+      "mem_util": 13,
+      "vram_used": 7773,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 19.28,
+      "created_at": "2026-04-10T10:49:41.219Z"
+    },
+    {
+      "gpu_util": 33,
+      "mem_util": 9,
+      "vram_used": 7725,
+      "vram_total": 8192,
+      "temperature": 55,
+      "power": 50.96,
+      "created_at": "2026-04-10T10:50:41.240Z"
+    },
+    {
+      "gpu_util": 37,
+      "mem_util": 21,
+      "vram_used": 7706,
+      "vram_total": 8192,
+      "temperature": 45,
+      "power": 16.55,
+      "created_at": "2026-04-10T10:51:41.227Z"
+    },
+    {
+      "gpu_util": 8,
+      "mem_util": 1,
+      "vram_used": 7710,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 73.76,
+      "created_at": "2026-04-10T10:52:41.239Z"
     }
   ],
   "_sessionTiming": {
@@ -11043,6 +11386,46 @@
       "context": "auto-pushed by session-stop hook for nexus",
       "project": "nexus",
       "pushed_at": "2026-04-10T10:33:42.136Z",
+      "popped_at": null,
+      "status": "active",
+      "related_task_id": null
+    },
+    {
+      "id": 7,
+      "text": "Session ended with 1 task(s) still in progress: #96 v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files",
+      "context": "auto-pushed by session-stop hook for nexus",
+      "project": "nexus",
+      "pushed_at": "2026-04-10T10:39:34.216Z",
+      "popped_at": null,
+      "status": "active",
+      "related_task_id": null
+    },
+    {
+      "id": 8,
+      "text": "Session ended with 1 task(s) still in progress: #96 v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files",
+      "context": "auto-pushed by session-stop hook for nexus",
+      "project": "nexus",
+      "pushed_at": "2026-04-10T10:46:48.150Z",
+      "popped_at": null,
+      "status": "active",
+      "related_task_id": null
+    },
+    {
+      "id": 9,
+      "text": "Session ended with 1 task(s) still in progress: #96 v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files",
+      "context": "auto-pushed by session-stop hook for nexus",
+      "project": "nexus",
+      "pushed_at": "2026-04-10T10:48:57.490Z",
+      "popped_at": null,
+      "status": "active",
+      "related_task_id": null
+    },
+    {
+      "id": 10,
+      "text": "Session ended with 1 task(s) still in progress: #96 v4.0 Pre-release: Replace 17 hardcoded C:/Projects paths with configurable NEXUS_PROJECTS_DIR env var across 12 server files",
+      "context": "auto-pushed by session-stop hook for Projects",
+      "project": "Projects",
+      "pushed_at": "2026-04-10T10:50:46.663Z",
       "popped_at": null,
       "status": "active",
       "related_task_id": null
