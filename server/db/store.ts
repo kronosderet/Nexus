@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, renameSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import type {
@@ -15,6 +15,7 @@ type IdTable = 'tasks' | 'activity' | 'sessions' | 'scratchpads' | 'bookmarks';
 
 const BAK_PATH = DB_PATH + '.bak';
 const BAK2_PATH = DB_PATH + '.bak.2';
+const TMP_PATH = DB_PATH + '.tmp';
 
 export class NexusStore {
   data: NexusData;
@@ -78,18 +79,30 @@ export class NexusStore {
     };
   }
 
+  private _flushing = false;
+  private _pendingSemanticLinks = 0;
   _flush(): void {
-    const json = JSON.stringify(this.data, null, 2);
-    // Rotate backups: .bak → .bak.2, current → .bak, then write new
+    // Write mutex: skip if already flushing (prevents concurrent truncation)
+    if (this._flushing) return;
+    this._flushing = true;
     try {
-      if (existsSync(BAK_PATH)) {
-        try { writeFileSync(BAK2_PATH, readFileSync(BAK_PATH)); } catch {}
-      }
-      if (existsSync(DB_PATH)) {
-        try { writeFileSync(BAK_PATH, readFileSync(DB_PATH)); } catch {}
-      }
-    } catch {}
-    writeFileSync(DB_PATH, json);
+      const json = JSON.stringify(this.data, null, 2);
+      // Atomic write: write to .tmp first, then rotate via rename
+      // rename() is atomic on most OS — if we crash mid-rotation,
+      // at least the .tmp file has valid data for recovery.
+      writeFileSync(TMP_PATH, json);
+      // Rotate backups
+      try {
+        if (existsSync(BAK_PATH)) renameSync(BAK_PATH, BAK2_PATH);
+      } catch {}
+      try {
+        if (existsSync(DB_PATH)) renameSync(DB_PATH, BAK_PATH);
+      } catch {}
+      // Promote tmp → primary (atomic on same filesystem)
+      renameSync(TMP_PATH, DB_PATH);
+    } finally {
+      this._flushing = false;
+    }
   }
   private _id(table: IdTable): number { return this._nextId[table]++; }
   _now(): string { return new Date().toISOString(); }
@@ -339,7 +352,13 @@ export class NexusStore {
     const linked: GraphEdge[] = [];
 
     // Fire-and-forget semantic linking (async, doesn't block recordDecision)
-    this._semanticAutoLink(newDec).catch(() => {});
+    // Capped: skip if too many already in flight to prevent promise accumulation
+    if (this._pendingSemanticLinks < 3) {
+      this._pendingSemanticLinks++;
+      this._semanticAutoLink(newDec)
+        .catch(() => {})
+        .finally(() => { this._pendingSemanticLinks--; });
+    }
 
     // Synchronous keyword fallback (always runs, immediate)
     const newWords = this._significantWords(newDec.decision + ' ' + newDec.context);

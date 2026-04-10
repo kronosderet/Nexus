@@ -24,14 +24,28 @@ if (existsSync(EMBED_CACHE_PATH)) {
   try { cache = JSON.parse(readFileSync(EMBED_CACHE_PATH, 'utf-8')); } catch {}
 }
 
+let savePending: NodeJS.Timeout | null = null;
 function saveCache() {
-  const keys = Object.keys(cache);
-  if (keys.length > 500) {
-    const sorted = keys.sort((a, b) => (cache[a].ts || 0) - (cache[b].ts || 0));
-    for (const k of sorted.slice(0, keys.length - 400)) delete cache[k];
-  }
-  writeFileSync(EMBED_CACHE_PATH, JSON.stringify(cache));
+  // Debounce: write at most once per 5 seconds to avoid I/O bottleneck
+  if (savePending) return;
+  savePending = setTimeout(() => {
+    savePending = null;
+    const keys = Object.keys(cache);
+    if (keys.length > 500) {
+      const sorted = keys.sort((a, b) => (cache[a].ts || 0) - (cache[b].ts || 0));
+      for (const k of sorted.slice(0, keys.length - 400)) delete cache[k];
+    }
+    try { writeFileSync(EMBED_CACHE_PATH, JSON.stringify(cache)); } catch {}
+  }, 5000);
 }
+
+// Flush on exit
+process.on('exit', () => {
+  if (savePending) {
+    clearTimeout(savePending);
+    try { writeFileSync(EMBED_CACHE_PATH, JSON.stringify(cache)); } catch {}
+  }
+});
 
 export async function getEmbedding(text: string): Promise<number[] | null> {
   const key = text.slice(0, 200);
