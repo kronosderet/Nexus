@@ -166,10 +166,10 @@ export default function FuelModule({ ws }) {
           <div className="space-y-2">
             {history.sessionStats?.slice(0, 5).map((s, i) => (
               <div key={i} className="flex items-center gap-3 text-xs font-mono">
-                <span className="text-nexus-text-faint w-16">Session {i + 1}</span>
+                <span className="text-nexus-text-faint w-20">{s.date || `Session ${i + 1}`}</span>
                 <Bar percent={100 - s.burned} className="flex-1" />
-                <span className="text-nexus-text-dim w-20 text-right">{s.burned}% burned in {s.duration}h</span>
-                <span className="text-nexus-text-faint w-16 text-right">{s.rate}%/h</span>
+                <span className="text-nexus-text-dim w-24 text-right">{s.burned}% in {s.duration}h</span>
+                <span className="text-nexus-text-faint w-14 text-right">{s.rate}%/h</span>
               </div>
             ))}
           </div>

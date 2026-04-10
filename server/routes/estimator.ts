@@ -307,50 +307,67 @@ function calculateEventCosts(store: NexusStore) {
 }
 
 function buildHistoricalStats(store: NexusStore) {
-  const history = store.getUsage(200);
-  if (history.length < 2) return { insufficient: true };
+  const raw = store.getUsage(200);
+  if (raw.length < 2) return { insufficient: true };
 
-  // Group by session windows (detect resets: when session% jumps up)
-  const sessions: any[] = [];
-  let currentSession: any = { reports: [history[0]], startFuel: history[history.length - 1].session_percent };
+  // Sort chronologically (oldest → newest)
+  const history = [...raw].sort(
+    (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  // Group into sessions by detecting resets (fuel jumps UP > 20%)
+  const sessions: Array<{ reports: any[] }> = [];
+  let current: { reports: any[] } = { reports: [history[0]] };
 
   for (let i = 1; i < history.length; i++) {
     const prev = history[i - 1];
     const curr = history[i];
-    // Detect session reset: fuel jumps up significantly
-    if (curr.session_percent != null && prev.session_percent != null &&
-        curr.session_percent > prev.session_percent + 20) {
-      sessions.push(currentSession);
-      currentSession = { reports: [curr] };
+
+    const prevS = prev.session_percent ?? 0;
+    const currS = curr.session_percent ?? 0;
+
+    // Session reset: fuel increases significantly (e.g., 20% → 100%)
+    if (currS > prevS + 20) {
+      sessions.push(current);
+      current = { reports: [curr] };
     } else {
-      currentSession.reports.push(curr);
+      current.reports.push(curr);
     }
   }
-  sessions.push(currentSession);
+  sessions.push(current);
 
-  // Per-session stats
-  const sessionStats = sessions.filter(s => s.reports.length >= 2).map(s => {
-    const first = s.reports[s.reports.length - 1];
-    const last = s.reports[0];
-    const duration = (new Date(last.created_at).getTime() - new Date(first.created_at).getTime()) / 3600000;
-    const burned = (first.session_percent || 100) - (last.session_percent || 0);
-    return {
-      duration: Math.round(duration * 10) / 10,
-      burned: Math.round(burned),
-      rate: duration > 0 ? Math.round((burned / duration) * 10) / 10 : 0,
-      reports: s.reports.length,
-    };
-  });
+  // Per-session stats: first report = session start (highest fuel), last = session end (lowest)
+  const sessionStats = sessions
+    .filter(s => s.reports.length >= 2)
+    .map(s => {
+      const start = s.reports[0]; // chronologically first = highest fuel
+      const end = s.reports[s.reports.length - 1]; // chronologically last = lowest fuel
+      const durationMs = new Date(end.created_at).getTime() - new Date(start.created_at).getTime();
+      const durationH = durationMs / 3600000;
 
-  // Average burn rate across all sessions
+      const startFuel = start.session_percent ?? 100;
+      const endFuel = end.session_percent ?? 0;
+      const burned = Math.max(0, startFuel - endFuel); // never negative
+
+      return {
+        duration: Math.round(durationH * 10) / 10,
+        burned: Math.round(burned),
+        rate: durationH > 0.1 ? Math.round((burned / durationH) * 10) / 10 : 0,
+        reports: s.reports.length,
+        date: new Date(start.created_at).toLocaleDateString(),
+      };
+    })
+    .filter(s => s.duration > 0 && s.burned > 0) // skip zero-duration or zero-burn sessions
+    .reverse(); // newest first for display
+
   const avgRate = sessionStats.length > 0
     ? Math.round(sessionStats.reduce((s, x) => s + x.rate, 0) / sessionStats.length * 10) / 10
     : 0;
 
   return {
     totalReports: history.length,
-    sessionsDetected: sessions.length,
-    sessionStats,
+    sessionsDetected: sessionStats.length,
+    sessionStats: sessionStats.slice(0, 10), // last 10 sessions
     averageBurnRate: avgRate,
     averageSessionDuration: sessionStats.length > 0
       ? Math.round(sessionStats.reduce((s, x) => s + x.duration, 0) / sessionStats.length * 10) / 10

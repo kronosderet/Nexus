@@ -439,6 +439,17 @@
       "linked_files": "[]",
       "created_at": "2026-04-10T12:25:17.058Z",
       "updated_at": "2026-04-10T12:25:17.070Z"
+    },
+    {
+      "id": 111,
+      "title": "Fix Fuel module session history — data doesn't make sense",
+      "description": "",
+      "status": "done",
+      "priority": 2,
+      "sort_order": 1,
+      "linked_files": "[]",
+      "created_at": "2026-04-10T12:34:07.532Z",
+      "updated_at": "2026-04-10T12:36:21.895Z"
     }
   ],
   "activity": [
@@ -1645,6 +1656,76 @@
       "message": "Landmark reached -- \"Full audit of public Claude Code extension — plugin structure, MCP tools, skills, hooks, README, install flow\"",
       "meta": "{}",
       "created_at": "2026-04-10T12:26:41.724Z"
+    },
+    {
+      "id": 85688,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 13 files changed",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/1b/123107eecce1585582e1df16b7d54b47f6f9c8\",\"path\":\"Nexus/.git/objects/1b/123107eecce1585582e1df16b7d54b47f6f9c8\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/71/b88df5a766b924f1655e2212e23295bd0ae361\",\"path\":\"Nexus/.git/objects/71/b88df5a766b924f1655e2212e23295bd0ae361\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/8f/c5d51bdb28715f6fd03b118047557ae426a4c2\",\"path\":\"Nexus/.git/objects/8f/c5d51bdb28715f6fd03b118047557ae426a4c2\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/2d/2dc8dc2f8590aeaefdec883723fb5a65ef4d85\",\"path\":\"Nexus/.git/objects/2d/2dc8dc2f8590aeaefdec883723fb5a65ef4d85\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/93/e7a489e30fae3e6b4cd41dfb1d3616de723885\",\"path\":\"Nexus/.git/objects/93/e7a489e30fae3e6b4cd41dfb1d3616de723885\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/c3/fe1a0b0a5eae040809054c1ace728fdbca6842\",\"path\":\"Nexus/.git/objects/c3/fe1a0b0a5eae040809054c1ace728fdbca6842\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/2f/32f020de42a106540927ec3185a505079b43bd\",\"path\":\"Nexus/.git/objects/2f/32f020de42a106540927ec3185a505079b43bd\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/4c/0e3a2de42a31b655fdec4b1afbd559d2db8c9a\",\"path\":\"Nexus/.git/objects/4c/0e3a2de42a31b655fdec4b1afbd559d2db8c9a\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/f8/2836d1598c110b6d635dd27d7588e4e0f236b4\",\"path\":\"Nexus/.git/objects/f8/2836d1598c110b6d635dd27d7588e4e0f236b4\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T12:26:59.169Z"
+    },
+    {
+      "id": 85689,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:27:22.578Z"
+    },
+    {
+      "id": 85690,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:27:22.590Z"
+    },
+    {
+      "id": 85691,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:30:58.953Z"
+    },
+    {
+      "id": 85692,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:30:58.963Z"
+    },
+    {
+      "id": 85693,
+      "type": "task_created",
+      "message": "Plotted -- \"Fix Fuel module session history — data doesn't make sense\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:34:07.535Z"
+    },
+    {
+      "id": 85694,
+      "type": "system",
+      "message": "Nexus is online. Setting course.",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:35:37.727Z"
+    },
+    {
+      "id": 85695,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] client/src/modules/Fuel.jsx modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"client/src/modules/Fuel.jsx\",\"path\":\"Nexus/client/src/modules/Fuel.jsx\"}]}",
+      "created_at": "2026-04-10T12:35:50.351Z"
+    },
+    {
+      "id": 85696,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 2 files modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"tests/.test-nexus.json.bak.2\",\"path\":\"Nexus/tests/.test-nexus.json.bak.2\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"tests/.test-nexus.json.bak\",\"path\":\"Nexus/tests/.test-nexus.json.bak\"}]}",
+      "created_at": "2026-04-10T12:36:09.005Z"
+    },
+    {
+      "id": 85697,
+      "type": "task_done",
+      "message": "Landmark reached -- \"Fix Fuel module session history — data doesn't make sense\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:36:21.898Z"
     }
   ],
   "scratchpads": [
@@ -3971,6 +4052,43 @@
         "auto-summary"
       ],
       "created_at": "2026-04-10T12:07:32.140Z"
+    },
+    {
+      "id": 112,
+      "project": "nexus",
+      "summary": "Completed a comprehensive audit of the Claude Code extension architecture and decommissioned the SMOKE TEST TASK assets.",
+      "decisions": [
+        "Decommissioned SMOKE TEST TASK files following successful validation",
+        "Updated plugin configuration via hooks.json and plugin.json to reflect post-audit state",
+        "Refined .claude/settings.local.json for optimized local development environment"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "audit",
+        "cleanup",
+        "plugin-refactor",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T12:27:22.574Z"
+    },
+    {
+      "id": 113,
+      "project": "nexus",
+      "summary": "Concluded a formal audit of the Claude Code extension architecture and finalized the decommissioning of SMOKE TEST TASK assets.",
+      "decisions": [
+        "Decommissioned SMOKE TEST TASK assets from the active repository",
+        "Validated Claude Code extension architectural integrity via comprehensive audit"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "audit",
+        "decommissioning",
+        "architecture",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T12:30:58.949Z"
     }
   ],
   "usage": [
@@ -4489,6 +4607,18 @@
       "weekly_percent": 6,
       "note": "smoke test",
       "created_at": "2026-04-10T12:25:17.052Z"
+    },
+    {
+      "session_percent": 50,
+      "weekly_percent": 81,
+      "note": "new session with updated MCPB — testing + checking backlog",
+      "created_at": "2026-04-10T12:29:48.006Z"
+    },
+    {
+      "session_percent": 20,
+      "weekly_percent": 79,
+      "note": "fixing Fuel module session history",
+      "created_at": "2026-04-10T12:33:59.285Z"
     }
   ],
   "gpu_history": [
@@ -10278,6 +10408,105 @@
       "temperature": 51,
       "power": 21.16,
       "created_at": "2026-04-10T12:26:20.212Z"
+    },
+    {
+      "gpu_util": 51,
+      "mem_util": 11,
+      "vram_used": 7789,
+      "vram_total": 8192,
+      "temperature": 53,
+      "power": 50.59,
+      "created_at": "2026-04-10T12:27:20.240Z"
+    },
+    {
+      "gpu_util": 23,
+      "mem_util": 24,
+      "vram_used": 7753,
+      "vram_total": 8192,
+      "temperature": 53,
+      "power": 16.77,
+      "created_at": "2026-04-10T12:28:20.219Z"
+    },
+    {
+      "gpu_util": 6,
+      "mem_util": 1,
+      "vram_used": 7778,
+      "vram_total": 8192,
+      "temperature": 55,
+      "power": 42.37,
+      "created_at": "2026-04-10T12:29:20.223Z"
+    },
+    {
+      "gpu_util": 23,
+      "mem_util": 17,
+      "vram_used": 7737,
+      "vram_total": 8192,
+      "temperature": 53,
+      "power": 17.92,
+      "created_at": "2026-04-10T12:30:20.230Z"
+    },
+    {
+      "gpu_util": 29,
+      "mem_util": 14,
+      "vram_used": 7792,
+      "vram_total": 8192,
+      "temperature": 48,
+      "power": 16.33,
+      "created_at": "2026-04-10T12:31:20.240Z"
+    },
+    {
+      "gpu_util": 42,
+      "mem_util": 24,
+      "vram_used": 7782,
+      "vram_total": 8192,
+      "temperature": 47,
+      "power": 16.48,
+      "created_at": "2026-04-10T12:32:20.271Z"
+    },
+    {
+      "gpu_util": 33,
+      "mem_util": 16,
+      "vram_used": 7736,
+      "vram_total": 8192,
+      "temperature": 48,
+      "power": 16.34,
+      "created_at": "2026-04-10T12:33:20.261Z"
+    },
+    {
+      "gpu_util": 39,
+      "mem_util": 23,
+      "vram_used": 7749,
+      "vram_total": 8192,
+      "temperature": 48,
+      "power": 16.88,
+      "created_at": "2026-04-10T12:34:20.268Z"
+    },
+    {
+      "gpu_util": 21,
+      "mem_util": 17,
+      "vram_used": 7800,
+      "vram_total": 8192,
+      "temperature": 49,
+      "power": 17.03,
+      "created_at": "2026-04-10T12:35:20.268Z"
+    },
+    {
+      "gpu_util": 25,
+      "mem_util": 14,
+      "vram_used": 7788,
+      "vram_total": 8192,
+      "temperature": 49,
+      "power": 16.79,
+      "created_at": "2026-04-10T12:35:37.782Z"
+    },
+    {
+      "gpu_util": 26,
+      "mem_util": 18,
+      "vram_used": 7721,
+      "vram_total": 8192,
+      "temperature": 49,
+      "power": 16.62,
+      "created_at": "2026-04-10T12:36:37.834Z"
     }
   ],
   "_sessionTiming": {
