@@ -5,3 +5,5 @@ nexus.db
 .env
 .DS_Store
 Thumbs.db
+tests/.test-nexus.*
+nexus-embeddings.json
