@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Compass, Activity, Brain, TrendingUp, Package, CheckCircle2, Clock,
   AlertTriangle, Sparkles, ArrowRight, Loader2, RefreshCw, Target,
-  Layers, Plus, Trash2, GripVertical, Fuel, Zap,
+  Layers, Plus, Trash2, GripVertical, Search, Filter,
 } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
 
@@ -56,6 +56,12 @@ function groupByProject(tasks) {
 const CATEGORY_LABEL = { drift: 'Drift', blind_spot: 'Blind spot', orphan: 'Orphan', unvalidated: 'Unvalidated', stale: 'Stale', blocker: 'Blocker' };
 const CATEGORY_COLOR = { drift: 'text-nexus-amber', blind_spot: 'text-nexus-red', orphan: 'text-nexus-blue', unvalidated: 'text-nexus-purple', stale: 'text-nexus-text-faint', blocker: 'text-nexus-red' };
 
+const PRIORITY_STYLE = {
+  2: { label: 'HIGH', dot: 'bg-nexus-red', text: 'text-nexus-red' },
+  1: { label: 'MED', dot: 'bg-nexus-amber', text: 'text-nexus-amber' },
+  0: { label: '', dot: '', text: '' },
+};
+
 const COLUMNS = [
   { key: 'backlog', label: 'Backlog', color: 'border-nexus-text-faint' },
   { key: 'in_progress', label: 'In Progress', color: 'border-nexus-amber' },
@@ -78,6 +84,8 @@ export default function Command({ ws }) {
   const [fuel, setFuel] = useState(null);
   const [workload, setWorkload] = useState(null);
   const [recentActivity, setRecentActivity] = useState([]);
+  const [projectFilter, setProjectFilter] = useState('all');
+  const [kanbanSearch, setKanbanSearch] = useState('');
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [addingTo, setAddingTo] = useState(null);
 
@@ -152,38 +160,87 @@ export default function Command({ ws }) {
     );
   }
 
-  const inProgress = tasks.filter(t => t.status === 'in_progress');
-  const backlog = tasks.filter(t => t.status === 'backlog');
-  const done = tasks.filter(t => t.status === 'done');
+  // Project detection from task titles
+  const projects = useMemo(() => {
+    const set = new Set();
+    for (const t of tasks) {
+      const tag = t.title.match(/^\[([A-Za-z][A-Za-z0-9-]+)\]/i);
+      if (tag) set.add(tag[1].split('-')[0].toUpperCase());
+    }
+    return ['all', ...Array.from(set).sort()];
+  }, [tasks]);
+
+  // Filtered tasks (by project + kanban search)
+  const filtered = useMemo(() => {
+    let list = tasks;
+    if (projectFilter !== 'all') {
+      list = list.filter(t => {
+        const tag = t.title.match(/^\[([A-Za-z][A-Za-z0-9-]+)\]/i);
+        const key = tag ? tag[1].split('-')[0].toUpperCase() : 'OTHER';
+        return key === projectFilter || (!tag && projectFilter === 'OTHER');
+      });
+    }
+    if (kanbanSearch.trim()) {
+      const q = kanbanSearch.trim().toLowerCase();
+      list = list.filter(t => t.title.toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q));
+    }
+    return list;
+  }, [tasks, projectFilter, kanbanSearch]);
+
+  const inProgress = filtered.filter(t => t.status === 'in_progress');
+  const backlog = filtered.filter(t => t.status === 'backlog');
+  const done = filtered.filter(t => t.status === 'done');
 
   return (
     <div>
-      {/* Header + view toggle */}
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-nexus-text flex items-center gap-2">
-            <Compass size={18} className="text-nexus-amber" />
-            Command
-          </h2>
-          <p className="text-xs font-mono text-nexus-text-faint mt-1">
-            {inProgress.length} active, {backlog.length} plotted, {thoughts.length} held.
-          </p>
+      {/* Header + view toggle + project filter */}
+      <div className="mb-4 space-y-3">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-nexus-text flex items-center gap-2">
+              <Compass size={18} className="text-nexus-amber" />
+              Command
+            </h2>
+            <p className="text-xs font-mono text-nexus-text-faint mt-1">
+              {inProgress.length} active, {backlog.length} plotted, {thoughts.length} held.
+            </p>
+          </div>
+          <div className="flex gap-1">
+            {[
+              { key: 'strategic', label: 'Strategic', icon: Compass },
+              { key: 'kanban', label: 'Kanban', icon: Target },
+            ].map(tab => {
+              const Icon = tab.icon;
+              return (
+                <button key={tab.key} onClick={() => setView(tab.key)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono transition-colors ${
+                    view === tab.key ? 'bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20' : 'text-nexus-text-faint hover:text-nexus-text border border-transparent'
+                  }`}>
+                  <Icon size={12} />{tab.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <div className="flex gap-1">
-          {[
-            { key: 'strategic', label: 'Strategic', icon: Compass },
-            { key: 'kanban', label: 'Kanban', icon: Target },
-          ].map(tab => {
-            const Icon = tab.icon;
-            return (
-              <button key={tab.key} onClick={() => setView(tab.key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono transition-colors ${
-                  view === tab.key ? 'bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20' : 'text-nexus-text-faint hover:text-nexus-text border border-transparent'
-                }`}>
-                <Icon size={12} />{tab.label}
-              </button>
-            );
-          })}
+        {/* Project filter + search */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter size={10} className="text-nexus-text-faint" />
+          {projects.map(p => (
+            <button key={p} onClick={() => setProjectFilter(p)}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-mono border transition-colors ${
+                projectFilter === p ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/20' : 'text-nexus-text-faint border-nexus-border hover:text-nexus-text'
+              }`}>
+              {p === 'all' ? 'All' : p}
+            </button>
+          ))}
+          {view === 'kanban' && (
+            <div className="relative ml-auto">
+              <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-nexus-text-faint" />
+              <input value={kanbanSearch} onChange={e => setKanbanSearch(e.target.value)}
+                placeholder="Search tasks..."
+                className="bg-nexus-bg border border-nexus-border rounded-lg pl-7 pr-3 py-1 text-[10px] text-nexus-text font-mono focus:border-nexus-amber focus:outline-none w-40" />
+            </div>
+          )}
         </div>
       </div>
 
@@ -291,28 +348,21 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
           </div>
         )}
 
-        {/* Session work summary */}
-        {(() => {
-          const today = new Date().toDateString();
-          const doneToday = done.filter(t => t.updated_at && new Date(t.updated_at).toDateString() === today);
-          const review = tasks.filter(t => t.status === 'review');
-          return (doneToday.length > 0 || review.length > 0) ? (
-            <div className="mb-3 grid grid-cols-3 gap-2">
-              <div className="bg-nexus-bg rounded-lg px-2 py-1.5 text-center">
-                <p className="text-lg font-light text-nexus-green">{doneToday.length}</p>
-                <p className="text-[9px] font-mono text-nexus-text-faint">done today</p>
-              </div>
-              <div className="bg-nexus-bg rounded-lg px-2 py-1.5 text-center">
-                <p className="text-lg font-light text-nexus-blue">{review.length}</p>
-                <p className="text-[9px] font-mono text-nexus-text-faint">in review</p>
-              </div>
-              <div className="bg-nexus-bg rounded-lg px-2 py-1.5 text-center">
-                <p className="text-lg font-light text-nexus-amber">{inProgress.length}</p>
-                <p className="text-[9px] font-mono text-nexus-text-faint">active</p>
-              </div>
-            </div>
-          ) : null;
-        })()}
+        {/* Session work summary — always visible */}
+        <div className="mb-3 grid grid-cols-3 gap-2">
+          <div className="bg-nexus-bg rounded-lg px-2 py-1.5 text-center">
+            <p className={`text-lg font-light ${done.filter(t => t.updated_at && new Date(t.updated_at).toDateString() === new Date().toDateString()).length > 0 ? 'text-nexus-green' : 'text-nexus-text-faint'}`}>{done.filter(t => t.updated_at && new Date(t.updated_at).toDateString() === new Date().toDateString()).length}</p>
+            <p className="text-[9px] font-mono text-nexus-text-faint">done today</p>
+          </div>
+          <div className="bg-nexus-bg rounded-lg px-2 py-1.5 text-center">
+            <p className={`text-lg font-light ${tasks.filter(t => t.status === 'review').length > 0 ? 'text-nexus-blue' : 'text-nexus-text-faint'}`}>{tasks.filter(t => t.status === 'review').length}</p>
+            <p className="text-[9px] font-mono text-nexus-text-faint">in review</p>
+          </div>
+          <div className="bg-nexus-bg rounded-lg px-2 py-1.5 text-center">
+            <p className={`text-lg font-light ${inProgress.length > 0 ? 'text-nexus-amber' : 'text-nexus-text-faint'}`}>{inProgress.length}</p>
+            <p className="text-[9px] font-mono text-nexus-text-faint">active</p>
+          </div>
+        </div>
 
         {/* Recent completions with duration */}
         {(() => {
@@ -458,21 +508,26 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
 // ── Kanban View (from MissionBoard) ─────────────────────
 
 function TaskCard({ task, onUpdate, onDelete, onDragStart }) {
+  const prio = PRIORITY_STYLE[task.priority] || PRIORITY_STYLE[0];
   return (
     <div draggable onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(task.id)); e.dataTransfer.effectAllowed = 'move'; onDragStart(task.id); }}
       className="bg-nexus-surface border border-nexus-border rounded-lg p-3 hover:border-nexus-border-bright transition-colors group cursor-grab active:cursor-grabbing">
       <div className="flex items-start gap-2">
         <GripVertical size={12} className="text-nexus-text-faint opacity-0 group-hover:opacity-50 mt-0.5 shrink-0" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-nexus-text truncate">{task.title}</p>
+          <div className="flex items-center gap-1.5">
+            {prio.label && <span className={`text-[8px] font-mono px-1 py-0.5 rounded ${prio.text} bg-nexus-bg border border-current`}>{prio.label}</span>}
+            <p className="text-sm text-nexus-text truncate">{task.title}</p>
+          </div>
           {task.description && <p className="text-xs text-nexus-text-faint mt-1 line-clamp-2">{task.description}</p>}
         </div>
-        <button onClick={() => onDelete(task.id)} className="opacity-0 group-hover:opacity-100 p-1 text-nexus-text-faint hover:text-nexus-red transition-all"><Trash2 size={12} /></button>
+        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this task?')) onDelete(task.id); }}
+          className="opacity-0 group-hover:opacity-100 p-1 text-nexus-text-faint hover:text-nexus-red transition-all"><Trash2 size={12} /></button>
       </div>
-      <div className="flex gap-1 mt-2 ml-5">
+      <div className="flex gap-1.5 mt-2 ml-5">
         {COLUMNS.map(col => (
           <button key={col.key} onClick={() => task.status !== col.key && onUpdate(task.id, { status: col.key })}
-            className={`w-2 h-2 rounded-full transition-all ${task.status === col.key ? `${col.color.replace('border', 'bg')} scale-125` : 'bg-nexus-border hover:bg-nexus-border-bright'}`}
+            className={`w-3 h-3 rounded-full transition-all ${task.status === col.key ? `${col.color.replace('border', 'bg')} scale-110` : 'bg-nexus-border hover:bg-nexus-border-bright'}`}
             title={col.label} />
         ))}
       </div>
@@ -493,10 +548,16 @@ function DropZone({ status, children, onDrop, isDragging }) {
 }
 
 function KanbanView({ tasks, draggingId, setDraggingId, newTaskTitle, setNewTaskTitle, addingTo, setAddingTo, onAdd, onUpdate, onDelete, onDrop }) {
+  const [showAllDone, setShowAllDone] = useState(false);
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       {COLUMNS.map(col => {
-        const colTasks = tasks.filter(t => t.status === col.key);
+        let colTasks = tasks.filter(t => t.status === col.key);
+        // Limit Done column to 20 most recent unless expanded
+        const totalDone = colTasks.length;
+        if (col.key === 'done' && !showAllDone) {
+          colTasks = [...colTasks].sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime()).slice(0, 20);
+        }
         return (
           <DropZone key={col.key} status={col.key} onDrop={onDrop} isDragging={draggingId !== null}>
             <div className={`border-t-2 ${col.color} pt-2 mb-3`}>
@@ -508,6 +569,12 @@ function KanbanView({ tasks, draggingId, setDraggingId, newTaskTitle, setNewTask
             <div className="space-y-2">
               {colTasks.map(task => <TaskCard key={task.id} task={task} onUpdate={onUpdate} onDelete={onDelete} onDragStart={setDraggingId} />)}
             </div>
+            {/* Show more for Done column */}
+            {col.key === 'done' && !showAllDone && totalDone > 20 && (
+              <button onClick={() => setShowAllDone(true)} className="mt-2 w-full py-1.5 text-[10px] font-mono text-nexus-text-faint hover:text-nexus-amber transition-colors">
+                Show all {totalDone} (+{totalDone - 20} hidden)
+              </button>
+            )}
             {addingTo === col.key ? (
               <div className="mt-2">
                 <input autoFocus className="w-full bg-nexus-bg border border-nexus-border rounded-lg px-3 py-2 text-sm text-nexus-text placeholder:text-nexus-text-faint focus:border-nexus-amber focus:outline-none"
