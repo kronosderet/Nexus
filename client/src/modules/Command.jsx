@@ -162,16 +162,7 @@ export default function Command({ ws }) {
     await api.updateTask(taskId, { status: newStatus });
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center gap-3 justify-center h-64">
-        <div className="text-2xl animate-compass text-nexus-amber">◈</div>
-        <span className="font-mono text-sm text-nexus-text-dim">Taking bearings...</span>
-      </div>
-    );
-  }
-
-  // Project detection from task titles
+  // Hooks MUST be before any early return (React rules of hooks)
   const projects = useMemo(() => {
     const set = new Set();
     for (const t of tasks) {
@@ -181,7 +172,6 @@ export default function Command({ ws }) {
     return ['all', ...Array.from(set).sort()];
   }, [tasks]);
 
-  // Filtered tasks (by project + kanban search)
   const filtered = useMemo(() => {
     let list = tasks;
     if (projectFilter !== 'all') {
@@ -197,6 +187,15 @@ export default function Command({ ws }) {
     }
     return list;
   }, [tasks, projectFilter, kanbanSearch]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-3 justify-center h-64">
+        <div className="text-2xl animate-compass text-nexus-amber">◈</div>
+        <span className="font-mono text-sm text-nexus-text-dim">Taking bearings...</span>
+      </div>
+    );
+  }
 
   const inProgress = filtered.filter(t => t.status === 'in_progress');
   const backlog = filtered.filter(t => t.status === 'backlog');
