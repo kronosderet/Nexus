@@ -60,9 +60,22 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 // ── Configuration ────────────────────────────────────────
+const STANDALONE = process.env.NEXUS_STANDALONE === '1';
 const NEXUS_BASE = process.env.NEXUS_BASE_URL || 'http://localhost:3001';
 const SERVER_NAME = 'nexus';
-const SERVER_VERSION = '3.3.0';
+const SERVER_VERSION = '4.0.0';
+
+// In standalone mode, import the local API adapter (direct store access, no Express needed)
+let localApiFetch: ((path: string, init?: any) => Promise<any>) | null = null;
+if (STANDALONE) {
+  try {
+    const mod = await import('./localApi.ts');
+    localApiFetch = mod.localApiFetch;
+    console.error('◈ Standalone mode — using in-process NexusStore at', process.env.NEXUS_DB_PATH || '~/.nexus/nexus.json');
+  } catch (err: any) {
+    console.error('◈ Failed to load standalone adapter:', err.message);
+  }
+}
 
 // ── Slow tools — need progress notifications to survive client timeouts ─
 // Tools in this set send periodic progress pings to the client during
@@ -78,11 +91,20 @@ const SLOW_TOOLS = new Set<string>([
 
 const HEARTBEAT_INTERVAL_MS = 8000; // ping every 8s — well under typical 60s timeouts
 
-// ── HTTP helper ──────────────────────────────────────────
+// ── API helper (standalone or HTTP proxy) ───────────────
 async function nexusFetch(
   path: string,
   init: RequestInit = {}
 ): Promise<any> {
+  // Standalone mode: route directly to in-process store
+  if (localApiFetch) {
+    return localApiFetch(path, {
+      method: init.method,
+      body: init.body ? (typeof init.body === 'string' ? init.body : JSON.stringify(init.body)) : undefined,
+    });
+  }
+
+  // Proxy mode: forward to Express server
   let res: Response;
   try {
     res = await fetch(`${NEXUS_BASE}${path}`, {
@@ -92,7 +114,7 @@ async function nexusFetch(
   } catch (err: any) {
     throw new Error(
       `Nexus server unreachable at ${NEXUS_BASE}. ` +
-        `Start it with: cd C:/Projects/Nexus && npm run dev:server. ` +
+        `Start with: nexus-dev.bat, or set NEXUS_STANDALONE=1 for direct mode. ` +
         `(${err.message})`
     );
   }
