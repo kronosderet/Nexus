@@ -60,12 +60,14 @@ async function api(path) {
 
 async function main() {
   // Parallel fetch — all endpoints, fail independently
-  const [tasks, sessions, decisions, fuel, risks] = await Promise.all([
+  const [tasks, sessions, decisions, fuel, risks, thoughts, activity] = await Promise.all([
     api('/tasks').catch(() => []),
     api(`/sessions?project=${encodeURIComponent(project)}&limit=3`).catch(() => []),
     api(`/ledger?project=${encodeURIComponent(project)}&limit=5`).catch(() => []),
     api('/estimator').catch(() => null),
     api('/overseer/risks').catch(() => ({ risks: [] })),
+    api('/thoughts').catch(() => []),
+    api('/activity?limit=5').catch(() => []),
   ]);
 
   const active = (tasks || []).filter(t => t.status !== 'done');
@@ -112,6 +114,34 @@ async function main() {
     lines.push(`Risks:`);
     for (const r of riskList.slice(0, 3)) lines.push(`  ! ${r.message}`);
   }
+
+  // Active thoughts (interrupt-recovery stack)
+  if (thoughts.length > 0) {
+    lines.push(`Thought Stack (${thoughts.length}):`);
+    for (const t of thoughts.slice(0, 3)) {
+      lines.push(`  > ${t.text.slice(0, 80)}${t.context ? ` [${t.context.slice(0, 40)}]` : ''}`);
+    }
+  }
+
+  // Recent activity
+  if (activity.length > 0) {
+    lines.push(`Recent activity:`);
+    for (const a of activity.slice(0, 3)) {
+      lines.push(`  ${a.message.slice(0, 100)}`);
+    }
+  }
+
+  // Git status (CWD project)
+  try {
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: process.cwd(), encoding: 'utf-8', timeout: 2000 }).trim();
+    const status = execSync('git status --porcelain', { cwd: process.cwd(), encoding: 'utf-8', timeout: 2000 }).trim();
+    const uncommitted = status ? status.split('\n').length : 0;
+    if (uncommitted > 0) {
+      lines.push(`Git: ${branch}, ${uncommitted} uncommitted changes`);
+    } else {
+      lines.push(`Git: ${branch}, clean`);
+    }
+  } catch {}
 
   lines.push(`[/Nexus Metabrain]`);
   console.log(lines.join('\n'));

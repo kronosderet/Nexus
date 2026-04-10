@@ -398,16 +398,16 @@ Group by severity. Be terse. Maximum 30 findings.`;
     startedAt: number;
   }>();
 
-  // Clean up old tasks after 10 minutes
+  // Clean up old tasks after 2 hours (long audits need results to survive)
   setInterval(() => {
-    const cutoff = Date.now() - 600_000;
+    const cutoff = Date.now() - 7_200_000;
     for (const [id, task] of asyncTasks) {
       if (task.startedAt < cutoff) asyncTasks.delete(id);
     }
   }, 60_000);
 
   router.post('/ask/start', async (req: Request, res: Response) => {
-    const { question } = req.body;
+    const { question, system_prompt, skip_context } = req.body;
     if (!question) return res.status(400).json({ error: 'Question required.' });
 
     const ai = await detectAI();
@@ -416,14 +416,22 @@ Group by severity. Be terse. Maximum 30 findings.`;
     const taskId = `overseer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     asyncTasks.set(taskId, {
       status: 'pending',
-      question,
+      question: question.slice(0, 200),
       startedAt: Date.now(),
     });
 
     // Fire and forget — the inference runs in the background
-    const ctx = gatherContext(store);
-    const contextPrompt = buildContextPrompt(ctx);
-    ask(ai, OVERSEER_SYSTEM, `Given this workspace state:\n\n${contextPrompt}\n\nQuestion: ${question}`)
+    // Callers can override the system prompt for task-specific outputs
+    // (e.g., code audit, auto-link proposals, structured JSON output)
+    // and skip context injection when the question already contains all needed data.
+    const systemMsg = system_prompt || OVERSEER_SYSTEM;
+    let userMsg = question;
+    if (!skip_context) {
+      const ctx = gatherContext(store);
+      const contextPrompt = buildContextPrompt(ctx);
+      userMsg = `Given this workspace state:\n\n${contextPrompt}\n\nQuestion: ${question}`;
+    }
+    ask(ai, systemMsg, userMsg)
       .then((answer) => {
         const advice = store.recordAdvice({ source: 'ask', question, recommendation: answer });
         const task = asyncTasks.get(taskId);
