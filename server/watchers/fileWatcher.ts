@@ -13,7 +13,10 @@ const IGNORED = [
   '**/build/**',
   '**/*.db',
   '**/*.db-journal',
-  '**/nexus.json',
+  '**/nexus.json',       // Nexus data store
+  '**/nexus.json.*',     // Backup rotation files (.bak, .bak.2, .tmp)
+  '**/nexus-embeddings.json', // Embedding cache
+  '**/.nexus/**',        // Nexus home directory
   '**/.next/**',
   '**/__pycache__/**',
   '**/*.pyc',
