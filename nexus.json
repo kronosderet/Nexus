@@ -417,6 +417,28 @@
       "linked_files": "[]",
       "created_at": "2026-04-10T11:57:19.683Z",
       "updated_at": "2026-04-10T12:06:37.659Z"
+    },
+    {
+      "id": 109,
+      "title": "Full audit of public Claude Code extension — plugin structure, MCP tools, skills, hooks, README, install flow",
+      "description": "",
+      "status": "done",
+      "priority": 2,
+      "sort_order": 1,
+      "linked_files": "[]",
+      "created_at": "2026-04-10T12:22:37.195Z",
+      "updated_at": "2026-04-10T12:26:41.722Z"
+    },
+    {
+      "id": 110,
+      "title": "SMOKE TEST TASK — safe to delete",
+      "description": "Created by mcpb/smoke-test-bundle.mjs",
+      "status": "done",
+      "priority": 0,
+      "sort_order": 27,
+      "linked_files": "[]",
+      "created_at": "2026-04-10T12:25:17.058Z",
+      "updated_at": "2026-04-10T12:25:17.070Z"
     }
   ],
   "activity": [
@@ -1511,6 +1533,118 @@
       "message": "Landmark reached -- \"Clean up public repo: update all .md files, remove stale files, audit what's tracked\"",
       "meta": "{}",
       "created_at": "2026-04-10T12:06:37.662Z"
+    },
+    {
+      "id": 85672,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 10 files changed",
+      "meta": "{\"changes\":[{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/bc/6fd619ae874a73a5d39ae6f42089ac0fb22b6a\",\"path\":\"Nexus/.git/objects/bc/6fd619ae874a73a5d39ae6f42089ac0fb22b6a\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/0d/fa724589dc29298a29dac062cb41f6573e56e5\",\"path\":\"Nexus/.git/objects/0d/fa724589dc29298a29dac062cb41f6573e56e5\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/00/1bf2524d9b43e523c8ca9c78c1f3368f9603b7\",\"path\":\"Nexus/.git/objects/00/1bf2524d9b43e523c8ca9c78c1f3368f9603b7\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/6d/0928a940ed2191f49deff6c8fa0ba03d3799ab\",\"path\":\"Nexus/.git/objects/6d/0928a940ed2191f49deff6c8fa0ba03d3799ab\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/f6/8bfc239ea1187bdbedcaa42b8f4c509c3922ee\",\"path\":\"Nexus/.git/objects/f6/8bfc239ea1187bdbedcaa42b8f4c509c3922ee\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/COMMIT_EDITMSG\",\"path\":\"Nexus/.git/COMMIT_EDITMSG\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\".git/objects/7b/f8319f53595b8644e9642cf9e729110b91df59\",\"path\":\"Nexus/.git/objects/7b/f8319f53595b8644e9642cf9e729110b91df59\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/refs/heads/main\",\"path\":\"Nexus/.git/refs/heads/main\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/logs/HEAD\",\"path\":\"Nexus/.git/logs/HEAD\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T12:07:05.698Z"
+    },
+    {
+      "id": 85673,
+      "type": "auto_summary",
+      "message": "Overseer auto-logged session for nexus",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:07:32.142Z"
+    },
+    {
+      "id": 85674,
+      "type": "system",
+      "message": "Session ended (nexus) — auto-summary unavailable, logged via stop hook",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:07:32.153Z"
+    },
+    {
+      "id": 85675,
+      "type": "task_created",
+      "message": "Plotted -- \"Full audit of public Claude Code extension — plugin structure, MCP tools, skills, hooks, README, install flow\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:22:37.198Z"
+    },
+    {
+      "id": 85676,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 3 files modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"plugin/server/index.js\",\"path\":\"Nexus/plugin/server/index.js\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"mcpb/server/index.js\",\"path\":\"Nexus/mcpb/server/index.js\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"mcpb/nexus.mcpb\",\"path\":\"Nexus/mcpb/nexus.mcpb\"}]}",
+      "created_at": "2026-04-10T12:24:36.475Z"
+    },
+    {
+      "id": 85677,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] plugin/.claude-plugin/plugin.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"plugin/.claude-plugin/plugin.json\",\"path\":\"Nexus/plugin/.claude-plugin/plugin.json\"}]}",
+      "created_at": "2026-04-10T12:24:45.828Z"
+    },
+    {
+      "id": 85678,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] plugin/hooks.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"plugin/hooks.json\",\"path\":\"Nexus/plugin/hooks.json\"}]}",
+      "created_at": "2026-04-10T12:25:08.691Z"
+    },
+    {
+      "id": 85679,
+      "type": "task_created",
+      "message": "Plotted -- \"SMOKE TEST TASK — safe to delete\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:25:17.061Z"
+    },
+    {
+      "id": 85680,
+      "type": "task_done",
+      "message": "Landmark reached -- \"SMOKE TEST TASK — safe to delete\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:25:17.073Z"
+    },
+    {
+      "id": 85681,
+      "type": "system",
+      "message": "smoke test activity",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:25:17.089Z"
+    },
+    {
+      "id": 85682,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] .git/index modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\".git/index\",\"path\":\"Nexus/.git/index\"}]}",
+      "created_at": "2026-04-10T12:25:18.573Z"
+    },
+    {
+      "id": 85683,
+      "type": "overseer_alert",
+      "message": "Overseer detected 1 critical risk",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:26:19.978Z"
+    },
+    {
+      "id": 85684,
+      "type": "file_change",
+      "message": "Terrain shift -- [.claude] settings.local.json modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\".claude\",\"file\":\"settings.local.json\",\"path\":\".claude/settings.local.json\"}]}",
+      "created_at": "2026-04-10T12:26:29.866Z"
+    },
+    {
+      "id": 85685,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 2 files modified",
+      "meta": "{\"changes\":[{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"tests/.test-nexus.json.bak\",\"path\":\"Nexus/tests/.test-nexus.json.bak\"},{\"type\":\"modified\",\"project\":\"Nexus\",\"file\":\"tests/.test-nexus.json.bak.2\",\"path\":\"Nexus/tests/.test-nexus.json.bak.2\"}]}",
+      "created_at": "2026-04-10T12:26:31.392Z"
+    },
+    {
+      "id": 85686,
+      "type": "file_change",
+      "message": "Terrain shift -- [Nexus] 6 files changed",
+      "meta": "{\"changes\":[{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-BM0jXHg3.js\",\"path\":\"Nexus/client/dist/assets/index-BM0jXHg3.js\"},{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-C8r-nV8k.css\",\"path\":\"Nexus/client/dist/assets/index-C8r-nV8k.css\"},{\"type\":\"removed\",\"project\":\"Nexus\",\"file\":\"client/dist/index.html\",\"path\":\"Nexus/client/dist/index.html\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/index.html\",\"path\":\"Nexus/client/dist/index.html\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-C8r-nV8k.css\",\"path\":\"Nexus/client/dist/assets/index-C8r-nV8k.css\"},{\"type\":\"added\",\"project\":\"Nexus\",\"file\":\"client/dist/assets/index-BM0jXHg3.js\",\"path\":\"Nexus/client/dist/assets/index-BM0jXHg3.js\"}]}",
+      "created_at": "2026-04-10T12:26:33.682Z"
+    },
+    {
+      "id": 85687,
+      "type": "task_done",
+      "message": "Landmark reached -- \"Full audit of public Claude Code extension — plugin structure, MCP tools, skills, hooks, README, install flow\"",
+      "meta": "{}",
+      "created_at": "2026-04-10T12:26:41.724Z"
     }
   ],
   "scratchpads": [
@@ -3820,6 +3954,23 @@
         "auto-summary"
       ],
       "created_at": "2026-04-10T11:54:00.295Z"
+    },
+    {
+      "id": 111,
+      "project": "nexus",
+      "summary": "Performed a repository audit and cleanup by updating documentation and removing obsolete test files.",
+      "decisions": [
+        "Removed tests/.test-nexus.json from the public repository",
+        "Updated CONCEPT.md and mcpb/README.md to reflect current project state"
+      ],
+      "blockers": [],
+      "files_touched": [],
+      "tags": [
+        "repository-maintenance",
+        "documentation",
+        "auto-summary"
+      ],
+      "created_at": "2026-04-10T12:07:32.140Z"
     }
   ],
   "usage": [
@@ -4326,6 +4477,18 @@
       "weekly_percent": 83,
       "note": "cleaning up repo for public — update docs, remove stale files",
       "created_at": "2026-04-10T11:57:18.264Z"
+    },
+    {
+      "session_percent": 52,
+      "weekly_percent": 81,
+      "note": "full audit of public CC extension before anyone installs it",
+      "created_at": "2026-04-10T12:22:36.388Z"
+    },
+    {
+      "session_percent": 74,
+      "weekly_percent": 6,
+      "note": "smoke test",
+      "created_at": "2026-04-10T12:25:17.052Z"
     }
   ],
   "gpu_history": [
@@ -9935,6 +10098,186 @@
       "temperature": 52,
       "power": 21.04,
       "created_at": "2026-04-10T12:06:20.086Z"
+    },
+    {
+      "gpu_util": 20,
+      "mem_util": 10,
+      "vram_used": 7712,
+      "vram_total": 8192,
+      "temperature": 53,
+      "power": 24.61,
+      "created_at": "2026-04-10T12:07:20.096Z"
+    },
+    {
+      "gpu_util": 31,
+      "mem_util": 14,
+      "vram_used": 7793,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 16.71,
+      "created_at": "2026-04-10T12:08:20.102Z"
+    },
+    {
+      "gpu_util": 32,
+      "mem_util": 15,
+      "vram_used": 7795,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 16.58,
+      "created_at": "2026-04-10T12:09:20.106Z"
+    },
+    {
+      "gpu_util": 30,
+      "mem_util": 14,
+      "vram_used": 7795,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 16.7,
+      "created_at": "2026-04-10T12:10:20.115Z"
+    },
+    {
+      "gpu_util": 32,
+      "mem_util": 15,
+      "vram_used": 7795,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 16.59,
+      "created_at": "2026-04-10T12:11:20.120Z"
+    },
+    {
+      "gpu_util": 32,
+      "mem_util": 15,
+      "vram_used": 7795,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 16.39,
+      "created_at": "2026-04-10T12:12:20.130Z"
+    },
+    {
+      "gpu_util": 30,
+      "mem_util": 14,
+      "vram_used": 7795,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 16.28,
+      "created_at": "2026-04-10T12:13:20.145Z"
+    },
+    {
+      "gpu_util": 31,
+      "mem_util": 15,
+      "vram_used": 7795,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 16.31,
+      "created_at": "2026-04-10T12:14:20.144Z"
+    },
+    {
+      "gpu_util": 30,
+      "mem_util": 15,
+      "vram_used": 7795,
+      "vram_total": 8192,
+      "temperature": 49,
+      "power": 16.3,
+      "created_at": "2026-04-10T12:15:20.151Z"
+    },
+    {
+      "gpu_util": 31,
+      "mem_util": 15,
+      "vram_used": 7795,
+      "vram_total": 8192,
+      "temperature": 49,
+      "power": 16.22,
+      "created_at": "2026-04-10T12:16:20.157Z"
+    },
+    {
+      "gpu_util": 30,
+      "mem_util": 14,
+      "vram_used": 7795,
+      "vram_total": 8192,
+      "temperature": 49,
+      "power": 16.17,
+      "created_at": "2026-04-10T12:17:20.163Z"
+    },
+    {
+      "gpu_util": 32,
+      "mem_util": 15,
+      "vram_used": 7795,
+      "vram_total": 8192,
+      "temperature": 49,
+      "power": 16.04,
+      "created_at": "2026-04-10T12:18:20.168Z"
+    },
+    {
+      "gpu_util": 30,
+      "mem_util": 14,
+      "vram_used": 7795,
+      "vram_total": 8192,
+      "temperature": 49,
+      "power": 16.17,
+      "created_at": "2026-04-10T12:19:20.178Z"
+    },
+    {
+      "gpu_util": 30,
+      "mem_util": 14,
+      "vram_used": 7795,
+      "vram_total": 8192,
+      "temperature": 48,
+      "power": 16.07,
+      "created_at": "2026-04-10T12:20:20.183Z"
+    },
+    {
+      "gpu_util": 31,
+      "mem_util": 15,
+      "vram_used": 7732,
+      "vram_total": 8192,
+      "temperature": 48,
+      "power": 15.99,
+      "created_at": "2026-04-10T12:21:20.185Z"
+    },
+    {
+      "gpu_util": 21,
+      "mem_util": 30,
+      "vram_used": 7745,
+      "vram_total": 8192,
+      "temperature": 48,
+      "power": 16.5,
+      "created_at": "2026-04-10T12:22:20.205Z"
+    },
+    {
+      "gpu_util": 13,
+      "mem_util": 2,
+      "vram_used": 7723,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 48.77,
+      "created_at": "2026-04-10T12:23:20.197Z"
+    },
+    {
+      "gpu_util": 30,
+      "mem_util": 15,
+      "vram_used": 7713,
+      "vram_total": 8192,
+      "temperature": 50,
+      "power": 20.86,
+      "created_at": "2026-04-10T12:24:20.208Z"
+    },
+    {
+      "gpu_util": 11,
+      "mem_util": 2,
+      "vram_used": 7740,
+      "vram_total": 8192,
+      "temperature": 52,
+      "power": 45.79,
+      "created_at": "2026-04-10T12:25:20.206Z"
+    },
+    {
+      "gpu_util": 28,
+      "mem_util": 14,
+      "vram_used": 7743,
+      "vram_total": 8192,
+      "temperature": 51,
+      "power": 21.16,
+      "created_at": "2026-04-10T12:26:20.212Z"
     }
   ],
   "_sessionTiming": {
