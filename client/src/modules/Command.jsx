@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Compass, Activity, Brain, TrendingUp, Package, CheckCircle2, Clock,
   AlertTriangle, Sparkles, ArrowRight, Loader2, RefreshCw, Target,
-  Layers, Plus, Trash2, GripVertical,
+  Layers, Plus, Trash2, GripVertical, Fuel, Zap,
 } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
 
@@ -75,21 +75,30 @@ export default function Command({ ws }) {
   const [loading, setLoading] = useState(true);
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [draggingId, setDraggingId] = useState(null);
+  const [fuel, setFuel] = useState(null);
+  const [workload, setWorkload] = useState(null);
+  const [recentActivity, setRecentActivity] = useState([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [addingTo, setAddingTo] = useState(null);
 
   async function fetchAll() {
     try {
-      const [t, th, p, c] = await Promise.all([
+      const [t, th, p, c, f, w, act] = await Promise.all([
         api.getTasks(),
         api.getThoughts().catch(() => []),
         api.getPredict().catch(() => ({ suggestions: [] })),
         api.getCritique().catch(() => ({ slowTasks: [] })),
+        api.getEstimator().catch(() => null),
+        api.getEstimatorWorkload().catch(() => null),
+        api.getActivity(10).catch(() => []),
       ]);
       setTasks(t || []);
       setThoughts(Array.isArray(th) ? th : []);
       setPredict(p);
       setCritique(c);
+      setFuel(f);
+      setWorkload(w);
+      setRecentActivity(act || []);
     } catch {} finally { setLoading(false); }
   }
 
@@ -182,6 +191,7 @@ export default function Command({ ws }) {
         <StrategicView
           tasks={tasks} inProgress={inProgress} backlog={backlog} done={done}
           thoughts={thoughts} plan={plan} predict={predict} critique={critique}
+          fuel={fuel} workload={workload} recentActivity={recentActivity}
           loadingPlan={loadingPlan} onRefreshPlan={fetchPlan} onRefresh={fetchAll}
         />
       ) : (
@@ -217,7 +227,16 @@ function EmptyState({ icon: Icon, message }) {
   return <div className="text-center py-4 text-nexus-text-faint"><Icon size={14} className="mx-auto mb-1.5 opacity-40" /><p className="text-[10px] font-mono">{message}</p></div>;
 }
 
-function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predict, critique, loadingPlan, onRefreshPlan }) {
+function FuelBar({ percent, className = '' }) {
+  const color = percent <= 15 ? 'bg-nexus-red' : percent <= 40 ? 'bg-nexus-amber' : 'bg-nexus-green';
+  return (
+    <div className={`h-1.5 bg-nexus-bg rounded-full overflow-hidden ${className}`}>
+      <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${Math.max(2, percent)}%` }} />
+    </div>
+  );
+}
+
+function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predict, critique, fuel, workload, recentActivity, loadingPlan, onRefreshPlan }) {
   const gaps = predict?.suggestions || [];
   const planTasks = parsePlanTasks(plan?.aiPlan);
   const focus = planFocus(plan?.aiPlan);
@@ -230,23 +249,70 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-      {/* NOW */}
-      <Panel title="Now" icon={Activity} accent="text-nexus-green" count={inProgress.length + thoughts.length}>
-        {inProgress.length > 0 ? (
-          <div className="space-y-1.5">
-            {inProgress.map(t => (
-              <div key={t.id} className="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-nexus-amber/5 border border-nexus-amber/20">
-                <div className="w-1.5 h-1.5 rounded-full bg-nexus-amber mt-1.5 shrink-0 animate-pulse" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-nexus-text truncate">{t.title}</p>
-                  {t.description && <p className="text-[10px] font-mono text-nexus-text-faint line-clamp-1 mt-0.5">{t.description}</p>}
-                </div>
-              </div>
-            ))}
+      {/* NOW — live cockpit */}
+      <Panel title="Now" icon={Activity} accent="text-nexus-green">
+        {/* Fuel gauges */}
+        {fuel?.tracked && (
+          <div className="space-y-2 mb-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono text-nexus-text-faint flex items-center gap-1"><Fuel size={9} /> Session</span>
+              <span className={`text-xs font-mono ${fuel.estimated.session <= 15 ? 'text-nexus-red' : fuel.estimated.session <= 40 ? 'text-nexus-amber' : 'text-nexus-green'}`}>{fuel.estimated.session}%</span>
+            </div>
+            <FuelBar percent={fuel.estimated.session} />
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono text-nexus-text-faint">Weekly</span>
+              <span className={`text-xs font-mono ${fuel.estimated.weekly <= 15 ? 'text-nexus-red' : fuel.estimated.weekly <= 40 ? 'text-nexus-amber' : 'text-nexus-green'}`}>{fuel.estimated.weekly}%</span>
+            </div>
+            <FuelBar percent={fuel.estimated.weekly} />
+            <div className="flex gap-3 text-[9px] font-mono text-nexus-text-faint mt-1">
+              {fuel.rates?.sessionPerHour > 0 && <span>Burn: {fuel.rates.sessionPerHour}%/h</span>}
+              {fuel.session?.chunksRemaining != null && <span>~{fuel.session.chunksRemaining} chunks left</span>}
+              {fuel.session?.resetWindow && <span>Reset: {Math.floor(fuel.session.resetWindow / 60)}h {fuel.session.resetWindow % 60}m</span>}
+            </div>
           </div>
-        ) : <EmptyState icon={Target} message="No active bearings." />}
+        )}
+
+        {/* Workload advisor */}
+        {workload?.currentSession?.recommendation && (
+          <div className={`px-2.5 py-2 rounded-lg mb-3 border ${
+            workload.currentSession.recommendation.action === 'wrap_up' ? 'bg-nexus-red/5 border-nexus-red/20' :
+            workload.currentSession.recommendation.action === 'small_tasks' ? 'bg-nexus-amber/5 border-nexus-amber/20' :
+            'bg-nexus-green/5 border-nexus-green/20'
+          }`}>
+            <div className="flex items-center gap-1.5">
+              <Zap size={10} className={
+                workload.currentSession.recommendation.action === 'wrap_up' ? 'text-nexus-red' :
+                workload.currentSession.recommendation.action === 'small_tasks' ? 'text-nexus-amber' : 'text-nexus-green'
+              } />
+              <span className="text-[10px] font-mono uppercase tracking-wider text-nexus-text-faint">
+                {workload.currentSession.recommendation.action.replace(/_/g, ' ')}
+              </span>
+            </div>
+            <p className="text-[10px] text-nexus-text-dim mt-1">{workload.currentSession.recommendation.message}</p>
+          </div>
+        )}
+
+        {/* In-progress tasks */}
+        {inProgress.length > 0 && (
+          <div className="mb-3">
+            <span className="text-[10px] font-mono text-nexus-text-faint mb-1 block">In Progress ({inProgress.length})</span>
+            <div className="space-y-1.5">
+              {inProgress.map(t => (
+                <div key={t.id} className="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-nexus-amber/5 border border-nexus-amber/20">
+                  <div className="w-1.5 h-1.5 rounded-full bg-nexus-amber mt-1.5 shrink-0 animate-pulse" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-nexus-text truncate">{t.title}</p>
+                    {t.description && <p className="text-[10px] font-mono text-nexus-text-faint line-clamp-1 mt-0.5">{t.description}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Thought stack */}
         {thoughts.length > 0 && (
-          <div className="pt-2 mt-2 border-t border-nexus-border">
+          <div className="mb-3">
             <span className="text-[10px] font-mono text-nexus-text-faint flex items-center gap-1 mb-1"><Brain size={9} /> Thoughts ({thoughts.length})</span>
             {thoughts.slice(0, 3).map((t, i) => (
               <div key={t.id} className={`flex items-start gap-1.5 px-2 py-1 rounded text-[11px] ${i === 0 ? 'bg-nexus-purple/5 border border-nexus-purple/20' : ''}`}>
@@ -255,6 +321,28 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
               </div>
             ))}
           </div>
+        )}
+
+        {/* Recent activity pulse */}
+        {recentActivity.length > 0 && (
+          <div className="pt-2 border-t border-nexus-border">
+            <span className="text-[10px] font-mono text-nexus-text-faint mb-1 block">Live Activity</span>
+            <div className="space-y-0.5">
+              {recentActivity.slice(0, 5).map((a, i) => (
+                <div key={a.id || i} className="flex items-start gap-2 text-[10px]">
+                  <span className="text-nexus-text-faint w-10 shrink-0 font-mono">
+                    {new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span className="text-nexus-text-dim truncate">{a.message}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Empty state only if truly nothing */}
+        {!fuel?.tracked && inProgress.length === 0 && thoughts.length === 0 && recentActivity.length === 0 && (
+          <EmptyState icon={Target} message="No data yet. Log fuel and start working." />
         )}
       </Panel>
 
