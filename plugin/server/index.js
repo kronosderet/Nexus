@@ -21832,7 +21832,7 @@ var StdioServerTransport = class {
 var STANDALONE = true;
 var NEXUS_BASE = process.env.NEXUS_BASE_URL || "http://localhost:3001";
 var SERVER_NAME = "nexus";
-var SERVER_VERSION = "4.0.0";
+var SERVER_VERSION = "4.1.0";
 var localApiFetch2 = null;
 if (STANDALONE) {
   try {

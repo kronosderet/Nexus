@@ -63,7 +63,7 @@ import {
 const STANDALONE = process.env.NEXUS_STANDALONE === '1';
 const NEXUS_BASE = process.env.NEXUS_BASE_URL || 'http://localhost:3001';
 const SERVER_NAME = 'nexus';
-const SERVER_VERSION = '4.0.0';
+const SERVER_VERSION = '4.1.0';
 
 // In standalone mode, import the local API adapter (direct store access, no Express needed)
 let localApiFetch: ((path: string, init?: any) => Promise<any>) | null = null;
