@@ -13,6 +13,29 @@ A local-first metabrain that gives every Claude Code instance persistent memory,
 
 That's it. Every conversation now has access to the Nexus metabrain.
 
+## Getting Started (First 5 Minutes)
+
+After installing, just **talk to Claude Code normally**. Nexus works in the background:
+
+1. **Session starts** → Nexus auto-injects your project context (tasks, decisions, recent sessions)
+2. **You work** → Claude uses Nexus tools naturally when relevant
+3. **Session ends** → Nexus auto-logs what happened + pushes a handoff for the next conversation
+
+**Try these prompts to see it in action:**
+
+```
+"What's the current state of my project?"     → triggers nexus_brief
+"Remember this decision: we chose X because Y" → triggers nexus_record_decision
+"Create a task for fixing the auth bug"        → triggers nexus_create_task
+"What did we do last session?"                 → triggers nexus_search
+"What should I work on next?"                  → triggers nexus_get_plan (needs LM Studio)
+"Wrap up this session"                         → triggers nexus_bridge_session
+```
+
+Or use slash commands directly: `/nexus-brief`, `/nexus-status`, `/nexus-plan`
+
+**No configuration needed.** Data is stored at `~/.nexus/nexus.json`. No server to run. No accounts. Everything local.
+
 ## What It Does
 
 Nexus solves the biggest problem with AI-assisted development: **Claude forgets everything between conversations.** Nexus doesn't.

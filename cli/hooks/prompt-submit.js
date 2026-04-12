@@ -1,26 +1,22 @@
 #!/usr/bin/env node
 /**
- * Claude Code UserPromptSubmit hook — logs each user prompt to Nexus.
+ * Claude Code UserPromptSubmit hook — logs each prompt to Nexus.
  *
- * Claude Code pipes a JSON object via stdin with:
- *   { session_id, transcript_path, cwd, ... }
- *
- * We read the transcript to get the latest user message, then log it
- * as an activity entry so the activity stream shows what's being worked on.
- *
+ * STANDALONE: reads/writes ~/.nexus/nexus.json directly (no server needed).
  * Must be FAST (<500ms) — runs before Claude starts responding.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
 
-const BASE = process.env.NEXUS_URL || 'http://localhost:3001';
+const NEXUS_DB = process.env.NEXUS_DB_PATH || join(homedir(), '.nexus', 'nexus.json');
 
-async function main() {
+function main() {
   // Read hook payload from stdin
   let payload;
   try {
-    const raw = readFileSync(0, 'utf-8').trim();
-    payload = JSON.parse(raw);
+    payload = JSON.parse(readFileSync(0, 'utf-8').trim());
   } catch {
     return;
   }
@@ -30,21 +26,14 @@ async function main() {
   try {
     if (payload.transcript_path) {
       const lines = readFileSync(payload.transcript_path, 'utf-8').trim().split('\n');
-      // Read from the end — find the last human/user message
       for (let i = lines.length - 1; i >= 0; i--) {
         try {
           const entry = JSON.parse(lines[i]);
           if (entry.type === 'human' || entry.role === 'user') {
-            // Message might be a string or array of content blocks
-            if (typeof entry.message === 'string') {
-              promptText = entry.message;
-            } else if (typeof entry.content === 'string') {
-              promptText = entry.content;
-            } else if (Array.isArray(entry.message?.content)) {
-              promptText = entry.message.content
-                .filter(b => b.type === 'text')
-                .map(b => b.text)
-                .join(' ');
+            if (typeof entry.message === 'string') promptText = entry.message;
+            else if (typeof entry.content === 'string') promptText = entry.content;
+            else if (Array.isArray(entry.message?.content)) {
+              promptText = entry.message.content.filter(b => b.type === 'text').map(b => b.text).join(' ');
             }
             if (promptText) break;
           }
@@ -55,21 +44,32 @@ async function main() {
 
   if (!promptText || promptText.length < 3) return;
 
-  // Truncate for logging
-  const summary = promptText.slice(0, 200) + (promptText.length > 200 ? '...' : '');
-
-  // Log as activity
+  // Read store directly
+  if (!existsSync(NEXUS_DB)) return;
+  let data;
   try {
-    await fetch(`${BASE}/api/activity`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'prompt',
-        message: `User: ${summary}`,
-      }),
-      signal: AbortSignal.timeout(1000),
-    });
+    data = JSON.parse(readFileSync(NEXUS_DB, 'utf-8'));
+  } catch {
+    return;
+  }
+
+  // Log activity
+  if (!data.activity) data.activity = [];
+  const maxId = data.activity.length > 0 ? Math.max(...data.activity.map(a => a.id)) : 0;
+  const summary = promptText.slice(0, 200) + (promptText.length > 200 ? '...' : '');
+  data.activity.push({
+    id: maxId + 1,
+    type: 'prompt',
+    message: `User: ${summary}`,
+    meta: '{}',
+    created_at: new Date().toISOString(),
+  });
+  if (data.activity.length > 500) data.activity = data.activity.slice(-500);
+
+  // Quick write (not atomic — speed matters here)
+  try {
+    writeFileSync(NEXUS_DB, JSON.stringify(data, null, 2));
   } catch {}
 }
 
-main().catch(() => {});
+try { main(); } catch {}
