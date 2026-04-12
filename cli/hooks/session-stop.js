@@ -1,33 +1,29 @@
 #!/usr/bin/env node
 /**
- * Claude Code Stop hook — auto-bridges the session into the metabrain.
+ * Claude Code Stop hook — auto-logs session end to Nexus.
  *
- * When a conversation ends, this hook:
- * 1. Tries to generate an AI session summary via /api/auto-summary
- * 2. If AI is available: commits the summary as a real session entry
- * 3. If AI is down: logs a minimal "session ended" activity entry
- * 4. Checks for in-progress tasks and pushes a handoff thought
+ * STANDALONE: reads/writes ~/.nexus/nexus.json directly (no server needed).
+ * Falls back gracefully — a failed stop hook must NEVER block Claude from exiting.
  *
- * All errors are swallowed — a failed stop hook must NEVER prevent
- * Claude Code from exiting cleanly.
- *
- * Install via: nexus hooks install
+ * 1. Logs a "session ended" activity entry
+ * 2. Pushes a handoff thought if tasks are in-progress (with dedup)
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { execSync } from 'node:child_process';
 
-const BASE = process.env.NEXUS_URL || 'http://localhost:3001';
+const NEXUS_DIR = process.env.NEXUS_HOME || join(homedir(), '.nexus');
+const NEXUS_DB = process.env.NEXUS_DB_PATH || join(NEXUS_DIR, 'nexus.json');
 
 function detectProject() {
   const cwd = process.cwd();
   try {
     const pkgPath = join(cwd, 'package.json');
     if (existsSync(pkgPath)) {
-      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-      const name = (pkg.name || '').replace(/^@[^/]+\//, '');
-      if (name.length > 1) return name;
+      const name = JSON.parse(readFileSync(pkgPath, 'utf-8')).name?.replace(/^@[^/]+\//, '');
+      if (name?.length > 1) return name;
     }
   } catch {}
   try {
@@ -38,80 +34,63 @@ function detectProject() {
   return cwd.split(/[/\\]/).pop() || 'unknown';
 }
 
-const project = detectProject();
+function main() {
+  if (!existsSync(NEXUS_DB)) return; // No data yet
 
-async function api(path, opts = {}) {
-  const res = await fetch(`${BASE}/api${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    signal: AbortSignal.timeout(120000), // 120s — AI summary via local model can be slow
-    ...opts,
+  let data;
+  try {
+    data = JSON.parse(readFileSync(NEXUS_DB, 'utf-8'));
+  } catch {
+    return;
+  }
+
+  const project = detectProject();
+  const now = new Date().toISOString();
+
+  // 1. Log activity
+  if (!data.activity) data.activity = [];
+  const maxId = data.activity.length > 0 ? Math.max(...data.activity.map(a => a.id)) : 0;
+  data.activity.push({
+    id: maxId + 1,
+    type: 'system',
+    message: `Session ended (${project})`,
+    meta: '{}',
+    created_at: now,
   });
-  if (!res.ok) throw new Error(`${res.status}`);
-  return res.json();
-}
+  // Cap at 500
+  if (data.activity.length > 500) data.activity = data.activity.slice(-500);
 
-async function main() {
-  let sessionLogged = false;
-
-  // Step 1: Try AI-powered auto-summary → commit as real session
-  try {
-    const summary = await api('/auto-summary', {
-      method: 'POST',
-      body: JSON.stringify({ project }),
-    });
-
-    if (summary?.id) {
-      // Auto-summary was generated AND committed (POST does both)
-      sessionLogged = true;
-    }
-  } catch {
-    // AI unavailable or summary failed — graceful degradation below
-  }
-
-  // Step 2: Fallback — log a minimal activity entry if summary failed
-  if (!sessionLogged) {
-    try {
-      await api('/activity', {
-        method: 'POST',
-        body: JSON.stringify({
-          type: 'system',
-          message: `Session ended (${project}) — auto-summary unavailable, logged via stop hook`,
-        }),
+  // 2. Push handoff thought for in-progress tasks (with dedup)
+  const tasks = data.tasks || [];
+  const inProgress = tasks.filter(t => t.status === 'in_progress');
+  if (inProgress.length > 0 && data.thoughts) {
+    const existing = (data.thoughts || []).filter(t => t.status === 'active');
+    const alreadyTracked = existing.some(th =>
+      inProgress.some(t => th.text.includes(`#${t.id}`))
+    );
+    if (!alreadyTracked) {
+      const maxThoughtId = data.thoughts.length > 0 ? Math.max(...data.thoughts.map(t => t.id)) : 0;
+      const taskList = inProgress.map(t => `#${t.id} ${t.title}`).join(', ');
+      data.thoughts.push({
+        id: maxThoughtId + 1,
+        text: `Session ended with ${inProgress.length} task(s) still in progress: ${taskList}`,
+        context: `auto-pushed by session-stop hook for ${project}`,
+        project,
+        status: 'active',
+        created_at: now,
       });
-    } catch {
-      // Even activity logging failed — server probably down. Nothing to do.
     }
   }
 
-  // Step 3: Check for in-progress tasks and push a handoff thought
-  // Only push if there isn't already a thought about the same tasks (prevents duplicates)
+  // Atomic write
   try {
-    const tasks = await api('/tasks');
-    const inProgress = (tasks || []).filter(t => t.status === 'in_progress');
-    if (inProgress.length > 0) {
-      // Check existing thoughts to avoid duplicates
-      const existing = await api('/thoughts').catch(() => []);
-      const taskIds = inProgress.map(t => `#${t.id}`).join(', ');
-      const alreadyTracked = (existing || []).some(th =>
-        inProgress.some(t => th.text.includes(`#${t.id}`))
-      );
-      if (!alreadyTracked) {
-        const taskList = inProgress.map(t => `#${t.id} ${t.title}`).join(', ');
-        await api('/thoughts', {
-          method: 'POST',
-          body: JSON.stringify({
-            text: `Session ended with ${inProgress.length} task(s) still in progress: ${taskList}`,
-            context: `auto-pushed by session-stop hook for ${project}`,
-            project,
-          }),
-        });
-      }
-    }
-  } catch {
-    // Non-critical — thoughts are a bonus, not a requirement
-  }
+    const json = JSON.stringify(data, null, 2);
+    const tmp = NEXUS_DB + '.tmp';
+    writeFileSync(tmp, json);
+    try { if (existsSync(NEXUS_DB + '.bak')) renameSync(NEXUS_DB + '.bak', NEXUS_DB + '.bak.2'); } catch {}
+    try { if (existsSync(NEXUS_DB)) renameSync(NEXUS_DB, NEXUS_DB + '.bak'); } catch {}
+    renameSync(tmp, NEXUS_DB);
+  } catch {}
 }
 
-main().catch(() => {
-  // Absolute silence. Exit cleanly no matter what.
-});
+try { main(); } catch {}

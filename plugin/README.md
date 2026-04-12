@@ -17,7 +17,7 @@ Nexus gives Claude Code a persistent brain across conversations:
 ## Install
 
 ```bash
-/plugin marketplace add kronosderet/nexus-marketplace
+/plugin marketplace add kronosderet/Nexus
 /plugin install nexus@nexus-marketplace
 ```
 
