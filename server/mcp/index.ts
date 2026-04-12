@@ -104,19 +104,26 @@ async function nexusFetch(
     });
   }
 
-  // Proxy mode: forward to Express server
+  // Proxy mode: forward to Express server (with single retry)
   let res: Response;
+  const doFetch = () => fetch(`${NEXUS_BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...init,
+  });
   try {
-    res = await fetch(`${NEXUS_BASE}${path}`, {
-      headers: { 'Content-Type': 'application/json' },
-      ...init,
-    });
+    res = await doFetch();
   } catch (err: any) {
-    throw new Error(
-      `Nexus server unreachable at ${NEXUS_BASE}. ` +
-        `Start with: nexus-dev.bat, or set NEXUS_STANDALONE=1 for direct mode. ` +
-        `(${err.message})`
-    );
+    // Single retry after 500ms (covers server restart window)
+    try {
+      await new Promise(r => setTimeout(r, 500));
+      res = await doFetch();
+    } catch {
+      throw new Error(
+        `Nexus server unreachable at ${NEXUS_BASE}. ` +
+          `Start with: nexus-dev.bat, or set NEXUS_STANDALONE=1 for direct mode. ` +
+          `(${err.message})`
+      );
+    }
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -683,12 +690,15 @@ async function handleTool(name: string, args: any): Promise<string> {
       const project = args?.project || 'Nexus';
       // The /api/init endpoint returns init checks but not a full brief.
       // Compose a brief from multiple endpoints (the same data the CLI uses).
+      // Per-call 10s timeout via Promise.race to prevent hanging on slow routes
+      const withTimeout = <T>(p: Promise<T>, fallback: T) =>
+        Promise.race([p, new Promise<T>(r => setTimeout(() => r(fallback), 10000))]);
       const [tasks, sessions, ledger, fuel, risks] = await Promise.all([
-        nexusFetch('/api/tasks').catch(() => []),
-        nexusFetch('/api/sessions').catch(() => []),
-        nexusFetch('/api/ledger').catch(() => []),
-        nexusFetch('/api/estimator').catch(() => null),
-        nexusFetch('/api/overseer/risks').catch(() => ({ risks: [] })),
+        withTimeout(nexusFetch('/api/tasks'), []),
+        withTimeout(nexusFetch('/api/sessions'), []),
+        withTimeout(nexusFetch('/api/ledger'), []),
+        withTimeout(nexusFetch('/api/estimator'), null),
+        withTimeout(nexusFetch('/api/overseer/risks'), { risks: [] }),
       ]);
 
       const projectLower = project.toLowerCase();

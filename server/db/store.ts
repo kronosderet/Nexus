@@ -191,7 +191,8 @@ export class NexusStore {
       meta: JSON.stringify(meta), created_at: this._now(),
     };
     this.data.activity.push(entry);
-    if (this.data.activity.length > 500) this.data.activity = this.data.activity.slice(-500);
+    // Keep last 500 active entries; bump cap to 750 to reduce loss frequency
+    if (this.data.activity.length > 750) this.data.activity = this.data.activity.slice(-500);
     this._flush();
     return entry;
   }

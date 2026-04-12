@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { createHash } from 'crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EMBED_CACHE_PATH = join(__dirname, '..', '..', 'nexus-embeddings.json');
@@ -26,7 +27,7 @@ if (existsSync(EMBED_CACHE_PATH)) {
 
 let savePending: NodeJS.Timeout | null = null;
 function saveCache() {
-  // Debounce: write at most once per 5 seconds to avoid I/O bottleneck
+  // Debounce: write at most once per 2 seconds (reduced from 5s to limit crash-window data loss)
   if (savePending) return;
   savePending = setTimeout(() => {
     savePending = null;
@@ -36,7 +37,7 @@ function saveCache() {
       for (const k of sorted.slice(0, keys.length - 400)) delete cache[k];
     }
     try { writeFileSync(EMBED_CACHE_PATH, JSON.stringify(cache)); } catch {}
-  }, 5000);
+  }, 2000);
 }
 
 // Flush on exit
@@ -48,7 +49,8 @@ process.on('exit', () => {
 });
 
 export async function getEmbedding(text: string): Promise<number[] | null> {
-  const key = text.slice(0, 200);
+  // Hash full text to avoid collisions from truncation
+  const key = createHash('sha256').update(text.slice(0, 1000)).digest('hex').slice(0, 32);
   if (cache[key]?.vec) return cache[key].vec;
 
   try {

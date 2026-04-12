@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { readdirSync, statSync } from 'fs';
+import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
 import type { Decision, GraphEdge } from '../types.ts';
@@ -24,15 +24,15 @@ export function createPredictRoutes(store: NexusStore, broadcast: (data: any) =>
   const router = Router();
 
   // Dry run — show what would be generated, don't create anything
-  router.get('/', (_req: Request, res: Response) => {
-    const gaps = detectGaps(store);
+  router.get('/', async (_req: Request, res: Response) => {
+    const gaps = await detectGaps(store);
     res.json(gaps);
   });
 
   // Generate — actually create the suggested tasks
-  router.post('/generate', (req: Request, res: Response) => {
+  router.post('/generate', async (req: Request, res: Response) => {
     const { categories } = req.body; // optional filter
-    const gaps = detectGaps(store);
+    const gaps = await detectGaps(store);
 
     const created: { id: number; title: string; category: string }[] = [];
 
@@ -78,7 +78,7 @@ interface GapSuggestion {
   decisionId?: number;
 }
 
-function detectGaps(store: NexusStore): { suggestions: GapSuggestion[]; stats: any } {
+async function detectGaps(store: NexusStore): Promise<{ suggestions: GapSuggestion[]; stats: any }> {
   const suggestions: GapSuggestion[] = [];
   const ledger = store.getAllDecisions();
   const edges = store.getAllEdges();
@@ -97,11 +97,12 @@ function detectGaps(store: NexusStore): { suggestions: GapSuggestion[]; stats: a
   // ── 1. Blind spots: git repos with no indexed decisions ─
   const decisionProjects = new Set(ledger.map(d => d.project.toLowerCase()));
   try {
-    for (const name of readdirSync(PROJECTS_DIR)) {
+    const dirEntries = await readdir(PROJECTS_DIR);
+    for (const name of dirEntries) {
       if (name === 'archive' || name === 'node_modules' || name.startsWith('.')) continue;
       const fullPath = join(PROJECTS_DIR, name);
       try {
-        statSync(join(fullPath, '.git'));
+        await stat(join(fullPath, '.git'));
       } catch {
         continue;
       }
@@ -150,10 +151,16 @@ function detectGaps(store: NexusStore): { suggestions: GapSuggestion[]; stats: a
   for (const d of topCentral) {
     // Skip deprecated decisions — no point suggesting tests for deleted features
     if (d.deprecated) continue;
-    const hasTestTask = tasks.some(t =>
-      t.title.toLowerCase().includes('test') &&
-      t.title.toLowerCase().includes(d.decision.toLowerCase().split(' ')[0])
-    );
+    // Check if any test task references significant words from this decision
+    const decWords = d.decision.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+    const hasTestTask = tasks.some(t => {
+      const title = t.title.toLowerCase();
+      if (!title.includes('test')) return false;
+      // Match if title shares 2+ significant words with decision
+      let matches = 0;
+      for (const w of decWords) { if (title.includes(w)) matches++; }
+      return matches >= 2;
+    });
     if (!hasTestTask && centrality[d.id] >= 5) {
       // Only suggest if it's Nexus-related (we have test infrastructure there)
       if (d.project.toLowerCase() === 'nexus') {
