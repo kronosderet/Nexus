@@ -227,6 +227,8 @@ export default function Overseer() {
   const [answer, setAnswer] = useState(null);
   const [asking, setAsking] = useState(false);
   const [context, setContext] = useState(null);
+  const [aiStatus, setAiStatus] = useState(null);
+  const [gpuInfo, setGpuInfo] = useState(null);
 
   async function fetchRisks() {
     try {
@@ -265,7 +267,12 @@ export default function Overseer() {
     }
   }
 
-  useEffect(() => { fetchRisks(); }, []);
+  useEffect(() => {
+    fetchRisks();
+    // Fetch AI model + GPU info on mount
+    api.getOverseerStatus().then(setAiStatus).catch(() => {});
+    api.getGpuDetail().then(setGpuInfo).catch(() => {});
+  }, []);
 
   return (
     <div>
@@ -275,7 +282,14 @@ export default function Overseer() {
           Overseer
         </h2>
         <p className="text-xs font-mono text-nexus-text-faint mt-1">
-          AI-powered project management intelligence. Gemma 4 26B on RTX 3070 Ti.
+          {aiStatus?.available
+            ? `${aiStatus.model || 'Unknown model'} via ${aiStatus.provider || 'local AI'}${gpuInfo?.name ? ` on ${gpuInfo.name}` : ''}`
+            : 'No local AI detected. Start LM Studio or Ollama.'}
+          {gpuInfo?.vram && aiStatus?.available && (
+            <span className="ml-2 text-nexus-text-faint/60">
+              ({gpuInfo.vram.used != null ? `${Math.round(gpuInfo.vram.used / 1024 * 10) / 10}/${Math.round(gpuInfo.vram.total / 1024 * 10) / 10} GB VRAM` : ''})
+            </span>
+          )}
         </p>
       </div>
 
@@ -323,6 +337,9 @@ export default function Overseer() {
                 <span>{context.openTasks} open tasks</span>
                 <span>{context.repos} repos</span>
                 <span>{context.sessions} sessions</span>
+                {gpuInfo?.utilization != null && (
+                  <span className="ml-auto">GPU {gpuInfo.utilization.gpu}% | {gpuInfo.temperature}°C</span>
+                )}
               </div>
             )}
           </div>

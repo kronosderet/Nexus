@@ -227,6 +227,12 @@ Format your response with clear section headers. Keep total response under 300 w
 export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) {
   const router = Router();
 
+  // Lightweight AI status check (no inference, just detection)
+  router.get('/status', async (_req: Request, res: Response) => {
+    const ai = await detectAI();
+    res.json(ai);
+  });
+
   // Full overseer analysis
   router.get('/', async (req: Request, res: Response) => {
     const ai = await detectAI();

@@ -74,6 +74,7 @@ export const api = {
   deleteBookmark: (id) => request(`/bookmarks/${id}`, { method: 'DELETE' }),
 
   // ── Overseer ───────────────────────────────────────────
+  getOverseerStatus: () => request('/overseer/status'),
   getOverseer: () => request('/overseer'),
   getOverseerRisks: () => request('/overseer/risks'),
   askOverseer: (body) => request('/overseer/ask', { method: 'POST', body }),
