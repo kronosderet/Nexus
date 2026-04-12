@@ -144,11 +144,12 @@ export function createUsageRoutes(store: NexusStore, broadcast: BroadcastFn) {
       ? history.filter((h: any) => new Date(h.created_at) >= curStart)
       : history;
 
-    if (sessionHistory.length >= 2) {
+    // Need 3+ data points spanning >5 minutes for meaningful burn rate
+    if (sessionHistory.length >= 3) {
       const newest = sessionHistory[0];
       const oldest = sessionHistory[sessionHistory.length - 1];
       const timeDiffH = (new Date(newest.created_at).getTime() - new Date(oldest.created_at).getTime()) / 3600000;
-      if (timeDiffH > 0.01 && oldest.session_percent != null && newest.session_percent != null) {
+      if (timeDiffH > 0.08 && oldest.session_percent != null && newest.session_percent != null) {
         const pctBurned = oldest.session_percent - newest.session_percent;
         if (pctBurned > 0) {
           const rate = Math.round((pctBurned / timeDiffH) * 10) / 10;

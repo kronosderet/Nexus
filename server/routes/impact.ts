@@ -179,11 +179,21 @@ export function createImpactRoutes(store: NexusStore) {
         `${list || '(none)'}. Generate a 3-4 sentence impact forecast describing: (1) what breaks, ` +
         `(2) estimated scope of change, (3) recommended migration approach. Be specific and concise.`;
 
+      // Auto-detect model from LM Studio
+      let modelName = 'google/gemma-4-31b';
+      try {
+        const modelsRes = await fetch('http://localhost:1234/v1/models', { signal: AbortSignal.timeout(5000) });
+        if (modelsRes.ok) {
+          const modelsData: any = await modelsRes.json();
+          const first = (modelsData.data || []).find((m: any) => m.id && !m.id.includes('embed'));
+          if (first) modelName = first.id;
+        }
+      } catch {}
       const aiRes = await fetch('http://localhost:1234/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': 'none' },
         body: JSON.stringify({
-          model: 'google/gemma-4-26b-a4b',
+          model: modelName,
           max_tokens: 400,
           messages: [{ role: 'user', content: userPrompt }],
         }),
