@@ -3,7 +3,6 @@
  * Claude Code SessionStart hook — injects Nexus metabrain context.
  *
  * STANDALONE: reads directly from ~/.nexus/nexus.json (no server needed).
- * Falls back to HTTP API at localhost:3001 if available.
  *
  * Output goes to stdout → becomes system context for the new conversation.
  * Fails silently if no data exists yet — Claude starts cold, no crash.

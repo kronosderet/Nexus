@@ -505,7 +505,7 @@ const commands = {
 ## Nexus Integration for ${project}
 
 ### What is Nexus?
-Local AI-powered mission control (v3.3). Tracks tasks, sessions, decisions,
+Local AI-powered mission control (v4.1). Tracks tasks, sessions, decisions,
 fuel usage, and git state across all projects. Features:
   • Knowledge Graph of 87+ decisions with 5 typed edge types + blast-radius analysis
   • Local AI Overseer (Gemma 4 via LM Studio) with self-improving Advice Journal
@@ -1700,7 +1700,7 @@ Ritual:  nexus_bridge_session (end-of-work: auto-summary + handoff)
     };
 
     console.log(`
-  ${amber('◈')} ${amber('NEXUS MCP SERVER')} -- v3.3
+  ${amber('◈')} ${amber('NEXUS MCP SERVER')} -- v4.1
 
   ${dim('Exposes the Nexus metabrain as 18 native MCP tools so every Claude')}
   ${dim('instance can call mcp__nexus__brief, mcp__nexus__check_guard, etc.')}
@@ -1874,7 +1874,7 @@ ${JSON.stringify(config, null, 2).split('\n').map(l => '    ' + l).join('\n')}
 
   ${amber('Commands:')}
     nexus hooks                     Claude Code lifecycle hooks (install/uninstall)
-    nexus mcp                       Print MCP server config (18 tools, v3.3)
+    nexus mcp                       Print MCP server config (20 tools, v4.1)
     nexus mcp --run                 Run the MCP stdio server (for debugging)
     nexus plan                      Autonomous session plan (AI-generated)
     nexus summarize [project]       Overseer writes session log (preview)
