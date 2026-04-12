@@ -21,6 +21,9 @@ export class NexusStore {
   data: NexusData;
   _lastRiskScan?: { risks: any[]; scannedAt: string; critical: number; warnings: number };
   private _nextId: Record<IdTable, number>;
+  private _nextLedgerId = 1;
+  private _nextThoughtId = 1;
+  private _edgeMutex = false;
 
   constructor() {
     if (existsSync(DB_PATH)) {
@@ -57,13 +60,16 @@ export class NexusStore {
     if (!this.data.advice) this.data.advice = [];
     if (!this.data.thoughts) this.data.thoughts = [];
 
+    const safeMax = (arr: number[]) => arr.reduce((m, v) => v > m ? v : m, 0);
     this._nextId = {
-      tasks: Math.max(0, ...this.data.tasks.map(t => t.id)) + 1,
-      activity: Math.max(0, ...this.data.activity.map(a => a.id)) + 1,
-      sessions: Math.max(0, ...this.data.sessions.map(s => s.id)) + 1,
-      scratchpads: Math.max(0, ...this.data.scratchpads.map(s => s.id)) + 1,
-      bookmarks: Math.max(0, ...this.data.bookmarks.map(b => b.id)) + 1,
+      tasks: safeMax(this.data.tasks.map(t => t.id)) + 1,
+      activity: safeMax(this.data.activity.map(a => a.id)) + 1,
+      sessions: safeMax(this.data.sessions.map(s => s.id)) + 1,
+      scratchpads: safeMax(this.data.scratchpads.map(s => s.id)) + 1,
+      bookmarks: safeMax(this.data.bookmarks.map(b => b.id)) + 1,
     };
+    this._nextLedgerId = safeMax((this.data.ledger || []).map(e => e.id)) + 1;
+    this._nextThoughtId = safeMax((this.data.thoughts || []).map(t => t.id)) + 1;
   }
 
   private _seed(): NexusData {
@@ -87,19 +93,30 @@ export class NexusStore {
     this._flushing = true;
     try {
       const json = JSON.stringify(this.data, null, 2);
-      // Atomic write: write to .tmp first, then rotate via rename
-      // rename() is atomic on most OS — if we crash mid-rotation,
-      // at least the .tmp file has valid data for recovery.
+      // Atomic write: write to .tmp first, then promote via rename
       writeFileSync(TMP_PATH, json);
-      // Rotate backups
+      // Rotate backups with rollback safety
+      let rotatedBak = false;
       try {
-        if (existsSync(BAK_PATH)) renameSync(BAK_PATH, BAK2_PATH);
+        if (existsSync(BAK_PATH)) { renameSync(BAK_PATH, BAK2_PATH); rotatedBak = true; }
       } catch {}
       try {
         if (existsSync(DB_PATH)) renameSync(DB_PATH, BAK_PATH);
-      } catch {}
+      } catch (err) {
+        // Rollback: restore BAK from BAK2 if we moved it
+        if (rotatedBak && existsSync(BAK2_PATH)) {
+          try { renameSync(BAK2_PATH, BAK_PATH); } catch {}
+        }
+        throw err;
+      }
       // Promote tmp → primary (atomic on same filesystem)
-      renameSync(TMP_PATH, DB_PATH);
+      try {
+        renameSync(TMP_PATH, DB_PATH);
+      } catch (err) {
+        // Recovery: .tmp has valid data but rename failed — try copy fallback
+        try { writeFileSync(DB_PATH, json); } catch {}
+        throw err;
+      }
     } finally {
       this._flushing = false;
     }
@@ -133,7 +150,7 @@ export class NexusStore {
   createTask({ title, description = '', status = 'backlog', priority = 0 }: {
     title: string; description?: string; status?: Task['status']; priority?: number;
   }): Task {
-    const maxOrder = this.data.tasks.filter(t => t.status === status).reduce((max, t) => Math.max(max, t.sort_order), 0);
+    const maxOrder = this.data.tasks.reduce((max, t) => t.status === status && t.sort_order > max ? t.sort_order : max, 0);
     const task: Task = {
       id: this._id('tasks'), title, description, status, priority,
       sort_order: maxOrder + 1, linked_files: '[]',
@@ -337,7 +354,7 @@ export class NexusStore {
   }): Decision {
     if (!this.data.ledger) this.data.ledger = [];
     const entry: Decision = {
-      id: (this.data.ledger.length > 0 ? Math.max(...this.data.ledger.map(e => e.id)) : 0) + 1,
+      id: this._nextLedgerId++,
       decision, context, project, alternatives, tags, created_at: this._now(),
     };
     this.data.ledger.push(entry);
@@ -384,7 +401,7 @@ export class NexusStore {
     return linked;
   }
 
-  /** Semantic auto-link via embeddings (async, non-blocking). */
+  /** Semantic auto-link via embeddings (async, non-blocking, mutex-guarded). */
   private async _semanticAutoLink(newDec: Decision): Promise<void> {
     const others = this.data.ledger.filter(d => d.id !== newDec.id && !d.deprecated);
     if (others.length === 0) return;
@@ -394,15 +411,22 @@ export class NexusStore {
 
     const similar = await findSimilar(queryText, candidateTexts, 5, 0.55);
 
-    for (const match of similar) {
-      const existing = others[match.index];
-      const alreadyLinked = this.data.graph_edges.some(
-        e => (e.from === newDec.id && e.to === existing.id) || (e.from === existing.id && e.to === newDec.id)
-      );
-      if (alreadyLinked) continue;
-      this.addEdge(newDec.id, existing.id, 'related',
-        `semantic-linked (${Math.round(match.similarity * 100)}% cosine similarity)`
-      );
+    // Acquire edge mutex to prevent concurrent graph_edges corruption
+    while (this._edgeMutex) await new Promise(r => setTimeout(r, 10));
+    this._edgeMutex = true;
+    try {
+      for (const match of similar) {
+        const existing = others[match.index];
+        const alreadyLinked = this.data.graph_edges.some(
+          e => (e.from === newDec.id && e.to === existing.id) || (e.from === existing.id && e.to === newDec.id)
+        );
+        if (alreadyLinked) continue;
+        this.addEdge(newDec.id, existing.id, 'related',
+          `semantic-linked (${Math.round(match.similarity * 100)}% cosine similarity)`
+        );
+      }
+    } finally {
+      this._edgeMutex = false;
     }
   }
 
@@ -607,7 +631,7 @@ export class NexusStore {
   pushThought(opts: { text: string; context?: string; project?: string; related_task_id?: number | null }): Thought {
     if (!this.data.thoughts) this.data.thoughts = [];
     const thought: Thought = {
-      id: (this.data.thoughts.length > 0 ? Math.max(...this.data.thoughts.map(t => t.id)) : 0) + 1,
+      id: this._nextThoughtId++,
       text: opts.text,
       context: opts.context ?? '',
       project: opts.project ?? 'general',
@@ -628,8 +652,15 @@ export class NexusStore {
     if (id != null) {
       target = thoughts.find(t => t.id === id && t.status === 'active');
     } else {
-      const active = thoughts.filter(t => t.status === 'active');
-      target = active.sort((a, b) => new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime())[0];
+      // Find most recent active thought without sorting entire array
+      let latest: Thought | undefined;
+      let latestTime = 0;
+      for (const t of thoughts) {
+        if (t.status !== 'active') continue;
+        const time = new Date(t.pushed_at).getTime();
+        if (time > latestTime) { latestTime = time; latest = t; }
+      }
+      target = latest;
     }
     if (!target) return null;
     target.popped_at = this._now();
@@ -680,12 +711,12 @@ export class NexusStore {
       t.created_at !== t.updated_at
     );
 
-    const withDuration = completed.map(t => ({
-      id: t.id,
-      title: t.title,
-      status: t.status,
-      minutes: Math.round((new Date(t.updated_at).getTime() - new Date(t.created_at).getTime()) / 60000),
-    })).filter(t => t.minutes >= 0 && t.minutes < 24 * 60); // sanity bounds
+    const now = Date.now();
+    const withDuration = completed.map(t => {
+      const created = Date.parse(t.created_at);
+      const updated = Date.parse(t.updated_at);
+      return { id: t.id, title: t.title, status: t.status, minutes: Math.round((updated - created) / 60000) };
+    }).filter(t => t.minutes >= 0 && t.minutes < 24 * 60); // sanity bounds
 
     if (withDuration.length === 0) {
       return { slowTasks: [], fastTasks: [], stuckTasks: [], averageCompletionMinutes: null, insights: ['Insufficient data for self-critique. Complete more tasks.'] };
@@ -700,7 +731,7 @@ export class NexusStore {
       .map(t => ({
         id: t.id,
         title: t.title,
-        ageHours: Math.round((Date.now() - new Date(t.created_at).getTime()) / 3600000),
+        ageHours: Math.round((now - Date.parse(t.created_at)) / 3600000),
       }))
       .filter(t => t.ageHours > 24);
 

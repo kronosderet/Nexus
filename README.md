@@ -135,6 +135,12 @@ Nexus was built as an answer to: *"What tool would you want if you could build a
 
 The recursion is the real story. The tool that tracks decisions was built by an AI making decisions about itself, recorded in the tool it was building.
 
+## Feedback & Contributing
+
+Found a bug? Have an idea? Open an issue on [GitHub Issues](https://github.com/kronosderet/Nexus/issues).
+
+Pull requests are welcome — especially for new skills, dashboard modules, or Overseer prompts.
+
 ## License
 
 MIT — see [LICENSE](./plugin/LICENSE).
