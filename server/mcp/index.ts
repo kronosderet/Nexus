@@ -325,6 +325,23 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: 'nexus_update_decision',
+    description:
+      'Update an existing decision in The Ledger. Use to refine decision text, add context/rationale, ' +
+      'update tags, or correct project assignment — without breaking existing graph edges.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'number', description: 'Decision id to update.' },
+        decision: { type: 'string', description: 'New decision text (optional).' },
+        rationale: { type: 'string', description: 'New context/rationale (optional).' },
+        project: { type: 'string', description: 'New project assignment (optional).' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'New tags (optional).' },
+      },
+      required: ['id'],
+    },
+  },
+  {
     name: 'nexus_push_thought',
     description:
       'Push a thought onto the LIFO Thought Stack — the interrupt-recovery working memory. ' +
@@ -780,6 +797,20 @@ async function handleTool(name: string, args: any): Promise<string> {
       return `◈ Decision #${result.id} recorded for ${args.project}\n  ${args.decision}`;
     }
 
+    case 'nexus_update_decision': {
+      if (args?.id == null) throw new Error('id is required');
+      const body: any = {};
+      if (args.decision) body.decision = args.decision;
+      if (args.rationale) body.context = args.rationale;
+      if (args.project) body.project = args.project;
+      if (args.tags) body.tags = args.tags;
+      const result = await nexusFetch(`/api/ledger/${Number(args.id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      });
+      return `◈ Decision #${result.id} updated\n  ${result.decision}`;
+    }
+
     case 'nexus_push_thought': {
       if (!args?.text) throw new Error('text is required');
       const result = await nexusFetch('/api/thoughts', {
@@ -880,7 +911,11 @@ async function handleTool(name: string, args: any): Promise<string> {
         method: 'PATCH',
         body: JSON.stringify({ status: 'done' }),
       });
-      return `◈ Landmark reached #${result.id}\n  ${result.title}`;
+      const lines = [`◈ Landmark reached #${result.id}`, `  ${result.title}`];
+      if (result.resolvedThoughts > 0) {
+        lines.push(`  ◈ Auto-resolved ${result.resolvedThoughts} linked thought${result.resolvedThoughts > 1 ? 's' : ''}`);
+      }
+      return lines.join('\n');
     }
 
     case 'nexus_log_activity': {

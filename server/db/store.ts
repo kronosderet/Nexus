@@ -160,6 +160,17 @@ export class NexusStore {
     this._flush();
     return d;
   }
+  updateDecision(id: number, updates: Partial<Pick<Decision, 'decision' | 'context' | 'alternatives' | 'tags' | 'project'>>): Decision | null {
+    const d = this.getDecisionById(id);
+    if (!d) return null;
+    if (updates.decision != null) d.decision = updates.decision;
+    if (updates.context != null) d.context = updates.context;
+    if (updates.alternatives != null) d.alternatives = updates.alternatives;
+    if (updates.tags != null) d.tags = updates.tags;
+    if (updates.project != null) d.project = updates.project;
+    this._flush();
+    return d;
+  }
   getDecisionCount(): number { return (this.data.ledger || []).length; }
   getAllEdges(): GraphEdge[] { return this.data.graph_edges || []; }
   getEdgeCount(): number { return (this.data.graph_edges || []).length; }
@@ -185,13 +196,24 @@ export class NexusStore {
     return task;
   }
 
-  updateTask(id: number, updates: Partial<Task>): { task: Task; old: Task } | null {
+  updateTask(id: number, updates: Partial<Task>): { task: Task; old: Task; resolvedThoughts?: number } | null {
     const idx = this.data.tasks.findIndex(t => t.id === id);
     if (idx === -1) return null;
     const old = { ...this.data.tasks[idx] };
     this.data.tasks[idx] = { ...old, ...updates, id, updated_at: this._now() } as Task;
+    // Auto-resolve thoughts linked to this task when marked done
+    let resolvedThoughts = 0;
+    if (updates.status === 'done') {
+      for (const t of (this.data.thoughts || [])) {
+        if (t.status === 'active' && t.related_task_id === id) {
+          t.status = 'resolved';
+          t.popped_at = this._now();
+          resolvedThoughts++;
+        }
+      }
+    }
     this._flush();
-    return { task: this.data.tasks[idx], old };
+    return { task: this.data.tasks[idx], old, resolvedThoughts };
   }
 
   deleteTask(id: number): Task | null {
