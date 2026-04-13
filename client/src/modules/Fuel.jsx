@@ -28,16 +28,20 @@ export default function FuelModule({ ws }) {
   const [workload, setWorkload] = useState(null);
   const [history, setHistory] = useState(null);
 
+  const [timing, setTiming] = useState(null);
+
   async function fetchAll() {
     try {
-      const [f, w, h] = await Promise.all([
+      const [f, w, h, t] = await Promise.all([
         api.getEstimator(),
         api.getEstimatorWorkload(),
         api.getEstimatorHistory(),
+        api.getUsageLatest().catch(() => null),
       ]);
       setFuel(f);
       setWorkload(w);
       setHistory(h);
+      if (t) setTiming(t);
     } catch (err) {
       console.error('Failed to fetch fuel data', err);
     }
@@ -72,6 +76,7 @@ export default function FuelModule({ ws }) {
           Fuel Management
         </h2>
         <p className="text-xs font-mono text-nexus-text-faint mt-1">
+          {timing?.plan ? `${timing.plan.label} (${timing.plan.multiplier}x) · ` : ''}
           {fuel?.estimated?.confidence === 'high' ? 'Fresh reading.' : `Estimated (${fuel?.reported?.minutesAgo ?? '?'}m since last report).`}
         </p>
       </div>

@@ -183,6 +183,8 @@ export class NexusStore {
   getEdgeCount(): number { return (this.data.graph_edges || []).length; }
   getSessionTiming(): SessionTiming | undefined { return this.data._sessionTiming; }
   setSessionTiming(timing: SessionTiming): void { this.data._sessionTiming = timing; this._flush(); }
+  getFuelConfig(): import('../types.js').FuelConfig | undefined { return this.data._fuelConfig; }
+  setFuelConfig(config: import('../types.js').FuelConfig): void { this.data._fuelConfig = config; this._flush(); }
 
   // ── Tasks ──────────────────────────────────────────────
   getAllTasks(): Task[] {

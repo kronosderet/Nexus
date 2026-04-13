@@ -1,23 +1,10 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
+import { getFuelConfig, setFuelConfig as saveFuelConfig, nowInTZ as configNowInTZ, getNextWeeklyReset as configGetNextWeeklyReset, PLAN_INFO } from '../lib/fuelConfig.ts';
 
 type BroadcastFn = (data: any) => void;
 
-// ── Reset schedule ─────────────────────────────────────
-const TIMEZONE = 'Europe/Prague';
-
-// Session: FIXED 5-hour windows (hard reset, NOT rolling from first use).
-// The user reports reset_in_minutes which tells us when the current window
-// ends. We store that absolute time and count down to it. When it passes,
-// the next window starts. We NEVER auto-start a rolling window.
-const SESSION_WINDOW_HOURS = 5;
-
-// Weekly: fixed reset Thursday 21:00 CET
-const WEEKLY_RESET_DAY = 4;    // 0=Sun, 4=Thu
-const WEEKLY_RESET_HOUR = 21;
-
 // ── Session tracking (persisted in store) ──────────────
-// _sessionTiming is stored in store.data so it survives restarts
 let _store: NexusStore | null = null;
 
 function getSessionTiming() {
@@ -25,21 +12,19 @@ function getSessionTiming() {
 }
 
 function nowInTZ() {
-  return new Date(new Date().toLocaleString('en-US', { timeZone: TIMEZONE }));
+  const config = _store ? getFuelConfig(_store) : { timezone: 'Europe/Prague' } as any;
+  return configNowInTZ(config);
 }
 
 function startSession(resetMinutesFromNow: number | null = null) {
+  const config = _store ? getFuelConfig(_store) : { sessionWindowHours: 5 } as any;
   const now = nowInTZ();
-  // Only set resetTime when the user explicitly provides reset_in_minutes.
-  // Without that, use the last known resetTime or fall back to SESSION_WINDOW_HOURS
-  // from NOW (best guess, will be corrected on next user report).
   const existing = getSessionTiming();
   const timing = {
     startTime: now.toISOString(),
     resetTime: resetMinutesFromNow != null
       ? new Date(now.getTime() + resetMinutesFromNow * 60000).toISOString()
-      : existing.resetTime || new Date(now.getTime() + SESSION_WINDOW_HOURS * 3600000).toISOString(),
-    // Track whether the resetTime came from user input (authoritative) or was guessed
+      : existing.resetTime || new Date(now.getTime() + config.sessionWindowHours * 3600000).toISOString(),
     resetSource: resetMinutesFromNow != null ? 'user' : (existing.resetSource || 'estimated'),
   };
   if (_store) {
@@ -48,16 +33,8 @@ function startSession(resetMinutesFromNow: number | null = null) {
 }
 
 function getNextWeeklyReset() {
-  const now = nowInTZ();
-  const reset = new Date(now);
-  const daysUntil = (WEEKLY_RESET_DAY - now.getDay() + 7) % 7;
-  if (daysUntil === 0 && (now.getHours() > WEEKLY_RESET_HOUR || (now.getHours() === WEEKLY_RESET_HOUR && now.getMinutes() > 0))) {
-    reset.setDate(reset.getDate() + 7);
-  } else {
-    reset.setDate(reset.getDate() + daysUntil);
-  }
-  reset.setHours(WEEKLY_RESET_HOUR, 0, 0, 0);
-  return reset;
+  const config = _store ? getFuelConfig(_store) : { timezone: 'Europe/Prague', weeklyResetDay: 4, weeklyResetHour: 21, sessionWindowHours: 5 } as any;
+  return configGetNextWeeklyReset(config);
 }
 
 function formatCountdown(ms: number) {
@@ -81,12 +58,15 @@ export function buildTimingInfo() {
   const sessionStartTime = timing.startTime ? new Date(timing.startTime) : null;
 
   let sessionInfo: any;
+  const config = _store ? getFuelConfig(_store) : { sessionWindowHours: 5, timezone: 'Europe/Prague', weeklyResetDay: 4, weeklyResetHour: 21, plan: 'pro' } as any;
+  const planInfo = PLAN_INFO[config.plan] || PLAN_INFO.pro;
+
   if (sessionResetTime) {
     const sessionMs = sessionResetTime.getTime() - now.getTime();
     const elapsed = sessionStartTime ? now.getTime() - sessionStartTime.getTime() : 0;
     sessionInfo = {
-      type: 'rolling',
-      windowHours: SESSION_WINDOW_HOURS,
+      type: 'fixed',
+      windowHours: config.sessionWindowHours,
       startedAt: sessionStartTime?.toISOString() || null,
       resetsAt: sessionResetTime.toISOString(),
       countdown: formatCountdown(Math.max(0, sessionMs)),
@@ -97,8 +77,8 @@ export function buildTimingInfo() {
     };
   } else {
     sessionInfo = {
-      type: 'rolling',
-      windowHours: SESSION_WINDOW_HOURS,
+      type: 'fixed',
+      windowHours: config.sessionWindowHours,
       startedAt: null,
       countdown: 'no active session',
       countdownMs: 0,
@@ -107,10 +87,11 @@ export function buildTimingInfo() {
 
   return {
     now: now.toISOString(),
-    timezone: TIMEZONE,
+    timezone: config.timezone,
+    plan: { name: config.plan, label: planInfo.label, multiplier: planInfo.multiplier },
     session: sessionInfo,
     weekly: {
-      resetsAt: `Thursday ${WEEKLY_RESET_HOUR}:00 ${TIMEZONE}`,
+      resetsAt: `${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][config.weeklyResetDay]} ${config.weeklyResetHour}:00 ${config.timezone}`,
       nextReset: nextWeekly.toISOString(),
       countdown: formatCountdown(weeklyMs),
       countdownMs: weeklyMs,
@@ -168,10 +149,18 @@ export function createUsageRoutes(store: NexusStore, broadcast: BroadcastFn) {
 
   // Log a usage data point
   router.post('/', (req: Request, res: Response) => {
-    const { session_percent, weekly_percent, note, reset_in_minutes } = req.body;
+    const { session_percent, weekly_percent, note, reset_in_minutes, plan, timezone } = req.body;
 
     if (session_percent == null && weekly_percent == null) {
       return res.status(400).json({ error: 'Provide session_percent and/or weekly_percent.' });
+    }
+
+    // Save plan/timezone config if provided (persists across sessions)
+    if (plan || timezone) {
+      const updates: any = {};
+      if (plan) updates.plan = plan;
+      if (timezone) updates.timezone = timezone;
+      saveFuelConfig(store, updates);
     }
 
     // Auto-start session tracking on first log, or if reset_in_minutes is provided

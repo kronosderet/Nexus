@@ -109,9 +109,10 @@ function buildEstimate(store: NexusStore) {
   const chunksRemaining = constrainingMinutes ? Math.floor(constrainingMinutes / 15) : null;
 
   // Weekly planning: how many full sessions left this week?
-  // A session typically burns 50-80% fuel, so sessions left = weekly% / avg_session_burn
-  const avgSessionBurn = 3; // ~3% of weekly per session (rough estimate, improves with data)
-  const sessionsLeftThisWeek = estimatedWeekly > 0 ? Math.floor(estimatedWeekly / avgSessionBurn) : 0;
+  // Learn avg session burn from actual data (sessions detected by fuel jumps)
+  const historicalStats = buildHistoricalStats(store);
+  const learnedSessionBurn = historicalStats.averageBurnRate > 0 ? historicalStats.averageBurnRate : 3;
+  const sessionsLeftThisWeek = estimatedWeekly > 0 ? Math.floor(estimatedWeekly / learnedSessionBurn) : 0;
 
   // Event-based costs (derived from actual activity vs fuel data)
   const eventCosts = calculateEventCosts(store);
