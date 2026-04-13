@@ -38,7 +38,7 @@ cd /d "%~dp0"
 
 REM -- Spawn dashboard in its own persistent window ---------------
 echo   [3/4] Starting dashboard (server/dashboard.ts on :3001)...
-start "Nexus Dashboard :3001" cmd /k "cd /d %~dp0 && npx tsx server/dashboard.ts"
+start "Nexus Dashboard :3001" cmd /k "cd /d %~dp0 && npm run dashboard"
 
 REM -- Small stagger so the dashboard claims port 3001 first ------
 timeout /t 2 /nobreak >nul
