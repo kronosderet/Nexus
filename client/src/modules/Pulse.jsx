@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../hooks/useApi.js';
 import { Activity, Cpu, HardDrive, GitBranch, FolderOpen, Clock, Flame, Thermometer, Zap, Gauge } from 'lucide-react';
-import ProjectHealth from '../components/ProjectHealth.jsx';
+// ProjectHealth moved to Fleet module
 import DigestWidget from '../components/DigestWidget.jsx';
 import QuickActions from '../components/QuickActions.jsx';
 import ClockWidget from '../components/ClockWidget.jsx';
@@ -191,14 +191,13 @@ function GpuPanel({ gpu }) {
 
 export default function Pulse({ ws }) {
   const [pulse, setPulse] = useState(null);
-  const [projectHealth, setProjectHealth] = useState(null);
+  // projectHealth moved to Fleet module
   const [loading, setLoading] = useState(true);
 
   async function fetchPulse() {
     try {
-      const [data, health] = await Promise.all([api.getPulse(), api.getProjectHealth()]);
+      const data = await api.getPulse();
       setPulse(data);
-      setProjectHealth(health);
     } catch {} finally {
       setLoading(false);
     }
@@ -292,8 +291,6 @@ export default function Pulse({ ws }) {
         <GpuPanel gpu={gpu} />
       </div>
 
-      {/* Project Health Cards */}
-      <ProjectHealth projects={projectHealth} />
     </div>
   );
 }
