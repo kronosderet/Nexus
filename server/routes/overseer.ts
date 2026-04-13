@@ -10,28 +10,8 @@ import { PROJECTS_DIR } from '../lib/config.ts';
 
 type BroadcastFn = (data: any) => void;
 
-// ── AI connection (same detection as ai.js) ─────────
-const AI_ENDPOINTS = [
-  { name: 'LM Studio', base: 'http://localhost:1234/v1', type: 'openai' },
-  { name: 'Ollama', base: 'http://localhost:11434', type: 'ollama' },
-];
-
-async function detectAI() {
-  for (const ep of AI_ENDPOINTS) {
-    try {
-      const url = ep.type === 'ollama' ? `${ep.base}/api/tags` : `${ep.base}/models`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
-      if (!res.ok) continue;
-      const data: any = await res.json();
-      const models = ep.type === 'ollama'
-        ? (data.models || []).map((m: any) => m.name)
-        : (data.data || []).filter((m: any) => !m.id.includes('embed')).map((m: any) => m.id);
-      if (models.length === 0) continue;
-      return { available: true, provider: ep.name, base: ep.base, type: ep.type, model: models[0] };
-    } catch {}
-  }
-  return { available: false } as any;
-}
+// ── AI connection — shared detection from lib/aiEndpoints.ts ─────
+import { detectAI } from '../lib/aiEndpoints.ts';
 
 async function ask(ai: any, system: string, prompt: string, maxTokens = 1500) {
   // Semaphore: only one AI inference at a time (prevents slot contention on 8GB VRAM)
