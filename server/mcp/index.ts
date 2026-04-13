@@ -363,6 +363,10 @@ const TOOLS: Tool[] = [
           type: 'string',
           description: 'Optional: which project this thought belongs to.',
         },
+        related_task_id: {
+          type: 'number',
+          description: 'Optional: link to a task ID. Thought auto-resolves when that task completes.',
+        },
       },
       required: ['text'],
     },
@@ -819,6 +823,7 @@ async function handleTool(name: string, args: any): Promise<string> {
           text: args.text,
           context: args.context || undefined,
           project: args.project || undefined,
+          related_task_id: args.related_task_id || undefined,
         }),
       });
       return `◈ Thought #${result.id} pushed onto the stack.\n  "${args.text}"${
