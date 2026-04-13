@@ -136,6 +136,7 @@ export default function Command({ ws }) {
       }
       if (msg.type === 'task_deleted') setTasks(prev => prev.filter(t => t.id !== msg.payload.id));
       if (msg.type === 'thought' || msg.type === 'activity') fetchAll();
+      if (msg.type === 'reload') fetchAll();
     });
   }, [ws]);
 

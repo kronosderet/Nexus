@@ -11,7 +11,7 @@
 
 import { homedir } from 'os';
 import { join, dirname } from 'path';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, watch } from 'fs';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 
@@ -159,6 +159,25 @@ async function start() {
   });
 
   store.addActivity('system', 'Dashboard online. Setting course.');
+
+  // ── File watcher: sync external writes (MCP server → disk → dashboard) ──
+  // When the MCP server writes to nexus.json, reload in-memory store and
+  // broadcast to all connected browser clients so the UI stays fresh.
+  const dbPath = process.env.NEXUS_DB_PATH!;
+  let reloadTimeout: ReturnType<typeof setTimeout> | null = null;
+  watch(dbPath, (eventType) => {
+    if (eventType !== 'change') return;
+    // Debounce: _flush writes .tmp then renames, which fires multiple events
+    if (reloadTimeout) return;
+    reloadTimeout = setTimeout(() => {
+      reloadTimeout = null;
+      // Skip if we just wrote it ourselves (prevent feedback loop)
+      if (store['_flushing']) return;
+      if (store.reload()) {
+        broadcast({ type: 'reload', payload: {} });
+      }
+    }, 300);
+  });
 }
 
 start().catch((err) => {

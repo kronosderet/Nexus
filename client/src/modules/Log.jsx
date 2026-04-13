@@ -94,6 +94,10 @@ export default function Log({ ws }) {
     return ws.subscribe((msg) => {
       if (msg.type === 'activity') setEntries(prev => [msg.payload, ...prev].slice(0, 200));
       if (msg.type === 'session_created') setSessions(prev => [msg.payload, ...prev]);
+      if (msg.type === 'reload') {
+        api.getActivity(200).then(setEntries).catch(() => {});
+        api.getSessions().then(setSessions).catch(() => {});
+      }
     });
   }, [ws]);
 

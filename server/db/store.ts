@@ -72,6 +72,30 @@ export class NexusStore {
     this._nextThoughtId = safeMax((this.data.thoughts || []).map(t => t.id)) + 1;
   }
 
+  /** Re-read data from disk (for external changes, e.g. MCP writes while dashboard is running). */
+  reload(): boolean {
+    if (!existsSync(DB_PATH)) return false;
+    try {
+      const raw = readFileSync(DB_PATH, 'utf-8');
+      const data = JSON.parse(raw);
+      this.data = data;
+      // Recalculate ID counters
+      const safeMax = (arr: number[]) => arr.reduce((m, v) => v > m ? v : m, 0);
+      this._nextId = {
+        tasks: safeMax((data.tasks || []).map((t: any) => t.id)) + 1,
+        activity: safeMax((data.activity || []).map((a: any) => a.id)) + 1,
+        sessions: safeMax((data.sessions || []).map((s: any) => s.id)) + 1,
+        scratchpads: safeMax((data.scratchpads || []).map((s: any) => s.id)) + 1,
+        bookmarks: safeMax((data.bookmarks || []).map((b: any) => b.id)) + 1,
+      };
+      this._nextLedgerId = safeMax((data.ledger || []).map((e: any) => e.id)) + 1;
+      this._nextThoughtId = safeMax((data.thoughts || []).map((t: any) => t.id)) + 1;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private _seed(): NexusData {
     return {
       tasks: [], activity: [], sessions: [], usage: [], gpu_history: [],
