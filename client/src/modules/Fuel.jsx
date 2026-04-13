@@ -72,7 +72,7 @@ export default function FuelModule({ ws }) {
           Fuel Management
         </h2>
         <p className="text-xs font-mono text-nexus-text-faint mt-1">
-          {fuel.estimated.confidence === 'high' ? 'Fresh reading.' : `Estimated (${fuel.reported.minutesAgo}m since last report).`}
+          {fuel?.estimated?.confidence === 'high' ? 'Fresh reading.' : `Estimated (${fuel?.reported?.minutesAgo ?? '?'}m since last report).`}
         </p>
       </div>
 
@@ -101,8 +101,8 @@ export default function FuelModule({ ws }) {
           <Bar percent={fuel.estimated.weekly} height="h-3" />
           {fuel.weekly && (
             <div className="mt-3 space-y-1 text-xs font-mono text-nexus-text-faint">
-              <p>~{fuel.weekly.sessionsLeft} sessions until Thursday reset</p>
-              <p>{fuel.weekly.note}</p>
+              <p>~{fuel.weekly?.sessionsLeft ?? '?'} sessions until Thursday reset</p>
+              {fuel.weekly?.note && <p>{fuel.weekly.note}</p>}
             </div>
           )}
         </div>
