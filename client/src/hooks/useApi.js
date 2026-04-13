@@ -49,6 +49,7 @@ export const api = {
   getGpuDetail: () => request('/pulse/gpu'),
   getGpuHistory: (hours = 1) => request(`/pulse/gpu/history?hours=${hours}`),
   getProjectHealth: () => request('/pulse/projects'),
+  getFleetOverview: () => request('/fleet'),
 
   // ── Sessions ───────────────────────────────────────────
   getSessions: (project) => request(`/sessions${project ? `?project=${encodeURIComponent(project)}` : ''}`),

@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar.jsx';
 import SearchModal from './components/SearchModal.jsx';
 import Command from './modules/Command.jsx';
 import Pulse from './modules/Pulse.jsx';
+import Fleet from './modules/Fleet.jsx';
 import FuelModule from './modules/Fuel.jsx';
 import GraphModule from './modules/Graph.jsx';
 import Overseer from './modules/Overseer.jsx';
@@ -15,15 +16,16 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 import ThoughtStackModal from './components/ThoughtStackModal.jsx';
 import ShortcutHelpModal from './components/ShortcutHelpModal.jsx';
 
-const MODULE_KEYS = ['command', 'pulse', 'fuel', 'graph', 'overseer', 'log', 'terminal'];
+const MODULE_KEYS = ['command', 'pulse', 'fleet', 'fuel', 'graph', 'overseer', 'log', 'terminal'];
 const MODULES = {
   command: { label: 'Command', icon: 'compass', component: Command, shortcut: '1' },
   pulse: { label: 'Dashboard', icon: 'activity', component: Pulse, shortcut: '2' },
-  fuel: { label: 'Fuel', icon: 'fuel', component: FuelModule, shortcut: '3' },
-  graph: { label: 'Graph', icon: 'git-branch', component: GraphModule, shortcut: '4' },
-  overseer: { label: 'Overseer', icon: 'brain', component: Overseer, shortcut: '5' },
-  log: { label: 'Log', icon: 'scroll-text', component: Log, shortcut: '6' },
-  terminal: { label: 'Terminal', icon: 'terminal', component: TerminalModule, shortcut: '7' },
+  fleet: { label: 'Fleet', icon: 'ship', component: Fleet, shortcut: '3' },
+  fuel: { label: 'Fuel', icon: 'fuel', component: FuelModule, shortcut: '4' },
+  graph: { label: 'Graph', icon: 'git-branch', component: GraphModule, shortcut: '5' },
+  overseer: { label: 'Overseer', icon: 'brain', component: Overseer, shortcut: '6' },
+  log: { label: 'Log', icon: 'scroll-text', component: Log, shortcut: '7' },
+  terminal: { label: 'Terminal', icon: 'terminal', component: TerminalModule, shortcut: '8' },
 };
 
 export default function App() {
