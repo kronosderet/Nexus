@@ -183,6 +183,21 @@ function buildEstimate(store: NexusStore) {
       sessionsLeft: sessionsLeftThisWeek,
       note: `~${sessionsLeftThisWeek} full sessions before Thursday reset`,
     },
+    // Weekly forecast: when will the weekly limit be hit at current pace?
+    forecast: (() => {
+      if (estimatedWeekly >= 95) return { status: 'fresh', message: 'Weekly limit barely touched' };
+      const weeklyUsed = 100 - estimatedWeekly;
+      // How many days since weekly reset? (Thursday 21:00)
+      const daysSinceReset = Math.max(0.5, (7 * 86400000 - (minutesUntilReset ? minutesUntilReset * 60000 : 0)) / 86400000 || 1);
+      const burnPerDay = weeklyUsed / daysSinceReset;
+      if (burnPerDay <= 0) return { status: 'stable', message: 'No weekly burn detected' };
+      const daysUntilEmpty = estimatedWeekly / burnPerDay;
+      const daysUntilReset = minutesUntilReset ? minutesUntilReset / 1440 : 7;
+      if (daysUntilEmpty > daysUntilReset) return { status: 'safe', message: `On track — will last until reset` };
+      const emptyDate = new Date(Date.now() + daysUntilEmpty * 86400000);
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      return { status: 'warning', message: `At current pace, limit hit ${dayNames[emptyDate.getDay()]} ~${emptyDate.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}` };
+    })(),
   };
 }
 
