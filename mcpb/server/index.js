@@ -6805,6 +6805,7 @@ var require_dist = __commonJS({
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { createHash } from "crypto";
 function cosineSim(a, b) {
   let dot = 0, magA = 0, magB = 0;
   for (let i = 0; i < a.length; i++) {
@@ -6827,10 +6828,10 @@ function saveCache() {
       writeFileSync(EMBED_CACHE_PATH, JSON.stringify(cache));
     } catch {
     }
-  }, 5e3);
+  }, 2e3);
 }
 async function getEmbedding(text) {
-  const key = text.slice(0, 200);
+  const key = createHash("sha256").update(text.slice(0, 1e3)).digest("hex").slice(0, 32);
   if (cache[key]?.vec) return cache[key].vec;
   try {
     const res = await fetch(EMBED_URL, {
@@ -6913,6 +6914,9 @@ var init_store = __esm({
       data;
       _lastRiskScan;
       _nextId;
+      _nextLedgerId = 1;
+      _nextThoughtId = 1;
+      _edgeMutex = false;
       constructor() {
         if (existsSync2(DB_PATH)) {
           try {
@@ -6945,13 +6949,38 @@ var init_store = __esm({
         if (!this.data.bookmarks) this.data.bookmarks = [];
         if (!this.data.advice) this.data.advice = [];
         if (!this.data.thoughts) this.data.thoughts = [];
+        const safeMax = (arr) => arr.reduce((m, v) => v > m ? v : m, 0);
         this._nextId = {
-          tasks: Math.max(0, ...this.data.tasks.map((t) => t.id)) + 1,
-          activity: Math.max(0, ...this.data.activity.map((a) => a.id)) + 1,
-          sessions: Math.max(0, ...this.data.sessions.map((s) => s.id)) + 1,
-          scratchpads: Math.max(0, ...this.data.scratchpads.map((s) => s.id)) + 1,
-          bookmarks: Math.max(0, ...this.data.bookmarks.map((b) => b.id)) + 1
+          tasks: safeMax(this.data.tasks.map((t) => t.id)) + 1,
+          activity: safeMax(this.data.activity.map((a) => a.id)) + 1,
+          sessions: safeMax(this.data.sessions.map((s) => s.id)) + 1,
+          scratchpads: safeMax(this.data.scratchpads.map((s) => s.id)) + 1,
+          bookmarks: safeMax(this.data.bookmarks.map((b) => b.id)) + 1
         };
+        this._nextLedgerId = safeMax((this.data.ledger || []).map((e) => e.id)) + 1;
+        this._nextThoughtId = safeMax((this.data.thoughts || []).map((t) => t.id)) + 1;
+      }
+      /** Re-read data from disk (for external changes, e.g. MCP writes while dashboard is running). */
+      reload() {
+        if (!existsSync2(DB_PATH)) return false;
+        try {
+          const raw = readFileSync2(DB_PATH, "utf-8");
+          const data = JSON.parse(raw);
+          this.data = data;
+          const safeMax = (arr) => arr.reduce((m, v) => v > m ? v : m, 0);
+          this._nextId = {
+            tasks: safeMax((data.tasks || []).map((t) => t.id)) + 1,
+            activity: safeMax((data.activity || []).map((a) => a.id)) + 1,
+            sessions: safeMax((data.sessions || []).map((s) => s.id)) + 1,
+            scratchpads: safeMax((data.scratchpads || []).map((s) => s.id)) + 1,
+            bookmarks: safeMax((data.bookmarks || []).map((b) => b.id)) + 1
+          };
+          this._nextLedgerId = safeMax((data.ledger || []).map((e) => e.id)) + 1;
+          this._nextThoughtId = safeMax((data.thoughts || []).map((t) => t.id)) + 1;
+          return true;
+        } catch {
+          return false;
+        }
       }
       _seed() {
         return {
@@ -6982,15 +7011,34 @@ var init_store = __esm({
         try {
           const json2 = JSON.stringify(this.data, null, 2);
           writeFileSync2(TMP_PATH, json2);
+          let rotatedBak = false;
           try {
-            if (existsSync2(BAK_PATH)) renameSync(BAK_PATH, BAK2_PATH);
+            if (existsSync2(BAK_PATH)) {
+              renameSync(BAK_PATH, BAK2_PATH);
+              rotatedBak = true;
+            }
           } catch {
           }
           try {
             if (existsSync2(DB_PATH)) renameSync(DB_PATH, BAK_PATH);
-          } catch {
+          } catch (err) {
+            if (rotatedBak && existsSync2(BAK2_PATH)) {
+              try {
+                renameSync(BAK2_PATH, BAK_PATH);
+              } catch {
+              }
+            }
+            throw err;
           }
-          renameSync(TMP_PATH, DB_PATH);
+          try {
+            renameSync(TMP_PATH, DB_PATH);
+          } catch (err) {
+            try {
+              writeFileSync2(DB_PATH, json2);
+            } catch {
+            }
+            throw err;
+          }
         } finally {
           this._flushing = false;
         }
@@ -7019,6 +7067,17 @@ var init_store = __esm({
         this._flush();
         return d;
       }
+      updateDecision(id, updates) {
+        const d = this.getDecisionById(id);
+        if (!d) return null;
+        if (updates.decision != null) d.decision = updates.decision;
+        if (updates.context != null) d.context = updates.context;
+        if (updates.alternatives != null) d.alternatives = updates.alternatives;
+        if (updates.tags != null) d.tags = updates.tags;
+        if (updates.project != null) d.project = updates.project;
+        this._flush();
+        return d;
+      }
       getDecisionCount() {
         return (this.data.ledger || []).length;
       }
@@ -7040,7 +7099,7 @@ var init_store = __esm({
         return [...this.data.tasks].sort((a, b) => a.sort_order - b.sort_order);
       }
       createTask({ title, description = "", status = "backlog", priority = 0 }) {
-        const maxOrder = this.data.tasks.filter((t) => t.status === status).reduce((max, t) => Math.max(max, t.sort_order), 0);
+        const maxOrder = this.data.tasks.reduce((max, t) => t.status === status && t.sort_order > max ? t.sort_order : max, 0);
         const task = {
           id: this._id("tasks"),
           title,
@@ -7061,8 +7120,18 @@ var init_store = __esm({
         if (idx === -1) return null;
         const old = { ...this.data.tasks[idx] };
         this.data.tasks[idx] = { ...old, ...updates, id, updated_at: this._now() };
+        let resolvedThoughts = 0;
+        if (updates.status === "done") {
+          for (const t of this.data.thoughts || []) {
+            if (t.status === "active" && t.related_task_id === id) {
+              t.status = "resolved";
+              t.popped_at = this._now();
+              resolvedThoughts++;
+            }
+          }
+        }
         this._flush();
-        return { task: this.data.tasks[idx], old };
+        return { task: this.data.tasks[idx], old, resolvedThoughts };
       }
       deleteTask(id) {
         const idx = this.data.tasks.findIndex((t) => t.id === id);
@@ -7084,7 +7153,7 @@ var init_store = __esm({
           created_at: this._now()
         };
         this.data.activity.push(entry);
-        if (this.data.activity.length > 500) this.data.activity = this.data.activity.slice(-500);
+        if (this.data.activity.length > 750) this.data.activity = this.data.activity.slice(-500);
         this._flush();
         return entry;
       }
@@ -7220,7 +7289,7 @@ var init_store = __esm({
       recordDecision({ decision, context = "", project = "general", alternatives = [], tags = [] }) {
         if (!this.data.ledger) this.data.ledger = [];
         const entry = {
-          id: (this.data.ledger.length > 0 ? Math.max(...this.data.ledger.map((e) => e.id)) : 0) + 1,
+          id: this._nextLedgerId++,
           decision,
           context,
           project,
@@ -7267,25 +7336,31 @@ var init_store = __esm({
         }
         return linked;
       }
-      /** Semantic auto-link via embeddings (async, non-blocking). */
+      /** Semantic auto-link via embeddings (async, non-blocking, mutex-guarded). */
       async _semanticAutoLink(newDec) {
         const others = this.data.ledger.filter((d) => d.id !== newDec.id && !d.deprecated);
         if (others.length === 0) return;
         const queryText = `${newDec.decision} ${newDec.context || ""}`;
         const candidateTexts = others.map((d) => `${d.decision} ${d.context || ""}`);
         const similar = await findSimilar(queryText, candidateTexts, 5, 0.55);
-        for (const match of similar) {
-          const existing = others[match.index];
-          const alreadyLinked = this.data.graph_edges.some(
-            (e) => e.from === newDec.id && e.to === existing.id || e.from === existing.id && e.to === newDec.id
-          );
-          if (alreadyLinked) continue;
-          this.addEdge(
-            newDec.id,
-            existing.id,
-            "related",
-            `semantic-linked (${Math.round(match.similarity * 100)}% cosine similarity)`
-          );
+        while (this._edgeMutex) await new Promise((r) => setTimeout(r, 10));
+        this._edgeMutex = true;
+        try {
+          for (const match of similar) {
+            const existing = others[match.index];
+            const alreadyLinked = this.data.graph_edges.some(
+              (e) => e.from === newDec.id && e.to === existing.id || e.from === existing.id && e.to === newDec.id
+            );
+            if (alreadyLinked) continue;
+            this.addEdge(
+              newDec.id,
+              existing.id,
+              "related",
+              `semantic-linked (${Math.round(match.similarity * 100)}% cosine similarity)`
+            );
+          }
+        } finally {
+          this._edgeMutex = false;
         }
       }
       /** Extract significant words (>3 chars, lowercased, deduped) from text. */
@@ -7454,7 +7529,7 @@ var init_store = __esm({
       pushThought(opts) {
         if (!this.data.thoughts) this.data.thoughts = [];
         const thought = {
-          id: (this.data.thoughts.length > 0 ? Math.max(...this.data.thoughts.map((t) => t.id)) : 0) + 1,
+          id: this._nextThoughtId++,
           text: opts.text,
           context: opts.context ?? "",
           project: opts.project ?? "general",
@@ -7473,8 +7548,17 @@ var init_store = __esm({
         if (id != null) {
           target = thoughts.find((t) => t.id === id && t.status === "active");
         } else {
-          const active = thoughts.filter((t) => t.status === "active");
-          target = active.sort((a, b) => new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime())[0];
+          let latest;
+          let latestTime = 0;
+          for (const t of thoughts) {
+            if (t.status !== "active") continue;
+            const time3 = new Date(t.pushed_at).getTime();
+            if (time3 > latestTime) {
+              latestTime = time3;
+              latest = t;
+            }
+          }
+          target = latest;
         }
         if (!target) return null;
         target.popped_at = this._now();
@@ -7509,12 +7593,12 @@ var init_store = __esm({
         const completed = tasks.filter(
           (t) => t.status === "done" && t.created_at && t.updated_at && t.created_at !== t.updated_at
         );
-        const withDuration = completed.map((t) => ({
-          id: t.id,
-          title: t.title,
-          status: t.status,
-          minutes: Math.round((new Date(t.updated_at).getTime() - new Date(t.created_at).getTime()) / 6e4)
-        })).filter((t) => t.minutes >= 0 && t.minutes < 24 * 60);
+        const now = Date.now();
+        const withDuration = completed.map((t) => {
+          const created = Date.parse(t.created_at);
+          const updated = Date.parse(t.updated_at);
+          return { id: t.id, title: t.title, status: t.status, minutes: Math.round((updated - created) / 6e4) };
+        }).filter((t) => t.minutes >= 0 && t.minutes < 24 * 60);
         if (withDuration.length === 0) {
           return { slowTasks: [], fastTasks: [], stuckTasks: [], averageCompletionMinutes: null, insights: ["Insufficient data for self-critique. Complete more tasks."] };
         }
@@ -7523,7 +7607,7 @@ var init_store = __esm({
         const stuck = tasks.filter((t) => t.status === "in_progress").map((t) => ({
           id: t.id,
           title: t.title,
-          ageHours: Math.round((Date.now() - new Date(t.created_at).getTime()) / 36e5)
+          ageHours: Math.round((now - Date.parse(t.created_at)) / 36e5)
         })).filter((t) => t.ageHours > 24);
         const insights = [];
         insights.push(`Average completion time: ${Math.round(avg)} min across ${withDuration.length} completed tasks.`);
@@ -7680,6 +7764,25 @@ async function localApiFetch(path, init = {}) {
     const entry = store.recordDecision({ decision: body.decision, context: body.context || "", project: body.project || "general", tags: body.tags || [] });
     store.addActivity("decision", `Decision recorded -- [${entry.project}] ${body.decision.slice(0, 60)}`);
     return entry;
+  }
+  if (pathname.match(/^\/api\/ledger\/\d+$/) && method === "PATCH") {
+    const id = parseInt(pathname.split("/").pop());
+    const updates = {};
+    if (body.decision !== void 0) updates.decision = body.decision;
+    if (body.context !== void 0) updates.context = body.context;
+    if (body.project !== void 0) updates.project = body.project;
+    if (body.tags !== void 0) updates.tags = body.tags;
+    if (body.deprecated !== void 0) {
+      const d = store.getDecisionById(id);
+      if (d) {
+        d.deprecated = !!body.deprecated;
+        store._flush();
+      }
+    }
+    if (Object.keys(updates).length > 0) store.updateDecision(id, updates);
+    const result = store.getDecisionById(id);
+    if (!result) throw new Error("404: Decision not found.");
+    return result;
   }
   if (pathname === "/api/ledger/link" && method === "POST") {
     return store.addEdge(body.from, body.to, body.rel || "related", body.note || "");
@@ -21832,7 +21935,7 @@ var StdioServerTransport = class {
 var STANDALONE = process.env.NEXUS_STANDALONE === "1";
 var NEXUS_BASE = process.env.NEXUS_BASE_URL || "http://localhost:3001";
 var SERVER_NAME = "nexus";
-var SERVER_VERSION = "4.1.0";
+var SERVER_VERSION = "4.1.1";
 var localApiFetch2 = null;
 if (STANDALONE) {
   try {
@@ -21856,15 +21959,21 @@ async function nexusFetch(path, init = {}) {
     });
   }
   let res;
+  const doFetch = () => fetch(`${NEXUS_BASE}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...init
+  });
   try {
-    res = await fetch(`${NEXUS_BASE}${path}`, {
-      headers: { "Content-Type": "application/json" },
-      ...init
-    });
+    res = await doFetch();
   } catch (err) {
-    throw new Error(
-      `Nexus server unreachable at ${NEXUS_BASE}. Start with: nexus-dev.bat, or set NEXUS_STANDALONE=1 for direct mode. (${err.message})`
-    );
+    try {
+      await new Promise((r) => setTimeout(r, 500));
+      res = await doFetch();
+    } catch {
+      throw new Error(
+        `Nexus server unreachable at ${NEXUS_BASE}. Start with: nexus-dev.bat, or set NEXUS_STANDALONE=1 for direct mode. (${err.message})`
+      );
+    }
   }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -22037,6 +22146,21 @@ var TOOLS = [
         }
       },
       required: ["decision", "project"]
+    }
+  },
+  {
+    name: "nexus_update_decision",
+    description: "Update an existing decision in The Ledger. Use to refine decision text, add context/rationale, update tags, or correct project assignment \u2014 without breaking existing graph edges.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "number", description: "Decision id to update." },
+        decision: { type: "string", description: "New decision text (optional)." },
+        rationale: { type: "string", description: "New context/rationale (optional)." },
+        project: { type: "string", description: "New project assignment (optional)." },
+        tags: { type: "array", items: { type: "string" }, description: "New tags (optional)." }
+      },
+      required: ["id"]
     }
   },
   {
@@ -22339,12 +22463,13 @@ async function handleTool(name, args) {
   switch (name) {
     case "nexus_brief": {
       const project = args?.project || "Nexus";
+      const withTimeout = (p, fallback) => Promise.race([p, new Promise((r) => setTimeout(() => r(fallback), 1e4))]);
       const [tasks, sessions, ledger, fuel, risks] = await Promise.all([
-        nexusFetch("/api/tasks").catch(() => []),
-        nexusFetch("/api/sessions").catch(() => []),
-        nexusFetch("/api/ledger").catch(() => []),
-        nexusFetch("/api/estimator").catch(() => null),
-        nexusFetch("/api/overseer/risks").catch(() => ({ risks: [] }))
+        withTimeout(nexusFetch("/api/tasks"), []),
+        withTimeout(nexusFetch("/api/sessions"), []),
+        withTimeout(nexusFetch("/api/ledger"), []),
+        withTimeout(nexusFetch("/api/estimator"), null),
+        withTimeout(nexusFetch("/api/overseer/risks"), { risks: [] })
       ]);
       const projectLower = project.toLowerCase();
       const allProjects = /* @__PURE__ */ new Set();
@@ -22409,6 +22534,20 @@ async function handleTool(name, args) {
       });
       return `\u25C8 Decision #${result.id} recorded for ${args.project}
   ${args.decision}`;
+    }
+    case "nexus_update_decision": {
+      if (args?.id == null) throw new Error("id is required");
+      const body = {};
+      if (args.decision) body.decision = args.decision;
+      if (args.rationale) body.context = args.rationale;
+      if (args.project) body.project = args.project;
+      if (args.tags) body.tags = args.tags;
+      const result = await nexusFetch(`/api/ledger/${Number(args.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(body)
+      });
+      return `\u25C8 Decision #${result.id} updated
+  ${result.decision}`;
     }
     case "nexus_push_thought": {
       if (!args?.text) throw new Error("text is required");
@@ -22499,8 +22638,11 @@ async function handleTool(name, args) {
         method: "PATCH",
         body: JSON.stringify({ status: "done" })
       });
-      return `\u25C8 Landmark reached #${result.id}
-  ${result.title}`;
+      const lines = [`\u25C8 Landmark reached #${result.id}`, `  ${result.title}`];
+      if (result.resolvedThoughts > 0) {
+        lines.push(`  \u25C8 Auto-resolved ${result.resolvedThoughts} linked thought${result.resolvedThoughts > 1 ? "s" : ""}`);
+      }
+      return lines.join("\n");
     }
     case "nexus_log_activity": {
       if (!args?.message) throw new Error("message is required");
