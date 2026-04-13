@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Activity, Compass, ScrollText, Search, Brain, Terminal, GitBranch, Fuel, Menu, X } from 'lucide-react';
+import { Activity, Compass, ScrollText, Search, Brain, Terminal, GitBranch, Fuel, Ship, Menu, X } from 'lucide-react';
 
 const ICON_MAP = {
   activity: Activity,
@@ -9,6 +9,7 @@ const ICON_MAP = {
   'fuel': Fuel,
   'git-branch': GitBranch,
   'terminal': Terminal,
+  'ship': Ship,
 };
 
 export default function Sidebar({ modules, active, onSelect, connected, onSearchClick }) {

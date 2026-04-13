@@ -127,6 +127,9 @@ async function start() {
   app.use('/api/smart-search', createSmartSearchRoutes(store));
   app.use('/api/embeddings', createEmbeddingRoutes(store));
 
+  // Fleet overview (cross-project priority)
+  app.get('/api/fleet', (_req, res) => res.json(store.getFleetOverview()));
+
   // Status endpoint
   app.get('/api/status', (_req, res) => res.json({ status: 'online', version: '4.2.0', mode: 'dashboard', message: 'All instruments nominal, Captain.' }));
 
