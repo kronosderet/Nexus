@@ -5,8 +5,7 @@ import { createHash } from 'crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EMBED_CACHE_PATH = join(__dirname, '..', '..', 'nexus-embeddings.json');
-const EMBED_MODEL = 'text-embedding-nomic-embed-text-v1.5';
-const EMBED_URL = 'http://localhost:1234/v1/embeddings';
+import { EMBED_MODEL, EMBED_URL } from './aiEndpoints.ts';
 
 // ── Vector math ────────────────────────────────────────
 export function cosineSim(a: number[], b: number[]): number {

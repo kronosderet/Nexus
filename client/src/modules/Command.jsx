@@ -162,6 +162,10 @@ export default function Command({ ws }) {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
     await api.updateTask(taskId, { status: newStatus });
   }
+  // Composite workflows: Start/Ship/Park (push thought + log activity + status change in one shot)
+  async function handleStart(id) { await api.startTask(id).catch(() => api.updateTask(id, { status: 'in_progress' })); fetchAll(); }
+  async function handleShip(id) { await api.shipTask(id).catch(() => api.updateTask(id, { status: 'done' })); fetchAll(); }
+  async function handlePark(id) { await api.parkTask(id).catch(() => api.updateTask(id, { status: 'backlog' })); fetchAll(); }
 
   // Hooks MUST be before any early return (React rules of hooks)
   const projects = useMemo(() => {
@@ -262,7 +266,7 @@ export default function Command({ ws }) {
           thoughts={thoughts} plan={plan} predict={predict} critique={critique}
           fuel={fuel} workload={workload} recentActivity={recentActivity}
           loadingPlan={loadingPlan} onRefreshPlan={fetchPlan} onRefresh={fetchAll}
-          onUpdate={handleUpdate}
+          onUpdate={handleUpdate} onStart={handleStart} onShip={handleShip} onPark={handlePark}
         />
       ) : (
         <KanbanView
@@ -316,7 +320,7 @@ function elapsedSince(iso) {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-function LaterPanel({ backlog, onUpdate }) {
+function LaterPanel({ backlog, onUpdate, onStart }) {
   const [expanded, setExpanded] = useState({});
   const toggle = (p) => setExpanded(prev => ({ ...prev, [p]: !prev[p] }));
 
@@ -340,8 +344,8 @@ function LaterPanel({ backlog, onUpdate }) {
                     <div key={t.id} className="flex items-center gap-2 px-2 py-1 rounded text-xs text-nexus-text-dim hover:bg-nexus-bg/50 group">
                       {prio.label && <span className={`text-[7px] font-mono ${prio.text}`}>{prio.label}</span>}
                       <span className="flex-1 min-w-0 truncate">{t.title}</span>
-                      <button onClick={() => onUpdate(t.id, { status: 'in_progress' })}
-                        className="opacity-0 group-hover:opacity-100 text-[9px] font-mono text-nexus-amber hover:text-nexus-text transition-all" title="Start working">
+                      <button onClick={() => onStart(t.id)}
+                        className="opacity-0 group-hover:opacity-100 text-[9px] font-mono text-nexus-amber hover:text-nexus-text transition-all" title="Start working (+ push thought + log activity)">
                         Start
                       </button>
                     </div>
@@ -361,7 +365,7 @@ function LaterPanel({ backlog, onUpdate }) {
   );
 }
 
-function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predict, critique, fuel, workload, recentActivity, loadingPlan, onRefreshPlan, onUpdate }) {
+function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predict, critique, fuel, workload, recentActivity, loadingPlan, onRefreshPlan, onUpdate, onStart, onShip, onPark }) {
   const gaps = predict?.suggestions || [];
   const planTasks = parsePlanTasks(plan?.aiPlan);
   const focus = planFocus(plan?.aiPlan);
@@ -401,6 +405,17 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
                         {/* Progress bar based on avg completion time */}
                         <div className="h-1 bg-nexus-bg rounded-full overflow-hidden mt-1.5">
                           <div className={`h-full rounded-full transition-all duration-1000 ${progress > 80 ? 'bg-nexus-amber' : 'bg-nexus-green'}`} style={{ width: `${progress}%` }} />
+                        </div>
+                        {/* Quick actions */}
+                        <div className="flex gap-2 mt-2">
+                          <button onClick={() => onShip(t.id)}
+                            className="text-[9px] font-mono px-2 py-0.5 rounded bg-nexus-green/10 text-nexus-green border border-nexus-green/20 hover:bg-nexus-green/20 transition-colors">
+                            Ship
+                          </button>
+                          <button onClick={() => onPark(t.id)}
+                            className="text-[9px] font-mono px-2 py-0.5 rounded bg-nexus-bg text-nexus-text-faint border border-nexus-border hover:text-nexus-text transition-colors">
+                            Park
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -503,7 +518,7 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
       </Panel>
 
       {/* LATER — with expand/collapse + start action (#100) */}
-      <LaterPanel backlog={backlog} onUpdate={onUpdate} />
+      <LaterPanel backlog={backlog} onUpdate={onUpdate} onStart={onStart} />
 
       {/* DONE — with actual duration + today's stats (#102) */}
       <Panel title="Done" icon={CheckCircle2} accent="text-nexus-amber" count={recentDone.length}>
