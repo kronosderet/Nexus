@@ -216,14 +216,16 @@ function calculateBurnRates(history: any[]) {
   const avgSession = weightedAvg(sessionRates);
   const avgWeekly = weightedAvg(weeklyRates);
 
-  // Sanity cap: session can't burn >20%/h (100%/5h), weekly can't burn >15%/h
-  const sessionPerHour = Math.min(20, Math.round(avgSession * 60 * 10) / 10);
-  const weeklyPerHour = Math.min(15, Math.round(avgWeekly * 60 * 10) / 10);
+  // Session fuel is NOT time-proportional — it's compute-proportional.
+  // A heavy session can burn 100% in 30 min, a light one lasts 4h.
+  // We still calculate rate for internal estimates but cap aggressively.
+  const rawSessionPerHour = Math.round(avgSession * 60 * 10) / 10;
+  const rawWeeklyPerHour = Math.round(avgWeekly * 60 * 10) / 10;
   return {
-    sessionPerMinute: Math.min(avgSession, 20 / 60),
-    weeklyPerMinute: Math.min(avgWeekly, 15 / 60),
-    sessionPerHour,
-    weeklyPerHour,
+    sessionPerMinute: avgSession,
+    weeklyPerMinute: avgWeekly,
+    sessionPerHour: rawSessionPerHour,
+    weeklyPerHour: rawWeeklyPerHour,
   };
 }
 
