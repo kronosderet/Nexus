@@ -9,13 +9,18 @@ import type {
 import { findSimilar } from '../lib/embeddings.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DB_PATH = process.env.NEXUS_DB_PATH || join(__dirname, '..', '..', 'nexus.json');
 
 type IdTable = 'tasks' | 'activity' | 'sessions' | 'scratchpads' | 'bookmarks';
 
-const BAK_PATH = DB_PATH + '.bak';
-const BAK2_PATH = DB_PATH + '.bak.2';
-const TMP_PATH = DB_PATH + '.tmp';
+// Lazy DB path resolution — must be a function, not a const, because
+// in the esbuild bundle this module is parsed before localApi.ts can
+// set process.env.NEXUS_DB_PATH. Evaluating at call time fixes the race.
+function getDbPath() {
+  return process.env.NEXUS_DB_PATH || join(__dirname, '..', '..', 'nexus.json');
+}
+function getBakPath() { return getDbPath() + '.bak'; }
+function getBak2Path() { return getDbPath() + '.bak.2'; }
+function getTmpPath() { return getDbPath() + '.tmp'; }
 
 export class NexusStore {
   data: NexusData;
@@ -27,18 +32,18 @@ export class NexusStore {
   private _edgeMutex = false;
 
   constructor() {
-    if (existsSync(DB_PATH)) {
+    if (existsSync(getDbPath())) {
       try {
-        this.data = JSON.parse(readFileSync(DB_PATH, 'utf-8'));
+        this.data = JSON.parse(readFileSync(getDbPath(), 'utf-8'));
       } catch (err) {
         // Primary DB corrupted — try backup recovery
-        console.error(`◈ WARNING: ${DB_PATH} corrupted (${(err as Error).message}). Attempting backup recovery...`);
-        if (existsSync(BAK_PATH)) {
+        console.error(`◈ WARNING: ${getDbPath()} corrupted (${(err as Error).message}). Attempting backup recovery...`);
+        if (existsSync(getBakPath())) {
           try {
-            this.data = JSON.parse(readFileSync(BAK_PATH, 'utf-8'));
-            console.error(`◈ Recovered from ${BAK_PATH}. Data may be slightly behind.`);
+            this.data = JSON.parse(readFileSync(getBakPath(), 'utf-8'));
+            console.error(`◈ Recovered from ${getBakPath()}. Data may be slightly behind.`);
             // Immediately save the recovered data as the primary
-            writeFileSync(DB_PATH, JSON.stringify(this.data, null, 2));
+            writeFileSync(getDbPath(), JSON.stringify(this.data, null, 2));
           } catch {
             console.error(`◈ Backup also corrupted. Starting fresh.`);
             this.data = this._seed();
@@ -76,9 +81,9 @@ export class NexusStore {
 
   /** Re-read data from disk (for external changes, e.g. MCP writes while dashboard is running). */
   reload(): boolean {
-    if (!existsSync(DB_PATH)) return false;
+    if (!existsSync(getDbPath())) return false;
     try {
-      const raw = readFileSync(DB_PATH, 'utf-8');
+      const raw = readFileSync(getDbPath(), 'utf-8');
       const data = JSON.parse(raw);
       this.data = data;
       // Recalculate ID counters
@@ -121,27 +126,27 @@ export class NexusStore {
     try {
       const json = JSON.stringify(this.data, null, 2);
       // Atomic write: write to .tmp first, then promote via rename
-      writeFileSync(TMP_PATH, json);
+      writeFileSync(getTmpPath(), json);
       // Rotate backups with rollback safety
       let rotatedBak = false;
       try {
-        if (existsSync(BAK_PATH)) { renameSync(BAK_PATH, BAK2_PATH); rotatedBak = true; }
+        if (existsSync(getBakPath())) { renameSync(getBakPath(), getBak2Path()); rotatedBak = true; }
       } catch {}
       try {
-        if (existsSync(DB_PATH)) renameSync(DB_PATH, BAK_PATH);
+        if (existsSync(getDbPath())) renameSync(getDbPath(), getBakPath());
       } catch (err) {
         // Rollback: restore BAK from BAK2 if we moved it
-        if (rotatedBak && existsSync(BAK2_PATH)) {
-          try { renameSync(BAK2_PATH, BAK_PATH); } catch {}
+        if (rotatedBak && existsSync(getBak2Path())) {
+          try { renameSync(getBak2Path(), getBakPath()); } catch {}
         }
         throw err;
       }
       // Promote tmp → primary (atomic on same filesystem)
       try {
-        renameSync(TMP_PATH, DB_PATH);
+        renameSync(getTmpPath(), getDbPath());
       } catch (err) {
         // Recovery: .tmp has valid data but rename failed — try copy fallback
-        try { writeFileSync(DB_PATH, json); } catch {}
+        try { writeFileSync(getDbPath(), json); } catch {}
         throw err;
       }
     } finally {

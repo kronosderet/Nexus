@@ -6900,34 +6900,43 @@ __export(store_exports, {
 import { readFileSync as readFileSync2, writeFileSync as writeFileSync2, existsSync as existsSync2, renameSync } from "fs";
 import { join as join2, dirname as dirname2 } from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
-var __dirname2, DB_PATH, BAK_PATH, BAK2_PATH, TMP_PATH, NexusStore;
+function getDbPath() {
+  return process.env.NEXUS_DB_PATH || join2(__dirname2, "..", "..", "nexus.json");
+}
+function getBakPath() {
+  return getDbPath() + ".bak";
+}
+function getBak2Path() {
+  return getDbPath() + ".bak.2";
+}
+function getTmpPath() {
+  return getDbPath() + ".tmp";
+}
+var __dirname2, NexusStore;
 var init_store = __esm({
   "server/db/store.ts"() {
     "use strict";
     init_embeddings();
     __dirname2 = dirname2(fileURLToPath2(import.meta.url));
-    DB_PATH = process.env.NEXUS_DB_PATH || join2(__dirname2, "..", "..", "nexus.json");
-    BAK_PATH = DB_PATH + ".bak";
-    BAK2_PATH = DB_PATH + ".bak.2";
-    TMP_PATH = DB_PATH + ".tmp";
     NexusStore = class {
       data;
       _lastRiskScan;
       _nextId;
       _nextLedgerId = 1;
       _nextThoughtId = 1;
+      _nextEdgeId = 1;
       _edgeMutex = false;
       constructor() {
-        if (existsSync2(DB_PATH)) {
+        if (existsSync2(getDbPath())) {
           try {
-            this.data = JSON.parse(readFileSync2(DB_PATH, "utf-8"));
+            this.data = JSON.parse(readFileSync2(getDbPath(), "utf-8"));
           } catch (err) {
-            console.error(`\u25C8 WARNING: ${DB_PATH} corrupted (${err.message}). Attempting backup recovery...`);
-            if (existsSync2(BAK_PATH)) {
+            console.error(`\u25C8 WARNING: ${getDbPath()} corrupted (${err.message}). Attempting backup recovery...`);
+            if (existsSync2(getBakPath())) {
               try {
-                this.data = JSON.parse(readFileSync2(BAK_PATH, "utf-8"));
-                console.error(`\u25C8 Recovered from ${BAK_PATH}. Data may be slightly behind.`);
-                writeFileSync2(DB_PATH, JSON.stringify(this.data, null, 2));
+                this.data = JSON.parse(readFileSync2(getBakPath(), "utf-8"));
+                console.error(`\u25C8 Recovered from ${getBakPath()}. Data may be slightly behind.`);
+                writeFileSync2(getDbPath(), JSON.stringify(this.data, null, 2));
               } catch {
                 console.error(`\u25C8 Backup also corrupted. Starting fresh.`);
                 this.data = this._seed();
@@ -6959,12 +6968,13 @@ var init_store = __esm({
         };
         this._nextLedgerId = safeMax((this.data.ledger || []).map((e) => e.id)) + 1;
         this._nextThoughtId = safeMax((this.data.thoughts || []).map((t) => t.id)) + 1;
+        this._nextEdgeId = safeMax((this.data.graph_edges || []).map((e) => e.id)) + 1;
       }
       /** Re-read data from disk (for external changes, e.g. MCP writes while dashboard is running). */
       reload() {
-        if (!existsSync2(DB_PATH)) return false;
+        if (!existsSync2(getDbPath())) return false;
         try {
-          const raw = readFileSync2(DB_PATH, "utf-8");
+          const raw = readFileSync2(getDbPath(), "utf-8");
           const data = JSON.parse(raw);
           this.data = data;
           const safeMax = (arr) => arr.reduce((m, v) => v > m ? v : m, 0);
@@ -6977,6 +6987,7 @@ var init_store = __esm({
           };
           this._nextLedgerId = safeMax((data.ledger || []).map((e) => e.id)) + 1;
           this._nextThoughtId = safeMax((data.thoughts || []).map((t) => t.id)) + 1;
+          this._nextEdgeId = safeMax((data.graph_edges || []).map((e) => e.id)) + 1;
           return true;
         } catch {
           return false;
@@ -7010,31 +7021,31 @@ var init_store = __esm({
         this._flushing = true;
         try {
           const json2 = JSON.stringify(this.data, null, 2);
-          writeFileSync2(TMP_PATH, json2);
+          writeFileSync2(getTmpPath(), json2);
           let rotatedBak = false;
           try {
-            if (existsSync2(BAK_PATH)) {
-              renameSync(BAK_PATH, BAK2_PATH);
+            if (existsSync2(getBakPath())) {
+              renameSync(getBakPath(), getBak2Path());
               rotatedBak = true;
             }
           } catch {
           }
           try {
-            if (existsSync2(DB_PATH)) renameSync(DB_PATH, BAK_PATH);
+            if (existsSync2(getDbPath())) renameSync(getDbPath(), getBakPath());
           } catch (err) {
-            if (rotatedBak && existsSync2(BAK2_PATH)) {
+            if (rotatedBak && existsSync2(getBak2Path())) {
               try {
-                renameSync(BAK2_PATH, BAK_PATH);
+                renameSync(getBak2Path(), getBakPath());
               } catch {
               }
             }
             throw err;
           }
           try {
-            renameSync(TMP_PATH, DB_PATH);
+            renameSync(getTmpPath(), getDbPath());
           } catch (err) {
             try {
-              writeFileSync2(DB_PATH, json2);
+              writeFileSync2(getDbPath(), json2);
             } catch {
             }
             throw err;
@@ -7099,6 +7110,13 @@ var init_store = __esm({
       }
       setSessionTiming(timing) {
         this.data._sessionTiming = timing;
+        this._flush();
+      }
+      getFuelConfig() {
+        return this.data._fuelConfig;
+      }
+      setFuelConfig(config2) {
+        this.data._fuelConfig = config2;
         this._flush();
       }
       // ── Tasks ──────────────────────────────────────────────
@@ -7428,7 +7446,7 @@ var init_store = __esm({
       addEdge(fromId, toId, relationship = "related", note = "") {
         const exists = this.data.graph_edges.find((e) => e.from === fromId && e.to === toId && e.rel === relationship);
         if (exists) return exists;
-        const edge = { id: this.data.graph_edges.length + 1, from: fromId, to: toId, rel: relationship, note, created_at: this._now() };
+        const edge = { id: this._nextEdgeId++, from: fromId, to: toId, rel: relationship, note, created_at: this._now() };
         this.data.graph_edges.push(edge);
         this._flush();
         return edge;
@@ -7871,6 +7889,13 @@ async function localApiFetch(path, init = {}) {
     return thought;
   }
   if (pathname === "/api/usage" && method === "POST") {
+    if (body.plan || body.timezone) {
+      const updates = {};
+      if (body.plan) updates.plan = body.plan;
+      if (body.timezone) updates.timezone = body.timezone;
+      const current = store.getFuelConfig() || { plan: "pro", timezone: "Europe/Prague", sessionWindowHours: 5, weeklyResetDay: 4, weeklyResetHour: 21 };
+      store.setFuelConfig({ ...current, ...updates });
+    }
     const entry = store.logUsage({ session_percent: body.session_percent, weekly_percent: body.weekly_percent, note: body.note });
     return { ...entry, timing: {} };
   }
@@ -22291,6 +22316,15 @@ var TOOLS = [
         note: {
           type: "string",
           description: 'Optional free-text note attached to this reading (e.g. "before starting MCP tool work").'
+        },
+        plan: {
+          type: "string",
+          enum: ["free", "pro", "max5", "max20", "team", "team_premium", "enterprise", "api"],
+          description: "Optional: Claude subscription plan. Set once and it persists. Affects capacity estimates."
+        },
+        timezone: {
+          type: "string",
+          description: 'Optional: IANA timezone (e.g. "Europe/Prague", "America/New_York"). Affects reset time display.'
         }
       }
     }
@@ -22679,6 +22713,8 @@ async function handleTool(name, args) {
       if (args.weekly_percent != null) body.weekly_percent = Number(args.weekly_percent);
       if (args.reset_in_minutes != null) body.reset_in_minutes = Number(args.reset_in_minutes);
       if (args.note) body.note = String(args.note);
+      if (args.plan) body.plan = args.plan;
+      if (args.timezone) body.timezone = args.timezone;
       const result = await nexusFetch("/api/usage", {
         method: "POST",
         body: JSON.stringify(body)
