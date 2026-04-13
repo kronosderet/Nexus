@@ -25,7 +25,7 @@ export function buildTimingInfo(store: NexusStore) {
   const nextWeekly = configGetNextWeeklyReset(config);
   const weeklyMs = nextWeekly.getTime() - now.getTime();
 
-  const timing = store.(store.getSessionTiming() || {} as any) || {} as any;
+  const timing = store.getSessionTiming() || {} as any;
   const sessionResetTime = timing.resetTime ? new Date(timing.resetTime) : null;
   const sessionStartTime = timing.startTime ? new Date(timing.startTime) : null;
   const planInfo = PLAN_INFO[config.plan] || PLAN_INFO.pro;
