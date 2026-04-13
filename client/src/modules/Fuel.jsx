@@ -47,7 +47,7 @@ export default function FuelModule({ ws }) {
 
   useEffect(() => {
     if (!ws?.subscribe) return;
-    return ws.subscribe((msg) => { if (msg.type === 'usage_update') fetchAll(); });
+    return ws.subscribe((msg) => { if (msg.type === 'usage_update' || msg.type === 'reload') fetchAll(); });
   }, [ws]);
 
   if (!fuel?.tracked) {

@@ -215,7 +215,7 @@ export default function Pulse({ ws }) {
   useEffect(() => {
     if (!ws?.subscribe) return;
     return ws.subscribe((msg) => {
-      if (msg.type === 'gpu_snapshot' || msg.type === 'activity') {
+      if (msg.type === 'gpu_snapshot' || msg.type === 'activity' || msg.type === 'reload') {
         fetchPulse();
       }
     });
