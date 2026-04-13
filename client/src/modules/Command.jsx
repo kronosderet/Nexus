@@ -493,7 +493,7 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
                   <span className={`text-[9px] font-mono uppercase ${CATEGORY_COLOR[g.category] || 'text-nexus-text-faint'}`}>{CATEGORY_LABEL[g.category] || g.category}</span>
                   <p className="text-xs text-nexus-text-dim truncate">{g.title}</p>
                 </div>
-                <button onClick={() => { api.createTask({ title: g.title, description: g.reason, priority: g.priority || 1 }).catch(() => {}); }}
+                <button onClick={() => { api.createTask({ title: g.title, description: g.reason, priority: g.priority || 1 }).then(() => fetchAll()).catch(() => {}); }}
                   className="text-nexus-text-faint hover:text-nexus-amber shrink-0" title="Create task from gap"><Plus size={10} /></button>
               </div>
             ))}

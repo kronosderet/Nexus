@@ -8,6 +8,7 @@ export default function TerminalModule() {
   const [fullscreen, setFullscreen] = useState(false);
   const wsRef = useRef(null);
   const outputRef = useRef(null);
+  const lineId = useRef(0);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -18,23 +19,23 @@ export default function TerminalModule() {
     ws.onopen = () => setConnected(true);
     ws.onclose = () => {
       setConnected(false);
-      setOutput(prev => [...prev, { type: 'system', text: '--- Terminal disconnected ---' }]);
+      setOutput(prev => [...prev, { id: ++lineId.current, type: 'system', text: '--- Terminal disconnected ---' }]);
     };
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === 'terminal_output') {
           setOutput(prev => {
-            const next = [...prev, { type: 'output', text: msg.data }];
+            const next = [...prev, { id: ++lineId.current, type: 'output', text: msg.data }];
             // Keep buffer bounded
             return next.length > 500 ? next.slice(-400) : next;
           });
         }
         if (msg.type === 'terminal_ready') {
-          setOutput([{ type: 'system', text: `◈ Nexus Terminal — ${msg.cwd}` }]);
+          setOutput([{ id: ++lineId.current, type: 'system', text: `◈ Nexus Terminal — ${msg.cwd}` }]);
         }
         if (msg.type === 'terminal_exit') {
-          setOutput(prev => [...prev, { type: 'system', text: `--- Shell exited (code ${msg.code}) ---` }]);
+          setOutput(prev => [...prev, { id: ++lineId.current, type: 'system', text: `--- Shell exited (code ${msg.code}) ---` }]);
         }
       } catch {}
     };
@@ -52,7 +53,7 @@ export default function TerminalModule() {
   function send(text) {
     if (wsRef.current?.readyState === 1) {
       wsRef.current.send(JSON.stringify({ type: 'terminal_input', data: text + '\n' }));
-      setOutput(prev => [...prev, { type: 'input', text: `> ${text}` }]);
+      setOutput(prev => [...prev, { id: ++lineId.current, type: 'input', text: `> ${text}` }]);
     }
   }
 
@@ -113,8 +114,8 @@ export default function TerminalModule() {
         className="flex-1 bg-nexus-bg border border-nexus-border rounded-t-lg p-3 overflow-auto font-mono text-xs leading-relaxed"
         onClick={() => inputRef.current?.focus()}
       >
-        {output.map((line, i) => (
-          <div key={i} className={
+        {output.map((line) => (
+          <div key={line.id} className={
             line.type === 'system' ? 'text-nexus-amber' :
             line.type === 'input' ? 'text-nexus-green' :
             'text-nexus-text-dim'

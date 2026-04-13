@@ -138,7 +138,7 @@ function OverviewView({ graph, centrality, contradictions, holes }) {
           {Object.entries(edgeTypes).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
             <div key={type} className="flex items-center gap-2">
               <span className="text-xs font-mono text-nexus-text-dim w-24">{type}</span>
-              <div className="flex-1 h-1.5 bg-nexus-bg rounded-full"><div className="h-full bg-nexus-amber/50 rounded-full" style={{ width: `${(count / Math.max(...Object.values(edgeTypes))) * 100}%` }} /></div>
+              <div className="flex-1 h-1.5 bg-nexus-bg rounded-full"><div className="h-full bg-nexus-amber/50 rounded-full" style={{ width: `${(count / (Math.max(...Object.values(edgeTypes)) || 1)) * 100}%` }} /></div>
               <span className="text-xs font-mono text-nexus-text-faint w-8 text-right">{count}</span>
             </div>
           ))}
@@ -152,7 +152,7 @@ function OverviewView({ graph, centrality, contradictions, holes }) {
           {Object.entries(projects).sort((a, b) => b[1] - a[1]).map(([proj, count]) => (
             <div key={proj} className="flex items-center gap-2">
               <span className="text-xs font-mono text-nexus-text-dim w-24">{proj}</span>
-              <div className="flex-1 h-1.5 bg-nexus-bg rounded-full"><div className="h-full bg-nexus-purple/50 rounded-full" style={{ width: `${(count / Math.max(...Object.values(projects))) * 100}%` }} /></div>
+              <div className="flex-1 h-1.5 bg-nexus-bg rounded-full"><div className="h-full bg-nexus-purple/50 rounded-full" style={{ width: `${(count / (Math.max(...Object.values(projects)) || 1)) * 100}%` }} /></div>
               <span className="text-xs font-mono text-nexus-text-faint w-8 text-right">{count}</span>
             </div>
           ))}
