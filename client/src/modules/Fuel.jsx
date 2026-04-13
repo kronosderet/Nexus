@@ -24,11 +24,13 @@ function Bar({ percent, className = '', height = 'h-2' }) {
   );
 }
 
-function usageIntensity(rate) {
-  if (rate == null || rate <= 0) return { label: 'No data', color: 'text-nexus-text-faint' };
-  if (rate <= 8) return { label: 'Light', color: 'text-nexus-green' };
-  if (rate <= 14) return { label: 'Normal', color: 'text-nexus-amber' };
-  return { label: 'Heavy', color: 'text-nexus-red' };
+function usageIntensity(used) {
+  // Based on % used this session (not rate — rate is meaningless for compute-proportional limits)
+  if (used == null || used <= 0) return { label: 'Fresh', color: 'text-nexus-green' };
+  if (used <= 25) return { label: 'Light', color: 'text-nexus-green' };
+  if (used <= 50) return { label: 'Normal', color: 'text-nexus-amber' };
+  if (used <= 75) return { label: 'Heavy', color: 'text-nexus-amber' };
+  return { label: 'Critical', color: 'text-nexus-red' };
 }
 
 export default function FuelModule({ ws }) {
@@ -69,8 +71,8 @@ export default function FuelModule({ ws }) {
 
   const session = fuel.estimated?.session ?? 0;
   const weekly = fuel.estimated?.weekly ?? 0;
-  const rate = fuel.rates?.sessionPerHour;
-  const intensity = usageIntensity(rate);
+  const used = Math.round(100 - session);
+  const intensity = usageIntensity(used);
   const cs = workload?.currentSession;
   const sessionsLeft = fuel.weekly?.sessionsLeft;
   const planLabel = timing?.plan?.label;
@@ -140,7 +142,7 @@ export default function FuelModule({ ws }) {
           <div>
             <p className="text-[10px] font-mono text-nexus-text-faint mb-1">Usage</p>
             <p className={`text-sm font-medium ${intensity.color}`}>{intensity.label}</p>
-            {rate > 0 && <p className="text-[10px] font-mono text-nexus-text-faint">{rate}%/h burn rate</p>}
+            <p className="text-[10px] font-mono text-nexus-text-faint">{used}% of session budget used</p>
           </div>
 
           {/* Used this session */}
