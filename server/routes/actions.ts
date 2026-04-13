@@ -58,22 +58,72 @@ export function createActionRoutes(store: NexusStore, broadcast: BroadcastFn) {
     const action = actions.find((a: any) => a.id === String(req.params.id));
     if (!action) return res.status(404).json({ error: 'Unknown action.' });
 
-    const result = executeAction(action.command, store);
+    const result = executeAction(action.command, store, req.body);
     const entry = store.addActivity('action', `Quick action -- ${action.label}`);
     broadcast({ type: 'activity', payload: entry });
+    broadcast({ type: 'reload', payload: {} }); // Trigger full UI refresh for composite actions
     res.json({ success: true, action: action.label, result });
+  });
+
+  // Direct workflow endpoints (no action config needed)
+  router.post('/workflow/start/:taskId', (req: Request, res: Response) => {
+    const result = startTask(store, Number(req.params.taskId));
+    if (result.error) return res.status(400).json(result);
+    broadcast({ type: 'reload', payload: {} });
+    res.json(result);
+  });
+  router.post('/workflow/ship/:taskId', (req: Request, res: Response) => {
+    const result = shipTask(store, Number(req.params.taskId));
+    if (result.error) return res.status(400).json(result);
+    broadcast({ type: 'reload', payload: {} });
+    res.json(result);
+  });
+  router.post('/workflow/park/:taskId', (req: Request, res: Response) => {
+    const result = parkTask(store, Number(req.params.taskId));
+    if (result.error) return res.status(400).json(result);
+    broadcast({ type: 'reload', payload: {} });
+    res.json(result);
   });
 
   return router;
 }
 
-function executeAction(command: string, store: NexusStore): any {
+function executeAction(command: string, store: NexusStore, params?: any): any {
   switch (command) {
     case 'git-summary': return gitSummary();
     case 'system-check': return systemCheck();
     case 'clear-done': return clearDone(store);
+    case 'start-task': return startTask(store, params?.taskId);
+    case 'ship-task': return shipTask(store, params?.taskId);
+    case 'park-task': return parkTask(store, params?.taskId);
     default: return { error: 'Unknown command' };
   }
+}
+
+function startTask(store: NexusStore, taskId?: number) {
+  if (!taskId) return { error: 'taskId required' };
+  const result = store.updateTask(taskId, { status: 'in_progress' });
+  if (!result) return { error: 'Task not found' };
+  store.pushThought({ text: `Working on: ${result.task.title}`, context: `task #${taskId}`, related_task_id: taskId });
+  store.addActivity('task_started', `Set course for #${taskId} — "${result.task.title}"`);
+  return { task: result.task, thoughtPushed: true };
+}
+
+function shipTask(store: NexusStore, taskId?: number) {
+  if (!taskId) return { error: 'taskId required' };
+  const result = store.updateTask(taskId, { status: 'done' });
+  if (!result) return { error: 'Task not found' };
+  // resolvedThoughts is now returned by updateTask
+  return { task: result.task, resolvedThoughts: result.resolvedThoughts || 0 };
+}
+
+function parkTask(store: NexusStore, taskId?: number) {
+  if (!taskId) return { error: 'taskId required' };
+  const result = store.updateTask(taskId, { status: 'backlog' });
+  if (!result) return { error: 'Task not found' };
+  store.pushThought({ text: `Parked: ${result.task.title}`, context: `task #${taskId} returned to backlog`, related_task_id: taskId });
+  store.addActivity('task_parked', `Charted for later — #${taskId} "${result.task.title}"`);
+  return { task: result.task, thoughtPushed: true };
 }
 
 function gitSummary() {

@@ -117,6 +117,22 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
     store.addActivity('decision', `Decision recorded -- [${entry.project}] ${body.decision.slice(0, 60)}`);
     return entry;
   }
+  if (pathname.match(/^\/api\/ledger\/\d+$/) && method === 'PATCH') {
+    const id = parseInt(pathname.split('/').pop()!);
+    const updates: any = {};
+    if (body.decision !== undefined) updates.decision = body.decision;
+    if (body.context !== undefined) updates.context = body.context;
+    if (body.project !== undefined) updates.project = body.project;
+    if (body.tags !== undefined) updates.tags = body.tags;
+    if (body.deprecated !== undefined) {
+      const d = store.getDecisionById(id);
+      if (d) { d.deprecated = !!body.deprecated; store._flush(); }
+    }
+    if (Object.keys(updates).length > 0) store.updateDecision(id, updates);
+    const result = store.getDecisionById(id);
+    if (!result) throw new Error('404: Decision not found.');
+    return result;
+  }
   if (pathname === '/api/ledger/link' && method === 'POST') {
     return store.addEdge(body.from, body.to, body.rel || 'related', body.note || '');
   }

@@ -102,6 +102,9 @@ export const api = {
   // ── Actions ────────────────────────────────────────────
   getActions: () => request('/actions'),
   runAction: (id) => request(`/actions/${id}/run`, { method: 'POST' }),
+  startTask: (taskId) => request(`/actions/workflow/start/${taskId}`, { method: 'POST' }),
+  shipTask: (taskId) => request(`/actions/workflow/ship/${taskId}`, { method: 'POST' }),
+  parkTask: (taskId) => request(`/actions/workflow/park/${taskId}`, { method: 'POST' }),
 
   // ── Thoughts (v3.0) ────────────────────────────────────
   getThoughts: (project) => request(`/thoughts${project ? `?project=${encodeURIComponent(project)}` : ''}`),

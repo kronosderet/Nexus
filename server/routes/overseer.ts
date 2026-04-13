@@ -309,23 +309,30 @@ export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) 
     const ai = await detectAI();
     if (!ai.available) return res.json({ error: 'No local AI available.' });
 
-    const { focus = 'core', batch } = req.body || {}; // focus: core|server|client|full, batch: 1|2 (splits core in half)
+    const { focus = 'core', batch, files: selectedFiles } = req.body || {};
     const root = join(PROJECTS_DIR, 'Nexus');
     const files: { path: string; content: string }[] = [];
 
-    // Core files split into two batches for smaller context windows
-    const CORE_BATCH_1 = [
-      'server/db/store.ts', 'server/types.ts', 'server/index.ts',
-      'server/mcp/index.ts', 'server/lib/gpuSignal.ts', 'server/lib/embeddings.ts',
-      'server/routes/tasks.ts',
-    ];
-    const CORE_BATCH_2 = [
-      'server/routes/sessions.ts', 'server/routes/ledger.ts',
-      'server/routes/usage.ts', 'server/routes/thoughts.ts', 'server/routes/impact.ts',
-      'server/routes/estimator.ts', 'server/routes/guard.ts', 'server/routes/predict.ts',
-    ];
-
-    if (focus === 'core') {
+    // Selective audit: user-provided file list takes priority
+    if (Array.isArray(selectedFiles) && selectedFiles.length > 0) {
+      for (const rel of selectedFiles) {
+        try {
+          const content = readFileSync(join(root, String(rel)), 'utf-8');
+          files.push({ path: String(rel), content });
+        } catch {}
+      }
+    } else if (focus === 'core') {
+      // Core files split into two batches for smaller context windows
+      const CORE_BATCH_1 = [
+        'server/db/store.ts', 'server/types.ts', 'server/index.ts',
+        'server/mcp/index.ts', 'server/lib/gpuSignal.ts', 'server/lib/embeddings.ts',
+        'server/routes/tasks.ts',
+      ];
+      const CORE_BATCH_2 = [
+        'server/routes/sessions.ts', 'server/routes/ledger.ts',
+        'server/routes/usage.ts', 'server/routes/thoughts.ts', 'server/routes/impact.ts',
+        'server/routes/estimator.ts', 'server/routes/guard.ts', 'server/routes/predict.ts',
+      ];
       const fileList = batch === 1 ? CORE_BATCH_1 : batch === 2 ? CORE_BATCH_2 : [...CORE_BATCH_1, ...CORE_BATCH_2];
       for (const rel of fileList) {
         try {
