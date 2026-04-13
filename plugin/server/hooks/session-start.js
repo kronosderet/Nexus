@@ -8,7 +8,7 @@
  * Fails silently if no data exists yet — Claude starts cold, no crash.
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { execSync } from 'node:child_process';
@@ -91,12 +91,22 @@ function main() {
     for (const d of decisions) lines.push(`  - ${d.decision.slice(0, 100)}`);
   }
 
-  // Active thoughts
+  // Active thoughts — auto-pop the top one as recovery context
   const thoughts = (data.thoughts || []).filter(t => t.status === 'active');
   if (thoughts.length > 0) {
-    lines.push(`Thought Stack (${thoughts.length}):`);
-    for (const t of thoughts.slice(0, 3)) {
-      lines.push(`  > ${t.text.slice(0, 80)}${t.context ? ` [${t.context.slice(0, 40)}]` : ''}`);
+    const sorted = [...thoughts].sort((a, b) => new Date(b.pushed_at) - new Date(a.pushed_at));
+    const top = sorted[0];
+    lines.push(`◈ RESUME: ${top.text}`);
+    if (top.context) lines.push(`  Context: ${top.context}`);
+    if (top.project) lines.push(`  Project: ${top.project}`);
+    top.status = 'resolved';
+    top.popped_at = new Date().toISOString();
+    try { writeFileSync(NEXUS_DB, JSON.stringify(data, null, 2)); } catch {}
+    if (sorted.length > 1) {
+      lines.push(`Thought Stack (${sorted.length - 1} remaining):`);
+      for (const t of sorted.slice(1, 3)) {
+        lines.push(`  > ${t.text.slice(0, 80)}${t.context ? ` [${t.context.slice(0, 40)}]` : ''}`);
+      }
     }
   }
 

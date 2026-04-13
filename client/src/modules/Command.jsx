@@ -385,7 +385,7 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
                 const elapsed = elapsedSince(t.updated_at);
                 const estMin = estimateMinutes(t.title, critique?.averageCompletionMinutes || 35);
                 const elapsedMin = t.updated_at ? Math.floor((Date.now() - new Date(t.updated_at).getTime()) / 60000) : 0;
-                const progress = Math.min(95, Math.round((elapsedMin / estMin) * 100));
+                const progress = estMin > 0 ? Math.min(100, Math.round((elapsedMin / estMin) * 100)) : 0;
                 return (
                   <div key={t.id} className="px-2.5 py-2.5 rounded-lg bg-nexus-amber/5 border border-nexus-amber/20">
                     <div className="flex items-start gap-2">
