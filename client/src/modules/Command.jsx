@@ -197,7 +197,8 @@ export default function Command({ ws }) {
     );
   }
 
-  const inProgress = filtered.filter(t => t.status === 'in_progress');
+  // In-progress always shows ALL active work (unaffected by project filter / search)
+  const inProgress = tasks.filter(t => t.status === 'in_progress');
   const backlog = filtered.filter(t => t.status === 'backlog');
   const done = filtered.filter(t => t.status === 'done');
 

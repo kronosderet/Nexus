@@ -309,21 +309,25 @@ export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) 
     const ai = await detectAI();
     if (!ai.available) return res.json({ error: 'No local AI available.' });
 
-    const { focus = 'core' } = req.body || {}; // core | server | client | full
+    const { focus = 'core', batch } = req.body || {}; // focus: core|server|client|full, batch: 1|2 (splits core in half)
     const root = join(PROJECTS_DIR, 'Nexus');
     const files: { path: string; content: string }[] = [];
 
-    // Core files: the most important ~25k tokens for a focused audit
-    const CORE_FILES = [
+    // Core files split into two batches for smaller context windows
+    const CORE_BATCH_1 = [
       'server/db/store.ts', 'server/types.ts', 'server/index.ts',
       'server/mcp/index.ts', 'server/lib/gpuSignal.ts', 'server/lib/embeddings.ts',
-      'server/routes/tasks.ts', 'server/routes/sessions.ts', 'server/routes/ledger.ts',
+      'server/routes/tasks.ts',
+    ];
+    const CORE_BATCH_2 = [
+      'server/routes/sessions.ts', 'server/routes/ledger.ts',
       'server/routes/usage.ts', 'server/routes/thoughts.ts', 'server/routes/impact.ts',
       'server/routes/estimator.ts', 'server/routes/guard.ts', 'server/routes/predict.ts',
     ];
 
     if (focus === 'core') {
-      for (const rel of CORE_FILES) {
+      const fileList = batch === 1 ? CORE_BATCH_1 : batch === 2 ? CORE_BATCH_2 : [...CORE_BATCH_1, ...CORE_BATCH_2];
+      for (const rel of fileList) {
         try {
           const content = readFileSync(join(root, rel), 'utf-8');
           files.push({ path: rel, content });

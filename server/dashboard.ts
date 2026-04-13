@@ -96,7 +96,7 @@ async function start() {
 
   // Mount all API routes
   app.use('/api/tasks', createTaskRoutes(store, broadcast));
-  app.use('/api/activity', createActivityRoutes(store, broadcast));
+  app.use('/api/activity', createActivityRoutes(store));
   app.use('/api/sessions', createSessionRoutes(store, broadcast));
   app.use('/api/search', createSearchRoutes(store));
   app.use('/api/usage', createUsageRoutes(store, broadcast));
@@ -107,23 +107,23 @@ async function start() {
   app.use('/api/critique', createCritiqueRoutes(store));
   app.use('/api/thoughts', createThoughtRoutes(store, broadcast));
   app.use('/api/predict', createPredictRoutes(store, broadcast));
-  app.use('/api/bookmarks', createBookmarkRoutes(store, broadcast));
+  app.use('/api/bookmarks', createBookmarkRoutes(store));
   app.use('/api/overseer', createOverseerRoutes(store, broadcast));
-  app.use('/api/pulse', createPulseRoutes());
-  app.use('/api/clock', createClockRoutes(store));
+  app.use('/api/pulse', createPulseRoutes(store));
+  app.use('/api/clock', createClockRoutes(store, buildTimingInfo));
   app.use('/api/digest', createDigestRoutes(store));
   app.use('/api/init', createInitRoutes(store));
-  app.use('/api/actions', createActionRoutes(store));
+  app.use('/api/actions', createActionRoutes(store, broadcast));
   app.use('/api/heatmap', createHeatmapRoutes(store));
   app.use('/api/advice', createAdviceRoutes(store));
-  app.use('/api/scratchpads', createScratchpadRoutes(store, broadcast));
+  app.use('/api/scratchpads', createScratchpadRoutes(store));
   app.use('/api/fuel-intel', createFuelIntelRoutes(store));
   app.use('/api/plan', createPlanRoutes(store));
   app.use('/api/auto-summary', createAutoSummaryRoutes(store, broadcast));
   app.use('/api/remediate', createRemediateRoutes(store, broadcast));
   app.use('/api/focus', createFocusRoutes(store));
   app.use('/api/budget', createBudgetRoutes(store));
-  app.use('/api/github', createGitHubRoutes());
+  app.use('/api/github', createGitHubRoutes(store, broadcast));
   app.use('/api/smart-search', createSmartSearchRoutes(store));
   app.use('/api/embeddings', createEmbeddingRoutes(store));
 

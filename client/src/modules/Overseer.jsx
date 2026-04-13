@@ -241,7 +241,7 @@ export default function Overseer() {
     setLoading(true);
     try {
       const data = await api.getOverseer();
-      if (data.error) { setAnalysis(data.error); }
+      if (data.error) { setAnalysis(typeof data.error === 'string' ? data.error : data.error.message || JSON.stringify(data.error)); }
       else {
         setAnalysis(data.analysis);
         setContext(data.context);
