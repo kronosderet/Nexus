@@ -11,9 +11,9 @@ export function createTaskRoutes(store: NexusStore, broadcast: BroadcastFn) {
   });
 
   router.post('/', (req: Request, res: Response) => {
-    const { title, description, status, priority } = req.body;
+    const { title, description, status, priority, decision_ids } = req.body;
     if (!title?.trim()) return res.status(400).json({ error: 'Task title required.' });
-    const task = store.createTask({ title: title.trim(), description, status, priority });
+    const task = store.createTask({ title: title.trim(), description, status, priority, decision_ids });
     const entry = store.addActivity('task_created', `Plotted -- "${title}"`);
     broadcast({ type: 'task_update', payload: task });
     broadcast({ type: 'activity', payload: entry });

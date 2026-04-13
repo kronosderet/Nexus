@@ -24,10 +24,10 @@ export function createSessionRoutes(store: NexusStore, broadcast: BroadcastFn) {
   });
 
   router.post('/', (req: Request, res: Response) => {
-    const { project, summary, decisions, blockers, files_touched, tags } = req.body;
+    const { project, summary, decisions, blockers, files_touched, tags, completed_task_ids } = req.body;
     if (!project || !summary) return res.status(400).json({ error: 'Project and summary required.' });
 
-    const session = store.createSession({ project, summary, decisions, blockers, files_touched, tags });
+    const session = store.createSession({ project, summary, decisions, blockers, files_touched, tags, completed_task_ids });
     const entry = store.addActivity('session', `Session logged -- [${project}] ${summary.slice(0, 60)}${summary.length > 60 ? '...' : ''}`);
     broadcast({ type: 'activity', payload: entry });
     broadcast({ type: 'session_created', payload: session });

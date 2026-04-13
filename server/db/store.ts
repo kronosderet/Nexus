@@ -23,6 +23,7 @@ export class NexusStore {
   private _nextId: Record<IdTable, number>;
   private _nextLedgerId = 1;
   private _nextThoughtId = 1;
+  private _nextEdgeId = 1;
   private _edgeMutex = false;
 
   constructor() {
@@ -70,6 +71,7 @@ export class NexusStore {
     };
     this._nextLedgerId = safeMax((this.data.ledger || []).map(e => e.id)) + 1;
     this._nextThoughtId = safeMax((this.data.thoughts || []).map(t => t.id)) + 1;
+    this._nextEdgeId = safeMax((this.data.graph_edges || []).map(e => e.id)) + 1;
   }
 
   /** Re-read data from disk (for external changes, e.g. MCP writes while dashboard is running). */
@@ -90,6 +92,7 @@ export class NexusStore {
       };
       this._nextLedgerId = safeMax((data.ledger || []).map((e: any) => e.id)) + 1;
       this._nextThoughtId = safeMax((data.thoughts || []).map((t: any) => t.id)) + 1;
+      this._nextEdgeId = safeMax((data.graph_edges || []).map((e: any) => e.id)) + 1;
       return true;
     } catch {
       return false;
@@ -553,7 +556,7 @@ export class NexusStore {
   addEdge(fromId: number, toId: number, relationship: GraphEdge['rel'] = 'related', note = ''): GraphEdge {
     const exists = this.data.graph_edges.find(e => e.from === fromId && e.to === toId && e.rel === relationship);
     if (exists) return exists;
-    const edge: GraphEdge = { id: this.data.graph_edges.length + 1, from: fromId, to: toId, rel: relationship, note, created_at: this._now() };
+    const edge: GraphEdge = { id: this._nextEdgeId++, from: fromId, to: toId, rel: relationship, note, created_at: this._now() };
     this.data.graph_edges.push(edge);
     this._flush();
     return edge;
