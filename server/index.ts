@@ -122,7 +122,7 @@ app.use('/api/overseer', createOverseerRoutes(store, broadcast));
 app.use('/api/focus', createFocusRoutes(store));
 app.use('/api/budget', createBudgetRoutes(store));
 app.use('/api/init', createInitRoutes(store));
-app.use('/api/clock', createClockRoutes(store, buildTimingInfo));
+app.use('/api/clock', createClockRoutes(store));
 app.use('/api/remediate', createRemediateRoutes(store, broadcast));
 app.use('/api/embed', createEmbeddingRoutes(store));
 

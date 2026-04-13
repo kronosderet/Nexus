@@ -47,7 +47,8 @@ export default function FuelModule({ ws }) {
     }
   }
 
-  useEffect(() => { fetchAll(); const i = setInterval(fetchAll, 30000); return () => clearInterval(i); }, []);
+  // Safety-net poll every 2 min — real-time updates come via WebSocket (#170)
+  useEffect(() => { fetchAll(); const i = setInterval(fetchAll, 120000); return () => clearInterval(i); }, []);
 
   useEffect(() => {
     if (!ws?.subscribe) return;

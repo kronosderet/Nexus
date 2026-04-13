@@ -110,7 +110,7 @@ async function start() {
   app.use('/api/bookmarks', createBookmarkRoutes(store));
   app.use('/api/overseer', createOverseerRoutes(store, broadcast));
   app.use('/api/pulse', createPulseRoutes(store));
-  app.use('/api/clock', createClockRoutes(store, buildTimingInfo));
+  app.use('/api/clock', createClockRoutes(store));
   app.use('/api/digest', createDigestRoutes(store));
   app.use('/api/init', createInitRoutes(store));
   app.use('/api/actions', createActionRoutes(store, broadcast));

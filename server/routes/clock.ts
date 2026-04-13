@@ -1,31 +1,25 @@
 import { Router, Request, Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
+import { getFuelConfig, nowInTZ, getNextWeeklyReset as configGetNextWeeklyReset } from '../lib/fuelConfig.ts';
+import { buildTimingInfo } from './usage.ts';
 
-const TIMEZONE = 'Europe/Prague';
-const WEEKLY_RESET_DAY = 4;    // Thursday
-const WEEKLY_RESET_HOUR = 21;
-
-export function createClockRoutes(store: NexusStore, getUsageTiming: () => any): Router {
+export function createClockRoutes(store: NexusStore, _getUsageTiming?: () => any): Router {
   const router = Router();
 
   router.get('/', (req: Request, res: Response) => {
-    const now = new Date();
-    const local = new Date(now.toLocaleString('en-US', { timeZone: TIMEZONE }));
+    const config = getFuelConfig(store);
+    const local = nowInTZ(config);
     const hour = local.getHours();
 
     // Get fuel from store
     const usage = store.getLatestUsage();
     const history = store.getUsage(50);
 
-    // Get session timing from the usage route (single source of truth)
-    let usageTiming: any = null;
-    try {
-      // Fetch from our own usage/latest endpoint internally
-      usageTiming = getUsageTiming ? getUsageTiming() : null;
-    } catch {}
+    // Get session timing from the shared buildTimingInfo (single source of truth, #166)
+    const usageTiming = buildTimingInfo(store);
 
-    // Weekly reset
-    const nextWeeklyReset = getNextWeeklyReset(local);
+    // Weekly reset from config (#167)
+    const nextWeeklyReset = configGetNextWeeklyReset(config);
     const weeklyMs = nextWeeklyReset.getTime() - local.getTime();
 
     // Work hours
@@ -102,17 +96,7 @@ export function createClockRoutes(store: NexusStore, getUsageTiming: () => any):
   return router;
 }
 
-function getNextWeeklyReset(now: Date): Date {
-  const reset = new Date(now);
-  const daysUntil = (WEEKLY_RESET_DAY - now.getDay() + 7) % 7;
-  if (daysUntil === 0 && (now.getHours() > WEEKLY_RESET_HOUR || (now.getHours() === WEEKLY_RESET_HOUR && now.getMinutes() > 0))) {
-    reset.setDate(reset.getDate() + 7);
-  } else {
-    reset.setDate(reset.getDate() + daysUntil);
-  }
-  reset.setHours(WEEKLY_RESET_HOUR, 0, 0, 0);
-  return reset;
-}
+// getNextWeeklyReset removed — now imported from fuelConfig.ts (#169)
 
 function formatCountdown(ms: number): string {
   if (ms <= 0) return 'now';
