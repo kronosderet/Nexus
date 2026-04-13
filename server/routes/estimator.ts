@@ -109,10 +109,12 @@ function buildEstimate(store: NexusStore) {
   const chunksRemaining = constrainingMinutes ? Math.floor(constrainingMinutes / 15) : null;
 
   // Weekly planning: how many full sessions left this week?
-  // Learn avg session burn from actual data (sessions detected by fuel jumps)
+  // Learn from historical data, but cap at sane range (2-15% per session)
   const historicalStats = buildHistoricalStats(store);
-  const learnedSessionBurn = historicalStats.averageBurnRate > 0 ? historicalStats.averageBurnRate : 3;
-  const sessionsLeftThisWeek = estimatedWeekly > 0 ? Math.floor(estimatedWeekly / learnedSessionBurn) : 0;
+  const learnedBurn = historicalStats.averageBurnRate;
+  const defaultSessionBurn = 5; // 5% of weekly per session (conservative default for Max 5x)
+  const sessionBurn = (learnedBurn > 2 && learnedBurn < 15) ? learnedBurn : defaultSessionBurn;
+  const sessionsLeftThisWeek = estimatedWeekly > 0 ? Math.floor(estimatedWeekly / sessionBurn) : 0;
 
   // Event-based costs (derived from actual activity vs fuel data)
   const eventCosts = calculateEventCosts(store);
@@ -214,11 +216,14 @@ function calculateBurnRates(history: any[]) {
   const avgSession = weightedAvg(sessionRates);
   const avgWeekly = weightedAvg(weeklyRates);
 
+  // Sanity cap: session can't burn >20%/h (100%/5h), weekly can't burn >15%/h
+  const sessionPerHour = Math.min(20, Math.round(avgSession * 60 * 10) / 10);
+  const weeklyPerHour = Math.min(15, Math.round(avgWeekly * 60 * 10) / 10);
   return {
-    sessionPerMinute: avgSession,
-    weeklyPerMinute: avgWeekly,
-    sessionPerHour: Math.round(avgSession * 60 * 10) / 10,
-    weeklyPerHour: Math.round(avgWeekly * 60 * 10) / 10,
+    sessionPerMinute: Math.min(avgSession, 20 / 60),
+    weeklyPerMinute: Math.min(avgWeekly, 15 / 60),
+    sessionPerHour,
+    weeklyPerHour,
   };
 }
 
@@ -339,26 +344,28 @@ function buildHistoricalStats(store: NexusStore) {
 
   // Per-session stats: first report = session start (highest fuel), last = session end (lowest)
   const sessionStats = sessions
-    .filter(s => s.reports.length >= 2)
+    .filter(s => s.reports.length >= 3) // need 3+ data points for meaningful session stats
     .map(s => {
-      const start = s.reports[0]; // chronologically first = highest fuel
-      const end = s.reports[s.reports.length - 1]; // chronologically last = lowest fuel
+      const start = s.reports[0];
+      const end = s.reports[s.reports.length - 1];
       const durationMs = new Date(end.created_at).getTime() - new Date(start.created_at).getTime();
       const durationH = durationMs / 3600000;
 
       const startFuel = start.session_percent ?? 100;
       const endFuel = end.session_percent ?? 0;
-      const burned = Math.max(0, startFuel - endFuel); // never negative
+      const burned = Math.max(0, startFuel - endFuel);
+      // Cap rate at 20%/h (max possible: 100%/5h = 20%/h)
+      const rate = durationH > 0.1 ? Math.min(20, Math.round((burned / durationH) * 10) / 10) : 0;
 
       return {
         duration: Math.round(durationH * 10) / 10,
         burned: Math.round(burned),
-        rate: durationH > 0.1 ? Math.round((burned / durationH) * 10) / 10 : 0,
+        rate,
         reports: s.reports.length,
         date: new Date(start.created_at).toLocaleDateString(),
       };
     })
-    .filter(s => s.duration > 0 && s.burned > 0) // skip zero-duration or zero-burn sessions
+    .filter(s => s.duration > 0.1 && s.burned > 0 && s.rate <= 20) // skip nonsensical sessions
     .reverse(); // newest first for display
 
   const avgRate = sessionStats.length > 0
