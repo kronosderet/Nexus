@@ -61,11 +61,29 @@
 - Overseer GUI: dynamic model + GPU info (auto-detected from LM Studio)
 - impact.ts: auto-detect model from /v1/models instead of hardcoded
 
-## Current — v4.2
+### v4.2.0 — The Living Metabrain
+- 22 MCP tools (up from 20)
+- Decision lifecycle: proposed → active → validated → deprecated + confidence scores
+- Task ↔ Decision links: provenance chain (decision_ids on tasks)
+- Session → Task completion tracking: sessions auto-record which tasks they closed
+- Advice → Decision chain: link Overseer recommendations to resulting decisions
+- Cross-project fleet overview: nexus_fleet_overview ranks all tasks by urgency
+- Thought auto-resolve: completing a task auto-pops linked thoughts
+- Thought auto-recovery: SessionStart hook auto-pops top thought as RESUME context
+- nexus_update_decision tool: edit decisions without breaking graph edges
+- Selective code audit: audit specific files, not all-or-nothing
+- /nexus-health skill: one-command installation verification
+- Quick Actions: Start/Ship/Park task workflows (composite server endpoints)
+- push_thought now accepts related_task_id for auto-resolve linkage
 
-### Dashboard Polish
-- Shared React state (modules fetch independently, should share)
-- Log module: debounced session search
+## Current — v4.3
+
+### Dashboard & UX
+- Shared React Context (single NexusProvider, reduce redundant API calls)
+- Overseer Chat History (persistent Q&A backed by advice journal)
+- Activity Timeline View (visual chronological canvas)
+- Graph Visual Overhaul (project colors, edge toggles, node sidebar)
+- Overseer Scheduled Scans (daily risk + weekly AI digest)
 
 ## Future — v5.0 Vision
 

@@ -7055,7 +7055,7 @@ var init_store = __esm({
         return this.data.ledger || [];
       }
       getActiveDecisions() {
-        return (this.data.ledger || []).filter((d) => !d.deprecated);
+        return (this.data.ledger || []).filter((d) => !d.deprecated && d.lifecycle !== "deprecated");
       }
       getDecisionById(id) {
         return (this.data.ledger || []).find((d) => d.id === id) || null;
@@ -7064,6 +7064,7 @@ var init_store = __esm({
         const d = this.getDecisionById(id);
         if (!d) return null;
         d.deprecated = true;
+        d.lifecycle = "deprecated";
         this._flush();
         return d;
       }
@@ -7075,6 +7076,12 @@ var init_store = __esm({
         if (updates.alternatives != null) d.alternatives = updates.alternatives;
         if (updates.tags != null) d.tags = updates.tags;
         if (updates.project != null) d.project = updates.project;
+        if (updates.lifecycle != null) {
+          d.lifecycle = updates.lifecycle;
+          d.deprecated = updates.lifecycle === "deprecated";
+        }
+        if (updates.confidence != null) d.confidence = updates.confidence;
+        if (updates.last_reviewed_at != null) d.last_reviewed_at = updates.last_reviewed_at;
         this._flush();
         return d;
       }
@@ -7098,7 +7105,7 @@ var init_store = __esm({
       getAllTasks() {
         return [...this.data.tasks].sort((a, b) => a.sort_order - b.sort_order);
       }
-      createTask({ title, description = "", status = "backlog", priority = 0 }) {
+      createTask({ title, description = "", status = "backlog", priority = 0, decision_ids }) {
         const maxOrder = this.data.tasks.reduce((max, t) => t.status === status && t.sort_order > max ? t.sort_order : max, 0);
         const task = {
           id: this._id("tasks"),
@@ -7108,6 +7115,7 @@ var init_store = __esm({
           priority,
           sort_order: maxOrder + 1,
           linked_files: "[]",
+          ...decision_ids?.length ? { decision_ids } : {},
           created_at: this._now(),
           updated_at: this._now()
         };
@@ -7259,7 +7267,7 @@ var init_store = __esm({
       getSession(id) {
         return this.data.sessions.find((s) => s.id === id) || null;
       }
-      createSession({ project, summary, decisions = [], blockers = [], files_touched = [], tags = [] }) {
+      createSession({ project, summary, decisions = [], blockers = [], files_touched = [], tags = [], completed_task_ids }) {
         const session = {
           id: this._id("sessions"),
           project,
@@ -7268,6 +7276,7 @@ var init_store = __esm({
           blockers,
           files_touched,
           tags,
+          ...completed_task_ids?.length ? { completed_task_ids } : {},
           created_at: this._now()
         };
         this.data.sessions.push(session);
@@ -7278,6 +7287,50 @@ var init_store = __esm({
         const sessions = this.getSessions({ project, limit });
         const tasks = this.data.tasks.filter((t) => t.status !== "done" && t.title.toLowerCase().includes(project.toLowerCase()));
         return { sessions, activeTasks: tasks };
+      }
+      /** Record that a task was completed during the most recent session today. */
+      recordTaskCompletion(taskId) {
+        const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+        const session = [...this.data.sessions].filter((s) => s.created_at.startsWith(today)).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+        if (!session) return;
+        if (!session.completed_task_ids) session.completed_task_ids = [];
+        if (!session.completed_task_ids.includes(taskId)) {
+          session.completed_task_ids.push(taskId);
+          this._flush();
+        }
+      }
+      /** Link an advice entry to a decision it led to. */
+      linkAdviceToDecision(adviceId, decisionId) {
+        const idx = (this.data.advice || []).findIndex((a) => a.id === adviceId);
+        if (idx === -1) return null;
+        this.data.advice[idx].decision_id = decisionId;
+        this._flush();
+        return this.data.advice[idx];
+      }
+      /** Cross-project priority matrix: rank all open tasks by urgency. */
+      getFleetOverview() {
+        const tasks = this.data.tasks.filter((t) => t.status !== "done");
+        const now = Date.now();
+        const staleness = {};
+        const projects = /* @__PURE__ */ new Set();
+        for (const s of this.data.sessions) projects.add(s.project.toLowerCase());
+        for (const proj of projects) {
+          const latest = this.data.sessions.filter((s) => s.project.toLowerCase() === proj).reduce((best, s) => {
+            const t = Date.parse(s.created_at);
+            return t > best ? t : best;
+          }, 0);
+          staleness[proj] = latest ? Math.floor((now - latest) / 864e5) : 999;
+        }
+        const scored = tasks.map((t) => {
+          const ageDays = Math.floor((now - Date.parse(t.created_at)) / 864e5);
+          const ageFactor = Math.min(3, 1 + ageDays / 7);
+          const proj = (t.title.match(/\[(\w+)\]/)?.[1] || "general").toLowerCase();
+          const staleFactor = Math.min(2, 1 + (staleness[proj] || 0) / 14);
+          const score = Math.round((t.priority + 1) * ageFactor * staleFactor * 100) / 100;
+          return { ...t, score, ageDays };
+        });
+        scored.sort((a, b) => b.score - a.score);
+        return { topTasks: scored.slice(0, 15), staleness };
       }
       // ── Ledger ─────────────────────────────────────────────
       getLedger({ project, tag, limit = 50 } = {}) {
@@ -7295,7 +7348,8 @@ var init_store = __esm({
           project,
           alternatives,
           tags,
-          created_at: this._now()
+          created_at: this._now(),
+          lifecycle: "active"
         };
         this.data.ledger.push(entry);
         const linked = this._autoLinkDecision(entry);
@@ -7412,7 +7466,7 @@ var init_store = __esm({
       }
       getGraph() {
         return {
-          nodes: this.data.ledger.map((d) => ({ id: d.id, label: d.decision.slice(0, 50), project: d.project, tags: d.tags || [] })),
+          nodes: this.data.ledger.map((d) => ({ id: d.id, label: d.decision.slice(0, 50), project: d.project, tags: d.tags || [], lifecycle: d.lifecycle })),
           edges: this.data.graph_edges.map((e) => ({ id: e.id, from: e.from, to: e.to, rel: e.rel, note: e.note }))
         };
       }
@@ -7720,15 +7774,16 @@ async function localApiFetch(path, init = {}) {
   }
   if (pathname === "/api/tasks" && method === "POST") {
     if (!body.title?.trim()) throw new Error("400: Task title required.");
-    const task = store.createTask({ title: body.title.trim(), description: body.description, status: body.status, priority: body.priority });
+    const task = store.createTask({ title: body.title.trim(), description: body.description, status: body.status, priority: body.priority, decision_ids: body.decision_ids });
     store.addActivity("task_created", `Plotted -- "${body.title}"`);
     return task;
   }
   if (pathname.match(/^\/api\/tasks\/\d+$/) && method === "PATCH") {
     const id = parseInt(pathname.split("/").pop());
-    const task = store.updateTask(id, body);
-    if (!task) throw new Error("404: Task not found.");
-    return task;
+    const result = store.updateTask(id, body);
+    if (!result) throw new Error("404: Task not found.");
+    if (body.status === "done") store.recordTaskCompletion(id);
+    return { ...result.task, resolvedThoughts: result.resolvedThoughts || 0 };
   }
   if (pathname.match(/^\/api\/tasks\/\d+$/) && method === "DELETE") {
     const id = parseInt(pathname.split("/").pop());
@@ -7772,6 +7827,9 @@ async function localApiFetch(path, init = {}) {
     if (body.context !== void 0) updates.context = body.context;
     if (body.project !== void 0) updates.project = body.project;
     if (body.tags !== void 0) updates.tags = body.tags;
+    if (body.lifecycle !== void 0) updates.lifecycle = body.lifecycle;
+    if (body.confidence !== void 0) updates.confidence = body.confidence;
+    if (body.last_reviewed_at !== void 0) updates.last_reviewed_at = body.last_reviewed_at;
     if (body.deprecated !== void 0) {
       const d = store.getDecisionById(id);
       if (d) {
@@ -7882,6 +7940,14 @@ async function localApiFetch(path, init = {}) {
       return { id: d.id, decision: d.decision, project: d.project, total };
     }).sort((a, b) => b.total - a.total);
     return { centrality: centrality.slice(0, 20), averageConnections: centrality.length ? Math.round(centrality.reduce((s, c) => s + c.total, 0) / centrality.length * 10) / 10 : 0 };
+  }
+  if (pathname === "/api/fleet") return store.getFleetOverview();
+  if (pathname.match(/^\/api\/advice\/\d+\/link-decision$/) && method === "PATCH") {
+    const id = parseInt(pathname.split("/")[3]);
+    if (!body.decision_id) throw new Error("400: decision_id required.");
+    const result = store.linkAdviceToDecision(id, body.decision_id);
+    if (!result) throw new Error("404: Advice not found.");
+    return result;
   }
   if (pathname === "/api/status") return { status: "online", mode: "standalone" };
   if (pathname === "/api/init") return { checks: {} };
@@ -21935,7 +22001,7 @@ var StdioServerTransport = class {
 var STANDALONE = process.env.NEXUS_STANDALONE === "1";
 var NEXUS_BASE = process.env.NEXUS_BASE_URL || "http://localhost:3001";
 var SERVER_NAME = "nexus";
-var SERVER_VERSION = "4.1.1";
+var SERVER_VERSION = "4.2.0";
 var localApiFetch2 = null;
 if (STANDALONE) {
   try {
@@ -22158,7 +22224,9 @@ var TOOLS = [
         decision: { type: "string", description: "New decision text (optional)." },
         rationale: { type: "string", description: "New context/rationale (optional)." },
         project: { type: "string", description: "New project assignment (optional)." },
-        tags: { type: "array", items: { type: "string" }, description: "New tags (optional)." }
+        tags: { type: "array", items: { type: "string" }, description: "New tags (optional)." },
+        lifecycle: { type: "string", enum: ["proposed", "active", "validated", "deprecated"], description: "Decision lifecycle state (optional)." },
+        confidence: { type: "number", description: "Confidence score 0-1 (optional)." }
       },
       required: ["id"]
     }
@@ -22180,6 +22248,10 @@ var TOOLS = [
         project: {
           type: "string",
           description: "Optional: which project this thought belongs to."
+        },
+        related_task_id: {
+          type: "number",
+          description: "Optional: link to a task ID. Thought auto-resolves when that task completes."
         }
       },
       required: ["text"]
@@ -22245,6 +22317,11 @@ var TOOLS = [
         priority: {
           type: "number",
           description: "Optional priority 0-2 (0=low, 1=normal, 2=high)."
+        },
+        decision_ids: {
+          type: "array",
+          items: { type: "number" },
+          description: "Optional: IDs of decisions this task implements or relates to."
         }
       },
       required: ["title"]
@@ -22457,6 +22534,11 @@ var TOOLS = [
         }
       }
     }
+  },
+  {
+    name: "nexus_fleet_overview",
+    description: "Get cross-project priority matrix: ranks ALL open tasks across ALL projects by priority \xD7 age \xD7 project_staleness. Returns top 15 most urgent items. Use when deciding what to work on when multiple projects compete for attention.",
+    inputSchema: { type: "object", properties: {} }
   }
 ];
 async function handleTool(name, args) {
@@ -22542,6 +22624,8 @@ async function handleTool(name, args) {
       if (args.rationale) body.context = args.rationale;
       if (args.project) body.project = args.project;
       if (args.tags) body.tags = args.tags;
+      if (args.lifecycle) body.lifecycle = args.lifecycle;
+      if (args.confidence != null) body.confidence = args.confidence;
       const result = await nexusFetch(`/api/ledger/${Number(args.id)}`, {
         method: "PATCH",
         body: JSON.stringify(body)
@@ -22556,7 +22640,8 @@ async function handleTool(name, args) {
         body: JSON.stringify({
           text: args.text,
           context: args.context || void 0,
-          project: args.project || void 0
+          project: args.project || void 0,
+          related_task_id: args.related_task_id || void 0
         })
       });
       return `\u25C8 Thought #${result.id} pushed onto the stack.
@@ -22625,6 +22710,7 @@ async function handleTool(name, args) {
       };
       if (args.description) body.description = args.description;
       if (args.priority != null) body.priority = Number(args.priority);
+      if (args.decision_ids) body.decision_ids = args.decision_ids;
       const result = await nexusFetch("/api/tasks", {
         method: "POST",
         body: JSON.stringify(body)
@@ -22886,6 +22972,25 @@ ${data.answer || "(no response)"}`;
         results.push(`  Recent session #${summary.id} documents what was done.`);
       }
       return results.join("\n");
+    }
+    case "nexus_fleet_overview": {
+      const data = await nexusFetch("/api/fleet");
+      const lines = ["\u25C8 Fleet Overview \u2014 Cross-Project Priority Matrix", ""];
+      if (data.topTasks?.length) {
+        for (const t of data.topTasks) {
+          const prio = t.priority === 2 ? "!!" : t.priority === 1 ? "! " : "  ";
+          lines.push(`  ${prio}#${t.id} [${t.status}] ${t.title.slice(0, 80)}  (score: ${t.score}, ${t.ageDays}d old)`);
+        }
+      } else {
+        lines.push("  No open tasks across any project.");
+      }
+      if (Object.keys(data.staleness || {}).length) {
+        lines.push("", "Project staleness (days since last session):");
+        for (const [proj, days] of Object.entries(data.staleness).sort((a, b) => b[1] - a[1])) {
+          lines.push(`  ${proj}: ${days}d`);
+        }
+      }
+      return lines.join("\n");
     }
     default:
       throw new Error(`Unknown tool: ${name}`);
