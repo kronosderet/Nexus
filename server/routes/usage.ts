@@ -4,38 +4,8 @@ import { getFuelConfig, setFuelConfig as saveFuelConfig, nowInTZ as configNowInT
 
 type BroadcastFn = (data: any) => void;
 
-// ── Session tracking (persisted in store) ──────────────
-let _store: NexusStore | null = null;
-
-function getSessionTiming() {
-  return _store?.getSessionTiming() || {};
-}
-
-function nowInTZ() {
-  const config = _store ? getFuelConfig(_store) : { timezone: 'Europe/Prague' } as any;
-  return configNowInTZ(config);
-}
-
-function startSession(resetMinutesFromNow: number | null = null) {
-  const config = _store ? getFuelConfig(_store) : { sessionWindowHours: 5 } as any;
-  const now = nowInTZ();
-  const existing = getSessionTiming();
-  const timing = {
-    startTime: now.toISOString(),
-    resetTime: resetMinutesFromNow != null
-      ? new Date(now.getTime() + resetMinutesFromNow * 60000).toISOString()
-      : existing.resetTime || new Date(now.getTime() + config.sessionWindowHours * 3600000).toISOString(),
-    resetSource: resetMinutesFromNow != null ? 'user' : (existing.resetSource || 'estimated'),
-  };
-  if (_store) {
-    _store.setSessionTiming(timing as any);
-  }
-}
-
-function getNextWeeklyReset() {
-  const config = _store ? getFuelConfig(_store) : { timezone: 'Europe/Prague', weeklyResetDay: 4, weeklyResetHour: 21, sessionWindowHours: 5 } as any;
-  return configGetNextWeeklyReset(config);
-}
+// Valid plan values for input sanitization (#161)
+const VALID_PLANS = new Set(['free', 'pro', 'max5', 'max20', 'team', 'team_premium', 'enterprise', 'api']);
 
 function formatCountdown(ms: number) {
   if (ms <= 0) return 'now';
@@ -48,19 +18,19 @@ function formatCountdown(ms: number) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-export function buildTimingInfo() {
-  const now = nowInTZ();
-  const nextWeekly = getNextWeeklyReset();
+/** Build timing info — accepts store param to avoid module-level singleton (#160). */
+export function buildTimingInfo(store: NexusStore) {
+  const config = getFuelConfig(store);
+  const now = configNowInTZ(config);
+  const nextWeekly = configGetNextWeeklyReset(config);
   const weeklyMs = nextWeekly.getTime() - now.getTime();
 
-  const timing = getSessionTiming();
+  const timing = store.(store.getSessionTiming() || {} as any) || {} as any;
   const sessionResetTime = timing.resetTime ? new Date(timing.resetTime) : null;
   const sessionStartTime = timing.startTime ? new Date(timing.startTime) : null;
-
-  let sessionInfo: any;
-  const config = _store ? getFuelConfig(_store) : { sessionWindowHours: 5, timezone: 'Europe/Prague', weeklyResetDay: 4, weeklyResetHour: 21, plan: 'pro' } as any;
   const planInfo = PLAN_INFO[config.plan] || PLAN_INFO.pro;
 
+  let sessionInfo: any;
   if (sessionResetTime) {
     const sessionMs = sessionResetTime.getTime() - now.getTime();
     const elapsed = sessionStartTime ? now.getTime() - sessionStartTime.getTime() : 0;
@@ -100,7 +70,21 @@ export function buildTimingInfo() {
 }
 
 export function createUsageRoutes(store: NexusStore, broadcast: BroadcastFn) {
-  _store = store; // capture for session timing persistence
+  // Session start helper — uses store closure, not module-level singleton
+  function startSession(resetMinutesFromNow: number | null = null) {
+    const config = getFuelConfig(store);
+    const now = configNowInTZ(config);
+    const existing = store.getSessionTiming() || {} as any;
+    const timing = {
+      startTime: now.toISOString(),
+      resetTime: resetMinutesFromNow != null
+        ? new Date(now.getTime() + resetMinutesFromNow * 60000).toISOString()
+        : existing.resetTime || new Date(now.getTime() + config.sessionWindowHours * 3600000).toISOString(),
+      resetSource: (resetMinutesFromNow != null ? 'user' : (existing.resetSource || 'estimated')) as 'user' | 'estimated',
+    };
+    store.setSessionTiming(timing);
+  }
+
   const router = Router();
 
   // Get usage history
@@ -112,14 +96,14 @@ export function createUsageRoutes(store: NexusStore, broadcast: BroadcastFn) {
   // Get latest reading with timing context
   router.get('/latest', (req: Request, res: Response) => {
     const latest = store.getLatestUsage();
-    const timing = buildTimingInfo();
+    const timing = buildTimingInfo(store);
     if (!latest) return res.json({ tracked: false, timing });
 
     // Calculate burn rate from recent history
     const history = store.getUsage(10);
     let burnRate: any = null;
     // Only use data points from current session window
-    const curTiming = getSessionTiming();
+    const curTiming = (store.getSessionTiming() || {} as any);
     const curStart = curTiming.startTime ? new Date(curTiming.startTime) : null;
     const sessionHistory = curStart
       ? history.filter((h: any) => new Date(h.created_at) >= curStart)
@@ -155,27 +139,33 @@ export function createUsageRoutes(store: NexusStore, broadcast: BroadcastFn) {
       return res.status(400).json({ error: 'Provide session_percent and/or weekly_percent.' });
     }
 
-    // Save plan/timezone config if provided (persists across sessions)
+    // Save plan/timezone config if provided — validate before saving (#161)
     if (plan || timezone) {
       const updates: any = {};
-      if (plan) updates.plan = plan;
-      if (timezone) updates.timezone = timezone;
-      saveFuelConfig(store, updates);
+      if (plan && VALID_PLANS.has(plan)) updates.plan = plan;
+      if (timezone && typeof timezone === 'string' && timezone.includes('/')) updates.timezone = timezone;
+      if (Object.keys(updates).length > 0) saveFuelConfig(store, updates);
     }
 
     // Auto-start session tracking on first log, or if reset_in_minutes is provided
-    const existingTiming = getSessionTiming();
+    const existingTiming = (store.getSessionTiming() || {} as any);
     if (!existingTiming.startTime || reset_in_minutes != null) {
       startSession(reset_in_minutes);
     }
 
+    // Guard against NaN from non-numeric input (#163)
+    const parsedSession = session_percent != null ? Number(session_percent) : null;
+    const parsedWeekly = weekly_percent != null ? Number(weekly_percent) : null;
+    if ((parsedSession != null && isNaN(parsedSession)) || (parsedWeekly != null && isNaN(parsedWeekly))) {
+      return res.status(400).json({ error: 'session_percent and weekly_percent must be numbers.' });
+    }
     const entry = store.logUsage({
-      session_percent: session_percent != null ? Number(session_percent) : null,
-      weekly_percent: weekly_percent != null ? Number(weekly_percent) : null,
+      session_percent: parsedSession,
+      weekly_percent: parsedWeekly,
       note,
     });
 
-    const timing = buildTimingInfo();
+    const timing = buildTimingInfo(store);
     const payload = { ...entry, timing };
     broadcast({ type: 'usage_update', payload });
 
@@ -203,14 +193,14 @@ export function createUsageRoutes(store: NexusStore, broadcast: BroadcastFn) {
       return res.status(400).json({ error: 'Provide reset_in_minutes.' });
     }
     startSession(Number(reset_in_minutes));
-    const timing = buildTimingInfo();
+    const timing = buildTimingInfo(store);
     broadcast({ type: 'usage_update', payload: { timing } });
     res.json({ success: true, timing });
   });
 
   // Timing info only
   router.get('/timing', (req: Request, res: Response) => {
-    res.json(buildTimingInfo());
+    res.json(buildTimingInfo(store));
   });
 
   return router;

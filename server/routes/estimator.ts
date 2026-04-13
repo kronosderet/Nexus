@@ -292,8 +292,8 @@ function calculateEventCosts(store: NexusStore) {
   // Task cost: average events per task completion
   const tasksDone = store.getAllTasks().filter(t => t.status === 'done');
   const eventsPerTask = totalEvents > 0 && tasksDone.length > 0
-    ? Math.max(3, Math.round(totalEvents / Math.max(1, tasksDone.length / 3))) // rough: ~1/3 of events relate to a task
-    : 10; // default: 10 events per task
+    ? Math.max(3, Math.round(totalEvents / Math.max(1, tasksDone.length))) // events per completed task (direct ratio)
+    : 8; // default: 8 events per task (conservative estimate)
 
   return {
     sessionPerEvent: Math.round(sessionPerEvent * 1000) / 1000,

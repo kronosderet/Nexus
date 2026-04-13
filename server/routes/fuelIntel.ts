@@ -58,8 +58,8 @@ function detectSessions(usage: UsageEntry[]): SessionWindow[] {
     const sessionJump = (curr.session_percent ?? 0) - (prev.session_percent ?? 0);
     const timeDiff = (new Date(curr.created_at).getTime() - new Date(prev.created_at).getTime()) / 3600000;
 
-    // New session: fuel jumped up >20% OR gap >6 hours
-    if (sessionJump > 20 || timeDiff > 6) {
+    // New session: fuel jumped >20% AND gap >30min (avoids false positive from manual correction), OR gap >6h
+    if ((sessionJump > 20 && timeDiff > 0.5) || timeDiff > 6) {
       if (currentSession.length >= 2) {
         sessions.push(analyzeSessionWindow(currentSession));
       }
