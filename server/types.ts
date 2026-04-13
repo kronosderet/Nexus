@@ -87,6 +87,16 @@ export interface SessionTiming {
   resetSource?: 'user' | 'estimated';
 }
 
+export type ClaudePlan = 'free' | 'pro' | 'max5' | 'max20' | 'team' | 'team_premium' | 'enterprise' | 'api';
+
+export interface FuelConfig {
+  plan: ClaudePlan;
+  timezone: string;              // IANA timezone
+  sessionWindowHours: number;    // default 5
+  weeklyResetDay: number;        // 0=Sun..6=Sat (default 4=Thu)
+  weeklyResetHour: number;       // 0-23 (default 21)
+}
+
 export interface Bookmark {
   id: number;
   title: string;
@@ -143,6 +153,7 @@ export interface NexusData {
   advice: AdviceEntry[];
   thoughts: Thought[];
   _sessionTiming?: SessionTiming;
+  _fuelConfig?: FuelConfig;
 }
 
 // ── API response types ─────────────────────────────────

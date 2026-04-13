@@ -418,6 +418,15 @@ const TOOLS: Tool[] = [
           type: 'string',
           description: 'Optional free-text note attached to this reading (e.g. "before starting MCP tool work").',
         },
+        plan: {
+          type: 'string',
+          enum: ['free', 'pro', 'max5', 'max20', 'team', 'team_premium', 'enterprise', 'api'],
+          description: 'Optional: Claude subscription plan. Set once and it persists. Affects capacity estimates.',
+        },
+        timezone: {
+          type: 'string',
+          description: 'Optional: IANA timezone (e.g. "Europe/Prague", "America/New_York"). Affects reset time display.',
+        },
       },
     },
   },
@@ -877,6 +886,8 @@ async function handleTool(name: string, args: any): Promise<string> {
       if (args.weekly_percent != null) body.weekly_percent = Number(args.weekly_percent);
       if (args.reset_in_minutes != null) body.reset_in_minutes = Number(args.reset_in_minutes);
       if (args.note) body.note = String(args.note);
+      if (args.plan) body.plan = args.plan;
+      if (args.timezone) body.timezone = args.timezone;
 
       const result = await nexusFetch('/api/usage', {
         method: 'POST',

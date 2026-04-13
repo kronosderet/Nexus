@@ -170,6 +170,14 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
 
   // ── Usage ─────────────────────────────────────────
   if (pathname === '/api/usage' && method === 'POST') {
+    // Save plan/timezone config if provided
+    if (body.plan || body.timezone) {
+      const updates: any = {};
+      if (body.plan) updates.plan = body.plan;
+      if (body.timezone) updates.timezone = body.timezone;
+      const current = store.getFuelConfig() || { plan: 'pro', timezone: 'Europe/Prague', sessionWindowHours: 5, weeklyResetDay: 4, weeklyResetHour: 21 };
+      store.setFuelConfig({ ...current, ...updates });
+    }
     const entry = store.logUsage({ session_percent: body.session_percent, weekly_percent: body.weekly_percent, note: body.note });
     return { ...entry, timing: {} };
   }
