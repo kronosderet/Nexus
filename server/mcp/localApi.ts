@@ -158,7 +158,7 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
       const current = store.getFuelConfig() || { plan: 'pro', timezone: 'Europe/Prague', sessionWindowHours: 5, weeklyResetDay: 4, weeklyResetHour: 21 };
       store.setFuelConfig({ ...current, ...updates });
     }
-    const entry = store.logUsage({ session_percent: body.session_percent, weekly_percent: body.weekly_percent, note: body.note });
+    const entry = store.logUsage({ session_percent: body.session_percent, weekly_percent: body.weekly_percent, sonnet_weekly_percent: body.sonnet_weekly_percent, extra_usage: body.extra_usage, note: body.note });
     return { ...entry, timing: {} };
   }
 

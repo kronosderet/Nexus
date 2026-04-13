@@ -43,7 +43,9 @@ export interface Scratchpad {
 
 export interface UsageEntry {
   session_percent: number | null;
-  weekly_percent: number | null;
+  weekly_percent: number | null;         // "All models" weekly limit
+  sonnet_weekly_percent?: number | null; // "Sonnet only" weekly limit (separate reset)
+  extra_usage?: boolean;                 // true if running on pay-per-use overflow
   note: string;
   created_at: string;
 }
@@ -93,8 +95,10 @@ export interface FuelConfig {
   plan: ClaudePlan;
   timezone: string;              // IANA timezone
   sessionWindowHours: number;    // default 5
-  weeklyResetDay: number;        // 0=Sun..6=Sat (default 4=Thu)
+  weeklyResetDay: number;        // 0=Sun..6=Sat (default 4=Thu for "All models")
   weeklyResetHour: number;       // 0-23 (default 21)
+  sonnetResetDay?: number;       // 0=Sun..6=Sat (default 0=Sun for "Sonnet only")
+  sonnetResetHour?: number;      // 0-23 (default 22)
 }
 
 export interface Bookmark {
