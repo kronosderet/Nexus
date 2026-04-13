@@ -337,6 +337,8 @@ const TOOLS: Tool[] = [
         rationale: { type: 'string', description: 'New context/rationale (optional).' },
         project: { type: 'string', description: 'New project assignment (optional).' },
         tags: { type: 'array', items: { type: 'string' }, description: 'New tags (optional).' },
+        lifecycle: { type: 'string', enum: ['proposed', 'active', 'validated', 'deprecated'], description: 'Decision lifecycle state (optional).' },
+        confidence: { type: 'number', description: 'Confidence score 0-1 (optional).' },
       },
       required: ['id'],
     },
@@ -445,6 +447,11 @@ const TOOLS: Tool[] = [
         priority: {
           type: 'number',
           description: 'Optional priority 0-2 (0=low, 1=normal, 2=high).',
+        },
+        decision_ids: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Optional: IDs of decisions this task implements or relates to.',
         },
       },
       required: ['title'],
@@ -702,6 +709,14 @@ const TOOLS: Tool[] = [
       },
     },
   },
+  {
+    name: 'nexus_fleet_overview',
+    description:
+      'Get cross-project priority matrix: ranks ALL open tasks across ALL projects by ' +
+      'priority × age × project_staleness. Returns top 15 most urgent items. ' +
+      'Use when deciding what to work on when multiple projects compete for attention.',
+    inputSchema: { type: 'object', properties: {} },
+  },
 ];
 
 // ── Tool handlers ────────────────────────────────────────
@@ -808,6 +823,8 @@ async function handleTool(name: string, args: any): Promise<string> {
       if (args.rationale) body.context = args.rationale;
       if (args.project) body.project = args.project;
       if (args.tags) body.tags = args.tags;
+      if (args.lifecycle) body.lifecycle = args.lifecycle;
+      if (args.confidence != null) body.confidence = args.confidence;
       const result = await nexusFetch(`/api/ledger/${Number(args.id)}`, {
         method: 'PATCH',
         body: JSON.stringify(body),
@@ -903,6 +920,7 @@ async function handleTool(name: string, args: any): Promise<string> {
       };
       if (args.description) body.description = args.description;
       if (args.priority != null) body.priority = Number(args.priority);
+      if (args.decision_ids) body.decision_ids = args.decision_ids;
       const result = await nexusFetch('/api/tasks', {
         method: 'POST',
         body: JSON.stringify(body),
@@ -1178,6 +1196,26 @@ async function handleTool(name: string, args: any): Promise<string> {
       }
 
       return results.join('\n');
+    }
+
+    case 'nexus_fleet_overview': {
+      const data = await nexusFetch('/api/fleet');
+      const lines: string[] = ['◈ Fleet Overview — Cross-Project Priority Matrix', ''];
+      if (data.topTasks?.length) {
+        for (const t of data.topTasks) {
+          const prio = t.priority === 2 ? '!!' : t.priority === 1 ? '! ' : '  ';
+          lines.push(`  ${prio}#${t.id} [${t.status}] ${t.title.slice(0, 80)}  (score: ${t.score}, ${t.ageDays}d old)`);
+        }
+      } else {
+        lines.push('  No open tasks across any project.');
+      }
+      if (Object.keys(data.staleness || {}).length) {
+        lines.push('', 'Project staleness (days since last session):');
+        for (const [proj, days] of Object.entries(data.staleness as Record<string, number>).sort((a, b) => (b[1] as number) - (a[1] as number))) {
+          lines.push(`  ${proj}: ${days}d`);
+        }
+      }
+      return lines.join('\n');
     }
 
     default:

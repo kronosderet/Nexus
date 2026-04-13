@@ -151,16 +151,17 @@ export class NexusStore {
   // ── Typed accessors for Ledger / Graph / Timing ────────
   // These replace (store as any).data.* casts in route files.
   getAllDecisions(): Decision[] { return this.data.ledger || []; }
-  getActiveDecisions(): Decision[] { return (this.data.ledger || []).filter(d => !d.deprecated); }
+  getActiveDecisions(): Decision[] { return (this.data.ledger || []).filter(d => !d.deprecated && d.lifecycle !== 'deprecated'); }
   getDecisionById(id: number): Decision | null { return (this.data.ledger || []).find(d => d.id === id) || null; }
   deprecateDecision(id: number): Decision | null {
     const d = this.getDecisionById(id);
     if (!d) return null;
     d.deprecated = true;
+    d.lifecycle = 'deprecated';
     this._flush();
     return d;
   }
-  updateDecision(id: number, updates: Partial<Pick<Decision, 'decision' | 'context' | 'alternatives' | 'tags' | 'project'>>): Decision | null {
+  updateDecision(id: number, updates: Partial<Pick<Decision, 'decision' | 'context' | 'alternatives' | 'tags' | 'project' | 'lifecycle' | 'confidence' | 'last_reviewed_at'>>): Decision | null {
     const d = this.getDecisionById(id);
     if (!d) return null;
     if (updates.decision != null) d.decision = updates.decision;
@@ -168,6 +169,9 @@ export class NexusStore {
     if (updates.alternatives != null) d.alternatives = updates.alternatives;
     if (updates.tags != null) d.tags = updates.tags;
     if (updates.project != null) d.project = updates.project;
+    if (updates.lifecycle != null) { d.lifecycle = updates.lifecycle; d.deprecated = updates.lifecycle === 'deprecated'; }
+    if (updates.confidence != null) d.confidence = updates.confidence;
+    if (updates.last_reviewed_at != null) d.last_reviewed_at = updates.last_reviewed_at;
     this._flush();
     return d;
   }
@@ -182,13 +186,14 @@ export class NexusStore {
     return [...this.data.tasks].sort((a, b) => a.sort_order - b.sort_order);
   }
 
-  createTask({ title, description = '', status = 'backlog', priority = 0 }: {
-    title: string; description?: string; status?: Task['status']; priority?: number;
+  createTask({ title, description = '', status = 'backlog', priority = 0, decision_ids }: {
+    title: string; description?: string; status?: Task['status']; priority?: number; decision_ids?: number[];
   }): Task {
     const maxOrder = this.data.tasks.reduce((max, t) => t.status === status && t.sort_order > max ? t.sort_order : max, 0);
     const task: Task = {
       id: this._id('tasks'), title, description, status, priority,
       sort_order: maxOrder + 1, linked_files: '[]',
+      ...(decision_ids?.length ? { decision_ids } : {}),
       created_at: this._now(), updated_at: this._now(),
     };
     this.data.tasks.push(task);
@@ -369,13 +374,15 @@ export class NexusStore {
     return this.data.sessions.find(s => s.id === id) || null;
   }
 
-  createSession({ project, summary, decisions = [], blockers = [], files_touched = [], tags = [] }: {
+  createSession({ project, summary, decisions = [], blockers = [], files_touched = [], tags = [], completed_task_ids }: {
     project: string; summary: string; decisions?: string[]; blockers?: string[];
-    files_touched?: string[]; tags?: string[];
+    files_touched?: string[]; tags?: string[]; completed_task_ids?: number[];
   }): Session {
     const session: Session = {
       id: this._id('sessions'), project, summary, decisions, blockers,
-      files_touched, tags, created_at: this._now(),
+      files_touched, tags,
+      ...(completed_task_ids?.length ? { completed_task_ids } : {}),
+      created_at: this._now(),
     };
     this.data.sessions.push(session);
     this._flush();
@@ -386,6 +393,59 @@ export class NexusStore {
     const sessions = this.getSessions({ project, limit });
     const tasks = this.data.tasks.filter(t => t.status !== 'done' && t.title.toLowerCase().includes(project.toLowerCase()));
     return { sessions, activeTasks: tasks };
+  }
+
+  /** Record that a task was completed during the most recent session today. */
+  recordTaskCompletion(taskId: number): void {
+    const today = new Date().toISOString().slice(0, 10);
+    const session = [...this.data.sessions]
+      .filter(s => s.created_at.startsWith(today))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+    if (!session) return;
+    if (!session.completed_task_ids) session.completed_task_ids = [];
+    if (!session.completed_task_ids.includes(taskId)) {
+      session.completed_task_ids.push(taskId);
+      this._flush();
+    }
+  }
+
+  /** Link an advice entry to a decision it led to. */
+  linkAdviceToDecision(adviceId: number, decisionId: number): any {
+    const idx = (this.data.advice || []).findIndex(a => a.id === adviceId);
+    if (idx === -1) return null;
+    (this.data.advice[idx] as any).decision_id = decisionId;
+    this._flush();
+    return this.data.advice[idx];
+  }
+
+  /** Cross-project priority matrix: rank all open tasks by urgency. */
+  getFleetOverview(): { topTasks: Array<Task & { score: number; ageDays: number }>; staleness: Record<string, number> } {
+    const tasks = this.data.tasks.filter(t => t.status !== 'done');
+    const now = Date.now();
+    // Project staleness: days since last session
+    const staleness: Record<string, number> = {};
+    const projects = new Set<string>();
+    for (const s of this.data.sessions) projects.add(s.project.toLowerCase());
+    for (const proj of projects) {
+      const latest = this.data.sessions
+        .filter(s => s.project.toLowerCase() === proj)
+        .reduce((best, s) => {
+          const t = Date.parse(s.created_at);
+          return t > best ? t : best;
+        }, 0);
+      staleness[proj] = latest ? Math.floor((now - latest) / 86400000) : 999;
+    }
+    // Score tasks
+    const scored = tasks.map(t => {
+      const ageDays = Math.floor((now - Date.parse(t.created_at)) / 86400000);
+      const ageFactor = Math.min(3, 1 + ageDays / 7);
+      const proj = (t.title.match(/\[(\w+)\]/)?.[1] || 'general').toLowerCase();
+      const staleFactor = Math.min(2, 1 + (staleness[proj] || 0) / 14);
+      const score = Math.round((t.priority + 1) * ageFactor * staleFactor * 100) / 100;
+      return { ...t, score, ageDays };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    return { topTasks: scored.slice(0, 15), staleness };
   }
 
   // ── Ledger ─────────────────────────────────────────────
@@ -403,6 +463,7 @@ export class NexusStore {
     const entry: Decision = {
       id: this._nextLedgerId++,
       decision, context, project, alternatives, tags, created_at: this._now(),
+      lifecycle: 'active',
     };
     this.data.ledger.push(entry);
     // Auto-link: find related decisions by keyword overlap
@@ -529,7 +590,7 @@ export class NexusStore {
 
   getGraph(): GraphData {
     return {
-      nodes: this.data.ledger.map(d => ({ id: d.id, label: d.decision.slice(0, 50), project: d.project, tags: d.tags || [] })),
+      nodes: this.data.ledger.map(d => ({ id: d.id, label: d.decision.slice(0, 50), project: d.project, tags: d.tags || [], lifecycle: d.lifecycle })),
       edges: this.data.graph_edges.map(e => ({ id: e.id, from: e.from, to: e.to, rel: e.rel, note: e.note })),
     };
   }

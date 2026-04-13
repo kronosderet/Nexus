@@ -27,6 +27,7 @@ export function createTaskRoutes(store: NexusStore, broadcast: BroadcastFn) {
 
     const { task, old, resolvedThoughts } = result;
     if (old.status !== task.status && task.status === 'done') {
+      store.recordTaskCompletion(task.id);
       const entry = store.addActivity('task_done', `Landmark reached -- "${task.title}"${resolvedThoughts ? ` (auto-resolved ${resolvedThoughts} thought${resolvedThoughts > 1 ? 's' : ''})` : ''}`);
       broadcast({ type: 'activity', payload: entry });
     } else if (old.status !== task.status) {

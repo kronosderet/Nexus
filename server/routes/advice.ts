@@ -50,5 +50,15 @@ export function createAdviceRoutes(store: NexusStore) {
     res.json(updated);
   });
 
+  // Link advice to a decision it led to
+  router.patch('/:id/link-decision', (req: Request, res: Response) => {
+    const id = parseInt(String(req.params.id));
+    const { decision_id } = req.body;
+    if (!decision_id) return res.status(400).json({ error: 'decision_id required.' });
+    const updated = store.linkAdviceToDecision(id, decision_id);
+    if (!updated) return res.status(404).json({ error: 'Advice not found.' });
+    res.json(updated);
+  });
+
   return router;
 }

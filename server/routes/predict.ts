@@ -149,8 +149,8 @@ async function detectGaps(store: NexusStore): Promise<{ suggestions: GapSuggesti
   const topCentral = sortedByCentrality.slice(0, Math.max(3, Math.floor(ledger.length * 0.1)));
 
   for (const d of topCentral) {
-    // Skip deprecated decisions — no point suggesting tests for deleted features
-    if (d.deprecated) continue;
+    // Skip deprecated or validated decisions — no point suggesting tests for deleted/verified features
+    if (d.deprecated || d.lifecycle === 'deprecated' || d.lifecycle === 'validated') continue;
     // Check if any test task references significant words from this decision
     const decWords = d.decision.toLowerCase().split(/\s+/).filter(w => w.length > 4);
     const hasTestTask = tasks.some(t => {

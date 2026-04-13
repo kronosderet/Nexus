@@ -66,15 +66,16 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
   }
   if (pathname === '/api/tasks' && method === 'POST') {
     if (!body.title?.trim()) throw new Error('400: Task title required.');
-    const task = store.createTask({ title: body.title.trim(), description: body.description, status: body.status, priority: body.priority });
+    const task = store.createTask({ title: body.title.trim(), description: body.description, status: body.status, priority: body.priority, decision_ids: body.decision_ids });
     store.addActivity('task_created', `Plotted -- "${body.title}"`);
     return task;
   }
   if (pathname.match(/^\/api\/tasks\/\d+$/) && method === 'PATCH') {
     const id = parseInt(pathname.split('/').pop()!);
-    const task = store.updateTask(id, body);
-    if (!task) throw new Error('404: Task not found.');
-    return task;
+    const result = store.updateTask(id, body);
+    if (!result) throw new Error('404: Task not found.');
+    if (body.status === 'done') store.recordTaskCompletion(id);
+    return { ...result.task, resolvedThoughts: result.resolvedThoughts || 0 };
   }
   if (pathname.match(/^\/api\/tasks\/\d+$/) && method === 'DELETE') {
     const id = parseInt(pathname.split('/').pop()!);
@@ -124,6 +125,9 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
     if (body.context !== undefined) updates.context = body.context;
     if (body.project !== undefined) updates.project = body.project;
     if (body.tags !== undefined) updates.tags = body.tags;
+    if (body.lifecycle !== undefined) updates.lifecycle = body.lifecycle;
+    if (body.confidence !== undefined) updates.confidence = body.confidence;
+    if (body.last_reviewed_at !== undefined) updates.last_reviewed_at = body.last_reviewed_at;
     if (body.deprecated !== undefined) {
       const d = store.getDecisionById(id);
       if (d) { d.deprecated = !!body.deprecated; store._flush(); }
@@ -257,6 +261,18 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
       return { id: d.id, decision: d.decision, project: d.project, total };
     }).sort((a, b) => b.total - a.total);
     return { centrality: centrality.slice(0, 20), averageConnections: centrality.length ? Math.round(centrality.reduce((s, c) => s + c.total, 0) / centrality.length * 10) / 10 : 0 };
+  }
+
+  // ── Fleet Overview ────────────────────────────────
+  if (pathname === '/api/fleet') return store.getFleetOverview();
+
+  // ── Advice ───────────────────────────────────────
+  if (pathname.match(/^\/api\/advice\/\d+\/link-decision$/) && method === 'PATCH') {
+    const id = parseInt(pathname.split('/')[3]);
+    if (!body.decision_id) throw new Error('400: decision_id required.');
+    const result = store.linkAdviceToDecision(id, body.decision_id);
+    if (!result) throw new Error('404: Advice not found.');
+    return result;
   }
 
   // ── Init / Status ─────────────────────────────────

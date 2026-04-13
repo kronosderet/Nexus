@@ -33,7 +33,7 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
   // Deprecate a decision
   router.patch('/:id', (req: Request, res: Response) => {
     const id = Number(req.params.id);
-    const { deprecated, decision: text, context, alternatives, tags, project } = req.body;
+    const { deprecated, decision: text, context, alternatives, tags, project, lifecycle, confidence, last_reviewed_at } = req.body;
     const existing = store.getDecisionById(id);
     if (!existing) return res.status(404).json({ error: 'Decision not found.' });
     if (deprecated !== undefined) { existing.deprecated = !!deprecated; store._flush(); }
@@ -43,6 +43,9 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
     if (alternatives !== undefined) updates.alternatives = alternatives;
     if (tags !== undefined) updates.tags = tags;
     if (project !== undefined) updates.project = project;
+    if (lifecycle !== undefined) updates.lifecycle = lifecycle;
+    if (confidence !== undefined) updates.confidence = confidence;
+    if (last_reviewed_at !== undefined) updates.last_reviewed_at = last_reviewed_at;
     if (Object.keys(updates).length > 0) store.updateDecision(id, updates);
     broadcast({ type: 'decision_update', payload: store.getDecisionById(id) });
     res.json(store.getDecisionById(id));
