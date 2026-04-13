@@ -69,10 +69,10 @@ export default function WelcomeScreen({ connected, onReady }) {
         N E X U S
       </h1>
       <p className="text-[10px] font-mono text-nexus-text-faint tracking-[0.25em] mb-2">
-        THE CARTOGRAPHER — v4.1
+        THE CARTOGRAPHER — v4.2
       </p>
       <p className="text-[9px] font-mono text-nexus-text-faint mb-8">
-        7 modules · 20 MCP tools · knowledge graph · local AI overseer
+        7 modules · 22 MCP tools · knowledge graph · local AI overseer
       </p>
 
       <div className="w-72 space-y-1.5">

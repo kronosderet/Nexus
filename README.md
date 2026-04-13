@@ -48,17 +48,17 @@ Nexus solves the biggest problem with AI-assisted development: **Claude forgets 
 - **Self-Critique** — identifies slow tasks, stuck items, completion patterns
 - **Local AI Overseer** (optional) — strategic analysis via LM Studio with up to 200k context
 
-## 20 Native MCP Tools
+## 22 Native MCP Tools
 
 After installing, Claude Code can call these directly — no shell-outs, no CLI:
 
 **Read:** `nexus_brief`, `nexus_get_plan`, `nexus_check_guard`, `nexus_search`, `nexus_get_critique`, `nexus_predict_gaps`, `nexus_get_blast_radius`, `nexus_ask_overseer`
 
-**Write:** `nexus_create_task`, `nexus_complete_task`, `nexus_log_activity`, `nexus_log_session`, `nexus_log_usage`, `nexus_record_decision`, `nexus_link_decisions`, `nexus_push_thought`, `nexus_pop_thought`
+**Write:** `nexus_create_task`, `nexus_complete_task`, `nexus_log_activity`, `nexus_log_session`, `nexus_log_usage`, `nexus_record_decision`, `nexus_update_decision`, `nexus_link_decisions`, `nexus_push_thought`, `nexus_pop_thought`
 
 **Async AI:** `nexus_ask_overseer_start`, `nexus_get_overseer_result`
 
-**Composite:** `nexus_bridge_session`
+**Composite:** `nexus_bridge_session`, `nexus_fleet_overview`
 
 ## Dashboard (Optional)
 
@@ -109,7 +109,7 @@ Without LM Studio, all 20 non-AI tools work normally.
 | Client | React 19 + Vite + Tailwind CSS 4 |
 | Store | JSON file at `~/.nexus/nexus.json` (with 3-gen backup rotation) |
 | AI | LM Studio / Ollama (optional, auto-detected) |
-| MCP | 20 tools via @modelcontextprotocol/sdk, stdio transport |
+| MCP | 22 tools via @modelcontextprotocol/sdk, stdio transport |
 | Tests | 153 Vitest tests (store + route-level integration) |
 | CLI | 46 commands, ESM, zero external deps |
 
