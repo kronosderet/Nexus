@@ -8,6 +8,7 @@ export interface Task {
   priority: number;
   sort_order: number;
   linked_files: string;
+  decision_ids?: number[];    // v4.2: links to decisions this task implements
   created_at: string;
   updated_at: string;
 }
@@ -28,6 +29,7 @@ export interface Session {
   blockers: string[];
   files_touched: string[];
   tags: string[];
+  completed_task_ids?: number[];  // v4.2: tasks completed during this session
   created_at: string;
 }
 
@@ -65,6 +67,9 @@ export interface Decision {
   tags: string[];
   created_at: string;
   deprecated?: boolean;
+  lifecycle?: 'proposed' | 'active' | 'validated' | 'deprecated';  // v4.2
+  confidence?: number;        // v4.2: 0-1 scale
+  last_reviewed_at?: string;  // v4.2: ISO timestamp
 }
 
 export interface GraphEdge {
@@ -120,6 +125,7 @@ export interface AdviceEntry {
   outcome: 'worked' | 'partial' | 'wrong' | null;
   notes: string;                  // why, or what happened
   measured_fuel_cost: number | null; // actual session% burned after accepting
+  decision_id?: number;              // v4.2: linked decision (if advice led to one)
 }
 
 // ── Store data shape ───────────────────────────────────
@@ -142,7 +148,7 @@ export interface NexusData {
 // ── API response types ─────────────────────────────────
 
 export interface GraphData {
-  nodes: { id: number; label: string; project: string; tags: string[] }[];
+  nodes: { id: number; label: string; project: string; tags: string[]; lifecycle?: string }[];
   edges: { id: number; from: number; to: number; rel: string; note: string }[];
 }
 
