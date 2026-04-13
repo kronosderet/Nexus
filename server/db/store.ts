@@ -337,10 +337,15 @@ export class NexusStore {
   }
 
   // ── Usage ──────────────────────────────────────────────
-  logUsage({ session_percent, weekly_percent, note = '' }: {
-    session_percent: number | null; weekly_percent: number | null; note?: string;
+  logUsage({ session_percent, weekly_percent, sonnet_weekly_percent, extra_usage, note = '' }: {
+    session_percent: number | null; weekly_percent: number | null;
+    sonnet_weekly_percent?: number | null; extra_usage?: boolean; note?: string;
   }): UsageEntry {
-    const entry: UsageEntry = { session_percent, weekly_percent, note, created_at: this._now() };
+    const entry: UsageEntry = {
+      session_percent, weekly_percent, note, created_at: this._now(),
+      ...(sonnet_weekly_percent != null ? { sonnet_weekly_percent } : {}),
+      ...(extra_usage != null ? { extra_usage } : {}),
+    };
     this.data.usage.push(entry);
     const cutoff = Date.now() - 30 * 86400000;
     this.data.usage = this.data.usage.filter(u => new Date(u.created_at).getTime() > cutoff);

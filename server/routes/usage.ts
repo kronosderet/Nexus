@@ -133,7 +133,7 @@ export function createUsageRoutes(store: NexusStore, broadcast: BroadcastFn) {
 
   // Log a usage data point
   router.post('/', (req: Request, res: Response) => {
-    const { session_percent, weekly_percent, note, reset_in_minutes, plan, timezone } = req.body;
+    const { session_percent, weekly_percent, sonnet_weekly_percent, extra_usage, note, reset_in_minutes, plan, timezone } = req.body;
 
     if (session_percent == null && weekly_percent == null) {
       return res.status(400).json({ error: 'Provide session_percent and/or weekly_percent.' });
@@ -162,6 +162,8 @@ export function createUsageRoutes(store: NexusStore, broadcast: BroadcastFn) {
     const entry = store.logUsage({
       session_percent: parsedSession,
       weekly_percent: parsedWeekly,
+      sonnet_weekly_percent: sonnet_weekly_percent != null ? Number(sonnet_weekly_percent) : undefined,
+      extra_usage: extra_usage != null ? !!extra_usage : undefined,
       note,
     });
 

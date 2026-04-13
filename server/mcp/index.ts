@@ -408,7 +408,15 @@ const TOOLS: Tool[] = [
         },
         weekly_percent: {
           type: 'number',
-          description: 'Weekly fuel REMAINING (0-100). If the user says "94% used", pass 6.',
+          description: 'Weekly fuel REMAINING (0-100) for "All models" limit. If the user says "42% used", pass 58.',
+        },
+        sonnet_weekly_percent: {
+          type: 'number',
+          description: 'Optional: "Sonnet only" weekly fuel REMAINING (0-100). Separate from All models limit.',
+        },
+        extra_usage: {
+          type: 'boolean',
+          description: 'Optional: true if user is on pay-per-use overflow (session limit hit but still working).',
         },
         reset_in_minutes: {
           type: 'number',
@@ -884,6 +892,8 @@ async function handleTool(name: string, args: any): Promise<string> {
       const body: any = {};
       if (args.session_percent != null) body.session_percent = Number(args.session_percent);
       if (args.weekly_percent != null) body.weekly_percent = Number(args.weekly_percent);
+      if (args.sonnet_weekly_percent != null) body.sonnet_weekly_percent = Number(args.sonnet_weekly_percent);
+      if (args.extra_usage != null) body.extra_usage = !!args.extra_usage;
       if (args.reset_in_minutes != null) body.reset_in_minutes = Number(args.reset_in_minutes);
       if (args.note) body.note = String(args.note);
       if (args.plan) body.plan = args.plan;
