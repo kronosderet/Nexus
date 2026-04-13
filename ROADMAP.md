@@ -47,17 +47,23 @@
 - 3 lifecycle hooks (SessionStart, Stop, UserPromptSubmit)
 - Command module: project filter, priority badges, search, plan caching, expand/collapse, per-task difficulty estimation
 - Published as Claude Code marketplace plugin
+- Submitted to all 3 Anthropic plugin directories
+
+### v4.1.1 — The Hardening
+- Overseer self-audit: 18 findings (5 critical, 8 important, 5 polish) — all fixed
+- store.ts: _flush crash rollback, semantic auto-link mutex, cached ID counters
+- MCP: nexusFetch retry with 500ms backoff, nexus_brief per-call 10s timeout
+- predict.ts: async filesystem ops, improved unvalidated decision matching
+- embeddings.ts: SHA-256 cache keys (no collision), 2s debounce (less crash-window loss)
+- Dashboard live sync: fs.watch + store.reload() + WebSocket broadcast bridges MCP→browser
+- Frontend audit: 7 route signature fixes, in-progress filter bug, Graph divide-by-zero, Fuel null safety, Terminal stable keys, Overseer error display
+- Code-audit batch mode (split 15 files into 2 halves for smaller context windows)
+- Overseer GUI: dynamic model + GPU info (auto-detected from LM Studio)
+- impact.ts: auto-detect model from /v1/models instead of hardcoded
 
 ## Current — v4.2
 
-### Phase 4: Official Directory Submission
-- Add tool annotations (readOnlyHint/destructiveHint) on all 20 MCP tools
-- Create 512×512 icon
-- Submit to Anthropic MCPB Directory + Claude Code Plugin Directory
-- Meet review requirements: 3+ examples, privacy policy, cross-platform
-
 ### Dashboard Polish
-- Remaining modules need audit (Fuel, Graph, Overseer, Dashboard, Terminal)
 - Shared React state (modules fetch independently, should share)
 - Log module: debounced session search
 
