@@ -49,6 +49,7 @@ export default function FuelModule({ ws }) {
   const [workload, setWorkload] = useState(null);
   const [history, setHistory] = useState(null);
   const [timing, setTiming] = useState(null);
+  const [showAllSessions, setShowAllSessions] = useState(false);
 
   async function fetchAll() {
     try {
@@ -214,31 +215,45 @@ export default function FuelModule({ ws }) {
         </div>
       )}
 
-      {/* Recent Sessions (only if we have clean data) */}
-      {history?.sessionStats?.length > 0 && (
+      {/* Session History (newest first, expandable) */}
+      {history?.sessionStats?.length > 0 && (() => {
+        const stats = [...history.sessionStats]; // already newest first from server
+        const visible = showAllSessions ? stats : stats.slice(0, 5);
+        const hasMore = stats.length > 5;
+        return (
         <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-3">
             <History size={14} className="text-nexus-amber" />
-            <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Recent Sessions</span>
+            <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Session History</span>
+            <span className="text-[9px] font-mono text-nexus-text-faint ml-auto">{stats.length} sessions</span>
           </div>
           <div className="space-y-2">
-            {history.sessionStats.slice(0, 5).map((s, i) => (
+            {visible.map((s, i) => (
               <div key={i} className="flex items-center gap-3 text-xs font-mono">
                 <span className="text-nexus-text-faint w-20 shrink-0">{s.date}</span>
                 <Bar percent={s.burned} className="flex-1" />
                 <span className={`w-10 text-right tabular-nums ${s.burned > 75 ? 'text-nexus-amber' : 'text-nexus-text-dim'}`}>{s.burned}%</span>
                 <span className="text-nexus-text-faint w-12 text-right">{s.duration}h</span>
-                <span className="text-[10px] text-nexus-text-faint w-14 text-right">{s.reports} reads</span>
+                <span className="text-[10px] text-nexus-text-faint w-14 text-right">{s.reports} pts</span>
               </div>
             ))}
           </div>
+          {hasMore && (
+            <button
+              onClick={() => setShowAllSessions(prev => !prev)}
+              className="text-[10px] font-mono text-nexus-amber hover:text-nexus-text mt-2 transition-colors"
+            >
+              {showAllSessions ? 'Show less' : `Show all ${stats.length} sessions`}
+            </button>
+          )}
           {history.sessionsDetected > 1 && (
             <p className="text-[10px] font-mono text-nexus-text-faint mt-2">
-              Avg: {history.averageSessionDuration}h per session across {history.sessionsDetected} sessions
+              Avg: {history.averageSessionDuration}h per session · {history.averageBurnRate}% avg burn
             </p>
           )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
