@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { execSync } from 'child_process';
-import { readdirSync, statSync } from 'fs';
+import { readdirSync, statSync, existsSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
 import type { NexusStore } from '../db/store.ts';
@@ -121,25 +121,34 @@ function getSystemInfo() {
   };
 }
 
+// Extra project directories outside PROJECTS_DIR (e.g. NAS-mounted projects)
+const EXTRA_PROJECTS: Array<{ name: string; path: string }> = [
+  { name: 'family-coop', path: 'M:/family coop' },
+];
+
 function scanProjects() {
   const projectsDir = PROJECTS_DIR;
+  const results: Array<{ name: string; path: string; hasGit: boolean }> = [];
   try {
-    return readdirSync(projectsDir)
-      .filter(name => {
-        try {
-          return statSync(join(projectsDir, name)).isDirectory() && !name.startsWith('.');
-        } catch { return false; }
-      })
-      .map(name => {
+    for (const name of readdirSync(projectsDir)) {
+      try {
+        if (!statSync(join(projectsDir, name)).isDirectory() || name.startsWith('.')) continue;
         const fullPath = join(projectsDir, name);
-        const hasGit = (() => {
-          try { statSync(join(fullPath, '.git')); return true; } catch { return false; }
-        })();
-        return { name, path: fullPath, hasGit };
-      });
-  } catch {
-    return [];
+        const hasGit = (() => { try { statSync(join(fullPath, '.git')); return true; } catch { return false; } })();
+        results.push({ name, path: fullPath, hasGit });
+      } catch {}
+    }
+  } catch {}
+  // Add extra project paths
+  for (const ep of EXTRA_PROJECTS) {
+    try {
+      if (existsSync(ep.path) && !results.some(r => r.name === ep.name)) {
+        const hasGit = (() => { try { statSync(join(ep.path, '.git')); return true; } catch { return false; } })();
+        results.push({ name: ep.name, path: ep.path, hasGit });
+      }
+    } catch {}
   }
+  return results;
 }
 
 function getGpuInfo() {

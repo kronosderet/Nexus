@@ -779,8 +779,9 @@ Ritual:  nexus_bridge_session (end-of-work: auto-summary + handoff)
     try {
       const tasks = await api('/tasks');
       const active = tasks.filter(t => t.status !== 'done');
-      const projTasks = active.filter(t => t.title.toLowerCase().includes(p));
-      const display = projTasks.length > 0 ? projTasks : active;
+      const projTasks = active.filter(t => (t.project && t.project.toLowerCase() === p) || (!t.project && t.title.toLowerCase().includes(p)));
+      const unassigned = active.filter(t => !t.project);
+      const display = projTasks.length > 0 ? projTasks : (unassigned.length > 0 ? unassigned : active);
       if (display.length > 0) {
         console.log(`  ${amber('Active tasks')}${projTasks.length > 0 ? ` (${project})` : ' (all)'}:`);
         for (const t of display.slice(0, 8)) console.log(formatTask(t));
