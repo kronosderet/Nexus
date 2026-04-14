@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
 import type { UsageEntry, Task } from '../types.ts';
+import { getFuelConfig, groupBySessionWindow } from '../lib/fuelConfig.ts';
 
 /**
  * Smart Fuel Intelligence
@@ -41,37 +42,20 @@ export function createFuelIntelRoutes(store: NexusStore) {
 }
 
 // ── Session boundary detection ──────────────────────────
-// Detect session starts from fuel jumps (>20% increase = new session)
-function detectSessions(usage: UsageEntry[]): SessionWindow[] {
+// Uses the known 5h fixed window grid — no heuristic fuel-jump detection
+function detectSessions(usage: UsageEntry[], store?: any): SessionWindow[] {
   if (usage.length < 2) return [];
 
-  const sorted = [...usage].sort((a, b) =>
-    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
+  // Use real window boundaries from FuelConfig
+  const config = store ? getFuelConfig(store) : { plan: 'pro' as const, timezone: 'Europe/Prague', sessionWindowHours: 5, weeklyResetDay: 4, weeklyResetHour: 21 };
+  const windows = groupBySessionWindow(usage, config);
 
   const sessions: SessionWindow[] = [];
-  let currentSession: UsageEntry[] = [sorted[0]];
-
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = sorted[i - 1];
-    const curr = sorted[i];
-    const sessionJump = (curr.session_percent ?? 0) - (prev.session_percent ?? 0);
-    const timeDiff = (new Date(curr.created_at).getTime() - new Date(prev.created_at).getTime()) / 3600000;
-
-    // New session: fuel jumped >20% AND gap >30min (avoids false positive from manual correction), OR gap >6h
-    if ((sessionJump > 20 && timeDiff > 0.5) || timeDiff > 6) {
-      if (currentSession.length >= 2) {
-        sessions.push(analyzeSessionWindow(currentSession));
-      }
-      currentSession = [curr];
-    } else {
-      currentSession.push(curr);
+  for (const w of windows) {
+    if (w.entries.length >= 2) {
+      sessions.push(analyzeSessionWindow(w.entries));
     }
   }
-  if (currentSession.length >= 2) {
-    sessions.push(analyzeSessionWindow(currentSession));
-  }
-
   return sessions;
 }
 
@@ -119,7 +103,7 @@ function analyzeSessionWindow(points: UsageEntry[]): SessionWindow {
 function learnTaskCosts(store: NexusStore) {
   const usage = store.getUsage(200);
   const tasks = store.getAllTasks();
-  const sessions = detectSessions(usage);
+  const sessions = detectSessions(usage, store);
 
   // Find tasks completed during each session window
   const taskCosts: { title: string; estimatedCost: number; session: string }[] = [];
@@ -184,7 +168,7 @@ function categorizeTask(title: string): string {
 // ── Session patterns ────────────────────────────────────
 function analyzeSessionPatterns(store: NexusStore) {
   const usage = store.getUsage(500);
-  const sessions = detectSessions(usage);
+  const sessions = detectSessions(usage, store);
 
   if (sessions.length < 2) {
     return { insufficient: true, message: 'Need more session data for pattern analysis.' };
@@ -256,7 +240,7 @@ function analyzeSessionPatterns(store: NexusStore) {
 // ── Weekly optimization ─────────────────────────────────
 function buildWeeklyPlan(store: NexusStore) {
   const usage = store.getUsage(500);
-  const sessions = detectSessions(usage);
+  const sessions = detectSessions(usage, store);
   const latestUsage = store.getLatestUsage();
   const weeklyRemaining = latestUsage?.weekly_percent ?? 100;
 

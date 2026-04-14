@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
+import { getFuelConfig, groupBySessionWindow } from '../lib/fuelConfig.ts';
 
 /**
  * Smart Fuel Estimator
@@ -333,56 +334,41 @@ function buildHistoricalStats(store: NexusStore) {
   const raw = store.getUsage(200);
   if (raw.length < 2) return { insufficient: true };
 
-  // Sort chronologically (oldest → newest)
-  const history = [...raw].sort(
-    (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
+  // Group by real 5h window boundaries (not fuel-jump heuristic)
+  const config = getFuelConfig(store);
+  const windows = groupBySessionWindow(raw, config);
 
-  // Group into sessions by detecting resets (fuel jumps UP > 20%)
-  const sessions: Array<{ reports: any[] }> = [];
-  let current: { reports: any[] } = { reports: [history[0]] };
-
-  for (let i = 1; i < history.length; i++) {
-    const prev = history[i - 1];
-    const curr = history[i];
-
-    const prevS = prev.session_percent ?? 0;
-    const currS = curr.session_percent ?? 0;
-
-    // Session reset: fuel increases significantly (e.g., 20% → 100%)
-    if (currS > prevS + 20) {
-      sessions.push(current);
-      current = { reports: [curr] };
-    } else {
-      current.reports.push(curr);
-    }
-  }
-  sessions.push(current);
-
-  // Per-session stats: first report = session start (highest fuel), last = session end (lowest)
-  const sessionStats = sessions
-    .filter(s => s.reports.length >= 3) // need 3+ data points for meaningful session stats
-    .map(s => {
-      const start = s.reports[0];
-      const end = s.reports[s.reports.length - 1];
-      const durationMs = new Date(end.created_at).getTime() - new Date(start.created_at).getTime();
+  // Per-window stats: highest fuel = session start, lowest = session end
+  const sessionStats = windows
+    .filter(w => w.entries.length >= 2)
+    .map(w => {
+      const entries = w.entries;
+      const first = entries[0];
+      const last = entries[entries.length - 1];
+      const durationMs = new Date(last.created_at).getTime() - new Date(first.created_at).getTime();
       const durationH = durationMs / 3600000;
 
-      const startFuel = start.session_percent ?? 100;
-      const endFuel = end.session_percent ?? 0;
-      const burned = Math.max(0, startFuel - endFuel);
-      // Cap rate at 20%/h (max possible: 100%/5h = 20%/h)
-      const rate = durationH > 0.1 ? Math.min(20, Math.round((burned / durationH) * 10) / 10) : 0;
+      // Find highest and lowest session_percent in this window
+      const maxFuel = Math.max(...entries.map((e: any) => e.session_percent ?? 0));
+      const minFuel = Math.min(...entries.map((e: any) => e.session_percent ?? 100));
+      const burned = Math.max(0, maxFuel - minFuel);
+
+      // Weekly burn: first weekly reading vs last in this window
+      const weeklyStart = first.weekly_percent ?? 0;
+      const weeklyEnd = last.weekly_percent ?? 0;
+      const weeklyBurned = Math.max(0, weeklyStart - weeklyEnd);
 
       return {
         duration: Math.round(durationH * 10) / 10,
         burned: Math.round(burned),
-        rate,
-        reports: s.reports.length,
-        date: new Date(start.created_at).toLocaleDateString(),
+        weeklyBurned: Math.round(weeklyBurned),
+        rate: durationH > 0.1 ? Math.round((burned / durationH) * 10) / 10 : 0,
+        reports: entries.length,
+        date: new Date(w.windowStart).toLocaleDateString(),
+        windowStart: w.windowStart,
       };
     })
-    .filter(s => s.duration > 0.1 && s.burned > 0 && s.rate <= 20) // skip nonsensical sessions
+    .filter(s => s.burned > 0) // skip empty windows
     .reverse(); // newest first for display
 
   const avgRate = sessionStats.length > 0
