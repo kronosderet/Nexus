@@ -10,6 +10,7 @@ import GraphModule from './modules/Graph.jsx';
 import Overseer from './modules/Overseer.jsx';
 import Log from './modules/Log.jsx';
 import TerminalModule from './modules/Terminal.jsx';
+import NexusProvider from './context/NexusProvider.jsx';
 import WelcomeScreen from './components/WelcomeScreen.jsx';
 import ToastOverlay from './components/ToastOverlay.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
@@ -92,9 +93,11 @@ export default function App() {
         onSearchClick={() => setSearchOpen(true)}
       />
       <main className="flex-1 overflow-auto p-4 md:p-6 pt-14 md:pt-6">
-        <ErrorBoundary resetKey={activeModule}>
-          <ActiveComponent ws={ws} />
-        </ErrorBoundary>
+        <NexusProvider ws={ws}>
+          <ErrorBoundary resetKey={activeModule}>
+            <ActiveComponent ws={ws} />
+          </ErrorBoundary>
+        </NexusProvider>
       </main>
       <SearchModal
         open={searchOpen}
