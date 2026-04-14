@@ -39,6 +39,7 @@ export function createPulseRoutes(store: NexusStore) {
     const activity = store ? store.getActivity(200) : [];
     const tasks = store ? store.getAllTasks() : [];
     const sessions = store ? store.getSessions({ limit: 100 }) : [];
+    const decisions = store ? store.getActiveDecisions() : [];
     const now = Date.now();
     const DAY = 86400000;
 
@@ -88,6 +89,7 @@ export function createPulseRoutes(store: NexusStore) {
         activity: { today: activityToday, week: activity7d, last: lastActivity },
         tasks: { open: openTasks, done: doneTasks },
         sessions: { count: projSessions.length, last: lastSession },
+        decisions: decisions.filter((d: any) => d.project.toLowerCase() === name).length,
         heat,
       };
     });

@@ -576,6 +576,11 @@ function TaskCard({ task, onUpdate, onDelete, onDragStart }) {
             <p className="text-sm text-nexus-text truncate">{task.title}</p>
           </div>
           {task.description && <p className="text-xs text-nexus-text-faint mt-1 line-clamp-2">{task.description}</p>}
+          {task.decision_ids?.length > 0 && (
+            <div className="flex gap-1 mt-1">{task.decision_ids.map(id => (
+              <span key={id} className="text-[8px] font-mono px-1 py-0.5 rounded bg-nexus-purple/10 text-nexus-purple border border-nexus-purple/20">D#{id}</span>
+            ))}</div>
+          )}
         </div>
         <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this task?')) onDelete(task.id); }}
           className="opacity-0 group-hover:opacity-100 p-1 text-nexus-text-faint hover:text-nexus-red transition-all"><Trash2 size={12} /></button>
