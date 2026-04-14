@@ -368,8 +368,7 @@ function buildHistoricalStats(store: NexusStore) {
         windowStart: w.windowStart,
       };
     })
-    .filter(s => s.burned > 0) // skip empty windows
-    .reverse(); // newest first for display
+    .filter(s => s.burned > 0); // skip empty windows (already newest-first from groupBySessionWindow)
 
   const avgRate = sessionStats.length > 0
     ? Math.round(sessionStats.reduce((s, x) => s + x.rate, 0) / sessionStats.length * 10) / 10
