@@ -8,6 +8,7 @@ export interface Task {
   priority: number;
   sort_order: number;
   linked_files: string;
+  project?: string;           // v4.2: project this task belongs to
   decision_ids?: number[];    // v4.2: links to decisions this task implements
   created_at: string;
   updated_at: string;

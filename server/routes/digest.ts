@@ -30,10 +30,11 @@ function buildDigest(store: NexusStore, range: string) {
   }
 
   // Count by project (extract [ProjectName] from messages)
+  const IGNORED_PROJECTS = new Set(['.claude', 'claude', 'Projects', 'unknown', '']);
   const projectCounts: Record<string, number> = {};
   for (const a of activity) {
     const match = a.message.match(/\[([^\]]+)\]/);
-    if (match) projectCounts[match[1]] = (projectCounts[match[1]] || 0) + 1;
+    if (match && !IGNORED_PROJECTS.has(match[1])) projectCounts[match[1]] = (projectCounts[match[1]] || 0) + 1;
   }
 
   // Sort projects by activity
