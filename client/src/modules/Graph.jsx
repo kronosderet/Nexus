@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { GitBranch, Target, AlertTriangle, BarChart3, Link2, RefreshCw, Search, ChevronRight, Network } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
 import { useNexusFleet } from '../context/useNexus.js';
@@ -375,10 +375,34 @@ function hashProjectColor(project) {
   return PROJECT_PALETTE[Math.abs(h) % PROJECT_PALETTE.length];
 }
 
+// Edge type visual styles
+const EDGE_STYLES = {
+  led_to:     { stroke: '#f59e0b', dash: 'none',   label: 'Led to' },
+  depends_on: { stroke: '#3b82f6', dash: '6,3',    label: 'Depends on' },
+  contradicts:{ stroke: '#ef4444', dash: '2,3',     label: 'Contradicts' },
+  replaced:   { stroke: '#6b7280', dash: '8,4',     label: 'Replaced' },
+  related:    { stroke: '#64748b', dash: '2,2',     label: 'Related' },
+};
+
 function VisualView({ graph }) {
-  const WIDTH = 600;
   const HEIGHT = 400;
   const [hoveredId, setHoveredId] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
+  const [hiddenProjects, setHiddenProjects] = useState(new Set());
+  const containerRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(600);
+
+  // Responsive width
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver(entries => {
+      for (const e of entries) setContainerWidth(Math.floor(e.contentRect.width));
+    });
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const WIDTH = containerWidth;
 
   // Memoized force-directed layout: runs once per graph (and on graph change)
   const layout = useMemo(() => {
@@ -523,31 +547,56 @@ function VisualView({ graph }) {
         <StatCard label="Components" value={components} sub={components === 1 ? 'Fully connected' : 'Disconnected clusters'} />
       </div>
 
-      <div className="bg-nexus-surface border border-nexus-border rounded-xl p-4">
-        <div className="relative" style={{ width: WIDTH, height: HEIGHT, maxWidth: '100%' }}>
+      {/* Project toggle chips */}
+      {(() => {
+        const projectSet = [...new Set(graph.nodes.map(n => n.project))].sort();
+        return (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {projectSet.map(p => {
+              const c = hashProjectColor(p);
+              const hidden = hiddenProjects.has(p);
+              return (
+                <button key={p} onClick={() => setHiddenProjects(prev => { const s = new Set(prev); s.has(p) ? s.delete(p) : s.add(p); return s; })}
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded-full border transition-all ${hidden ? 'opacity-30 border-nexus-border text-nexus-text-faint' : 'border-current'}`}
+                  style={{ color: hidden ? undefined : c.fill, borderColor: hidden ? undefined : c.fill + '40' }}>
+                  {p}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      <div className="bg-nexus-surface border border-nexus-border rounded-xl p-4 flex gap-4">
+        <div ref={containerRef} className="flex-1 min-w-0">
           <svg
             viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-            width={WIDTH}
+            width="100%"
             height={HEIGHT}
-            className="block max-w-full"
-            style={{ background: '#0a0e1a' }}
+            className="block"
+            style={{ background: '#0a0e1a', borderRadius: 8 }}
+            onClick={() => setSelectedId(null)}
           >
-            {/* Edges */}
+            {/* Edges with type-based styling */}
             {(graph.edges || []).map((e) => {
               const a = positions[e.from];
               const b = positions[e.to];
               if (!a || !b) return null;
+              const nodeA = graph.nodes.find(n => n.id === e.from);
+              const nodeB = graph.nodes.find(n => n.id === e.to);
+              if (nodeA && hiddenProjects.has(nodeA.project)) return null;
+              if (nodeB && hiddenProjects.has(nodeB.project)) return null;
               const isHi = hoveredId != null && (e.from === hoveredId || e.to === hoveredId);
+              const isSel = selectedId != null && (e.from === selectedId || e.to === selectedId);
+              const style = EDGE_STYLES[e.rel] || EDGE_STYLES.related;
               return (
                 <line
                   key={e.id}
-                  x1={a.x}
-                  y1={a.y}
-                  x2={b.x}
-                  y2={b.y}
-                  stroke={isHi ? '#f59e0b' : '#334155'}
-                  strokeOpacity={isHi ? 0.9 : 0.4}
-                  strokeWidth={isHi ? 1.5 : 0.8}
+                  x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                  stroke={isHi || isSel ? style.stroke : '#334155'}
+                  strokeOpacity={isHi || isSel ? 0.9 : 0.3}
+                  strokeWidth={isHi || isSel ? 1.5 : 0.8}
+                  strokeDasharray={style.dash}
                 />
               );
             })}
@@ -556,9 +605,11 @@ function VisualView({ graph }) {
             {graph.nodes.map((n) => {
               const p = positions[n.id];
               if (!p) return null;
+              if (hiddenProjects.has(n.project)) return null;
               const color = hashProjectColor(n.project);
               const r = nodeRadius(n.id);
               const isHi = hoveredId === n.id;
+              const isSel = selectedId === n.id;
               const lc = n.lifecycle;
               const lcColor = lc === 'validated' ? '#22c55e' : lc === 'proposed' ? '#60a5fa' : lc === 'deprecated' ? '#6b7280' : '#f59e0b';
               const lcLetter = lc === 'validated' ? 'V' : lc === 'proposed' ? 'P' : lc === 'deprecated' ? 'D' : 'A';
@@ -567,15 +618,16 @@ function VisualView({ graph }) {
                   <circle
                     cx={p.x}
                     cy={p.y}
-                    r={isHi ? r + 2 : r}
+                    r={isHi || isSel ? r + 2 : r}
                     fill={color.fill}
-                    fillOpacity={isHi ? 1 : 0.75}
-                    stroke={isHi ? '#f59e0b' : color.stroke}
-                    strokeOpacity={isHi ? 1 : 0.6}
-                    strokeWidth={isHi ? 2 : 1}
+                    fillOpacity={isHi || isSel ? 1 : 0.75}
+                    stroke={isSel ? '#fff' : isHi ? '#f59e0b' : color.stroke}
+                    strokeOpacity={isHi || isSel ? 1 : 0.6}
+                    strokeWidth={isSel ? 2.5 : isHi ? 2 : 1}
                     style={{ cursor: 'pointer', transition: 'r 0.1s' }}
                     onMouseEnter={() => setHoveredId(n.id)}
                     onMouseLeave={() => setHoveredId(null)}
+                    onClick={(ev) => { ev.stopPropagation(); setSelectedId(prev => prev === n.id ? null : n.id); }}
                   />
                   {lc && r >= 6 && (
                     <text x={p.x} y={p.y + 3} textAnchor="middle" fill={lcColor} fontSize={8} fontWeight="bold" fontFamily="ui-monospace" pointerEvents="none">
@@ -611,22 +663,65 @@ function VisualView({ graph }) {
               </g>
             )}
           </svg>
+
+          {/* Edge type legend */}
+          <div className="mt-2 flex flex-wrap gap-3">
+            {Object.entries(EDGE_STYLES).map(([key, s]) => (
+              <div key={key} className="flex items-center gap-1.5">
+                <svg width="20" height="8"><line x1="0" y1="4" x2="20" y2="4" stroke={s.stroke} strokeWidth="1.5" strokeDasharray={s.dash} /></svg>
+                <span className="text-[9px] font-mono text-nexus-text-faint">{s.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="mt-3 flex items-center gap-3 flex-wrap">
-          <span className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider">Project legend:</span>
-          {PROJECT_PALETTE.map((c) => (
-            <div key={c.name} className="flex items-center gap-1">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ background: c.fill }} />
-              <span className="text-[10px] font-mono text-nexus-text-faint">{c.name}</span>
+        {/* Click-to-detail sidebar */}
+        {selectedId && (() => {
+          const node = graph.nodes.find(n => n.id === selectedId);
+          if (!node) return null;
+          const edges = (graph.edges || []).filter(e => e.from === selectedId || e.to === selectedId);
+          return (
+            <div className="w-64 shrink-0 bg-nexus-bg border border-nexus-border rounded-xl p-4 max-h-[400px] overflow-y-auto">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-mono text-nexus-amber">#{node.id}</span>
+                <button onClick={() => setSelectedId(null)} className="text-nexus-text-faint hover:text-nexus-text text-xs">✕</button>
+              </div>
+              <p className="text-sm text-nexus-text mb-2">{node.label}</p>
+              <div className="space-y-2 text-[10px] font-mono text-nexus-text-faint">
+                <div className="flex gap-2">
+                  <span className="text-nexus-text-faint">Project:</span>
+                  <span className="text-nexus-text" style={{ color: hashProjectColor(node.project).fill }}>{node.project}</span>
+                </div>
+                <div className="flex gap-2">
+                  <span>Lifecycle:</span>
+                  <span className={node.lifecycle === 'validated' ? 'text-nexus-green' : node.lifecycle === 'deprecated' ? 'text-nexus-text-faint' : 'text-nexus-amber'}>{node.lifecycle || 'active'}</span>
+                </div>
+                <div className="flex gap-2">
+                  <span>Connections:</span>
+                  <span className="text-nexus-text">{edges.length}</span>
+                </div>
+                {edges.length > 0 && (
+                  <div className="pt-2 border-t border-nexus-border/50">
+                    <p className="mb-1 text-nexus-text-faint uppercase tracking-wider">Edges</p>
+                    {edges.slice(0, 10).map(e => {
+                      const otherId = e.from === selectedId ? e.to : e.from;
+                      const other = graph.nodes.find(n => n.id === otherId);
+                      const style = EDGE_STYLES[e.rel] || EDGE_STYLES.related;
+                      return (
+                        <button key={e.id} onClick={() => setSelectedId(otherId)}
+                          className="block w-full text-left py-1 hover:text-nexus-amber transition-colors">
+                          <span style={{ color: style.stroke }}>{style.label}</span>
+                          <span className="text-nexus-text-dim"> → #{otherId} {other?.label?.slice(0, 30) || '?'}</span>
+                        </button>
+                      );
+                    })}
+                    {edges.length > 10 && <p className="text-nexus-text-faint">+{edges.length - 10} more</p>}
+                  </div>
+                )}
+              </div>
             </div>
-          ))}
-          {hovered && (
-            <span className="text-[10px] font-mono text-nexus-amber ml-auto">
-              {String(hovered.project || 'unknown')}
-            </span>
-          )}
-        </div>
+          );
+        })()}
       </div>
     </div>
   );
