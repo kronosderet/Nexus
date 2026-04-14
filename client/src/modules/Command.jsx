@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNexusCore } from '../context/useNexus.js';
+import { useNexusFuel } from '../context/useNexus.js';
 import {
   Compass, Activity, Brain, TrendingUp, Package, CheckCircle2, Clock,
   AlertTriangle, Sparkles, ArrowRight, Loader2, RefreshCw, Target,
@@ -72,43 +74,42 @@ const COLUMNS = [
 // ── Main module ─────────────────────────────────────────
 
 export default function Command({ ws }) {
-  const [view, setView] = useState('strategic'); // strategic | kanban
-  const [tasks, setTasks] = useState([]);
-  const [thoughts, setThoughts] = useState([]);
+  // Shared context for tasks, thoughts, activity, fuel
+  const { tasks: tasksSlice, thoughts: thoughtsSlice, activity: activitySlice } = useNexusCore();
+  const { estimator: fuelSlice, workload: workloadSlice } = useNexusFuel();
+
+  const tasks = tasksSlice.data || [];
+  const thoughts = (thoughtsSlice.data || []).filter(t => t.status === 'active');
+  const fuel = fuelSlice.data;
+  const workload = workloadSlice.data;
+  const recentActivity = (activitySlice.data || []).slice(0, 10);
+  const loading = tasksSlice.loading;
+
+  // Local-only state (Command-specific, not shared)
+  const [view, setView] = useState('strategic');
   const [plan, setPlan] = useState(null);
   const [predict, setPredict] = useState(null);
   const [critique, setCritique] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [draggingId, setDraggingId] = useState(null);
-  const [fuel, setFuel] = useState(null);
-  const [workload, setWorkload] = useState(null);
-  const [recentActivity, setRecentActivity] = useState([]);
   const [projectFilter, setProjectFilter] = useState('all');
   const [kanbanSearch, setKanbanSearch] = useState('');
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [addingTo, setAddingTo] = useState(null);
 
-  async function fetchAll() {
+  // Fetch Command-specific data (plan, predict, critique) — NOT in context
+  async function fetchLocal() {
     try {
-      const [t, th, p, c, f, w, act] = await Promise.all([
-        api.getTasks(),
-        api.getThoughts().catch(() => []),
+      const [p, c] = await Promise.all([
         api.getPredict().catch(() => ({ suggestions: [] })),
         api.getCritique().catch(() => ({ slowTasks: [] })),
-        api.getEstimator().catch(() => null),
-        api.getEstimatorWorkload().catch(() => null),
-        api.getActivity(10).catch(() => []),
       ]);
-      setTasks(t || []);
-      setThoughts(Array.isArray(th) ? th : []);
       setPredict(p);
       setCritique(c);
-      setFuel(f);
-      setWorkload(w);
-      setRecentActivity(act || []);
-    } catch {} finally { setLoading(false); }
+    } catch {}
   }
+
+  function fetchAll() { fetchLocal(); } // For backward compat with onRefresh prop
 
   async function fetchPlan() {
     setLoadingPlan(true);
@@ -120,25 +121,12 @@ export default function Command({ ws }) {
   }
 
   useEffect(() => {
-    fetchAll();
-    // Restore cached plan so Next panel isn't empty on load
+    fetchLocal();
     try {
       const cached = localStorage.getItem('nexus-plan-cache');
       if (cached) setPlan(JSON.parse(cached));
     } catch {}
   }, []);
-
-  useEffect(() => {
-    if (!ws?.subscribe) return;
-    return ws.subscribe((msg) => {
-      if (msg.type === 'task_update') {
-        setTasks(prev => { const idx = prev.findIndex(t => t.id === msg.payload.id); if (idx >= 0) { const next = [...prev]; next[idx] = msg.payload; return next; } return [...prev, msg.payload]; });
-      }
-      if (msg.type === 'task_deleted') setTasks(prev => prev.filter(t => t.id !== msg.payload.id));
-      if (msg.type === 'thought' || msg.type === 'activity') fetchAll();
-      if (msg.type === 'reload') fetchAll();
-    });
-  }, [ws]);
 
   useEffect(() => {
     const clear = () => setDraggingId(null);
