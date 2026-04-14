@@ -94,14 +94,17 @@ function main() {
   // Active thoughts — auto-pop the top one as recovery context
   const thoughts = (data.thoughts || []).filter(t => t.status === 'active');
   if (thoughts.length > 0) {
+    // Auto-pop the most recent thought (LIFO) and inject as recovery instruction
     const sorted = [...thoughts].sort((a, b) => new Date(b.pushed_at) - new Date(a.pushed_at));
     const top = sorted[0];
     lines.push(`◈ RESUME: ${top.text}`);
     if (top.context) lines.push(`  Context: ${top.context}`);
     if (top.project) lines.push(`  Project: ${top.project}`);
+    // Auto-pop: mark as resolved so next session gets a fresh stack
     top.status = 'resolved';
     top.popped_at = new Date().toISOString();
     try { writeFileSync(NEXUS_DB, JSON.stringify(data, null, 2)); } catch {}
+    // Show remaining thoughts if any
     if (sorted.length > 1) {
       lines.push(`Thought Stack (${sorted.length - 1} remaining):`);
       for (const t of sorted.slice(1, 3)) {
