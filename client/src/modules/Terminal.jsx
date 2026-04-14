@@ -12,14 +12,23 @@ export default function TerminalModule() {
   const inputRef = useRef(null);
 
   useEffect(() => {
+    // Terminal WebSocket only available on dev server, not dashboard
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/terminal`);
-    wsRef.current = ws;
+    let ws;
+    try {
+      ws = new WebSocket(`${protocol}//${window.location.host}/ws/terminal`);
+      wsRef.current = ws;
+    } catch {
+      setOutput([{ id: ++lineId.current, type: 'system', text: '◈ Terminal not available in dashboard mode. Use Claude Code terminal instead.' }]);
+      return;
+    }
 
     ws.onopen = () => setConnected(true);
     ws.onclose = () => {
       setConnected(false);
-      setOutput(prev => [...prev, { id: ++lineId.current, type: 'system', text: '--- Terminal disconnected ---' }]);
+      if (output.length === 0) {
+        setOutput([{ id: ++lineId.current, type: 'system', text: '◈ Terminal not available in dashboard mode. Use Claude Code terminal instead.' }]);
+      }
     };
     ws.onmessage = (e) => {
       try {
