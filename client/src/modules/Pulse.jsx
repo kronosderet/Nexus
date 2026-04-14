@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../hooks/useApi.js';
 import { Activity, Cpu, HardDrive, GitBranch, FolderOpen, Clock, Flame, Thermometer, Zap, Gauge } from 'lucide-react';
-// ProjectHealth in Fleet module
+import { useNexusFleet } from '../context/useNexus.js';
 import DigestWidget from '../components/DigestWidget.jsx';
 import QuickActions from '../components/QuickActions.jsx';
 import ClockWidget from '../components/ClockWidget.jsx';
@@ -190,35 +190,9 @@ function GpuPanel({ gpu }) {
 }
 
 export default function Pulse({ ws }) {
-  const [pulse, setPulse] = useState(null);
-  // projectHealth moved to Fleet module
-  const [loading, setLoading] = useState(true);
-
-  async function fetchPulse() {
-    try {
-      const data = await api.getPulse();
-      setPulse(data);
-    } catch {} finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    fetchPulse();
-    // Slow safety-net poll — real-time updates come via WebSocket below
-    const interval = setInterval(fetchPulse, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Subscribe to server-pushed snapshots instead of aggressive polling
-  useEffect(() => {
-    if (!ws?.subscribe) return;
-    return ws.subscribe((msg) => {
-      if (msg.type === 'gpu_snapshot' || msg.type === 'activity' || msg.type === 'reload') {
-        fetchPulse();
-      }
-    });
-  }, [ws]);
+  const { pulse: pulseSlice } = useNexusFleet();
+  const pulse = pulseSlice.data;
+  const loading = pulseSlice.loading;
 
   if (loading) {
     return (

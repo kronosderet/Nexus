@@ -1,60 +1,28 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { GitBranch, Target, AlertTriangle, BarChart3, Link2, RefreshCw, Search, ChevronRight, Network } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
+import { useNexusFleet } from '../context/useNexus.js';
 
-export default function GraphModule({ ws }) {
-  const [view, setView] = useState('overview'); // overview, blast, centrality, contradictions, holes, visual
-  const [graph, setGraph] = useState(null);
-  const [centrality, setCentrality] = useState(null);
-  const [contradictions, setContradictions] = useState(null);
-  const [holes, setHoles] = useState(null);
+export default function GraphModule() {
+  const { graph: graphSlice } = useNexusFleet();
+  const [view, setView] = useState('overview');
   const [blastId, setBlastId] = useState('');
   const [blastResult, setBlastResult] = useState(null);
-  const [loading, setLoading] = useState(true);
 
-  async function fetchAll() {
-    setLoading(true);
-    try {
-      const [g, c, con, h] = await Promise.all([
-        api.getGraphFull(),
-        api.getImpactCentrality(),
-        api.getImpactContradictions(),
-        api.getImpactHoles(),
-      ]);
-      setGraph(g);
-      setCentrality(c);
-      setContradictions(con);
-      setHoles(h);
-    } catch (err) {
-      console.error('Failed to fetch graph data', err);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const graph = graphSlice.data?.graph || null;
+  const centrality = graphSlice.data?.centrality || null;
+  const contradictions = graphSlice.data?.contradictions || null;
+  const holes = graphSlice.data?.holes || null;
+  const loading = graphSlice.loading;
 
   async function autoLink() {
-    try {
-      await api.autoLinkGraph();
-      fetchAll();
-    } catch (err) {
-      console.error('Auto-link failed', err);
-    }
+    try { await api.autoLinkGraph(); graphSlice.refresh(); } catch {}
   }
 
   async function runBlast() {
     if (!blastId) return;
-    try {
-      setBlastResult(await api.getImpactBlast(blastId));
-    } catch (err) {
-      console.error('Blast analysis failed', err);
-    }
+    try { setBlastResult(await api.getImpactBlast(blastId)); } catch {}
   }
-
-  useEffect(() => { fetchAll(); }, []);
-  useEffect(() => {
-    if (!ws?.subscribe) return;
-    return ws.subscribe((msg) => { if (msg.type === 'reload' || msg.type === 'decision_update') fetchAll(); });
-  }, [ws]);
 
   if (loading) {
     return (

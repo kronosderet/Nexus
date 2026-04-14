@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { api } from '../hooks/useApi.js';
+import { useNexusCore } from '../context/useNexus.js';
 import {
   ScrollText, BookOpen, Compass, CheckCircle2, Trash2, Settings,
   FileEdit, AlertTriangle, Tag, ChevronDown, ChevronRight, Search, Filter,
@@ -71,35 +72,19 @@ function SessionCard({ session }) {
 
 // ── Main module ─────────────────────────────────────────
 
-export default function Log({ ws }) {
-  const [tab, setTab] = useState('activity'); // activity | sessions
-  const [entries, setEntries] = useState([]);
-  const [sessions, setSessions] = useState([]);
-  const [loadingA, setLoadingA] = useState(true);
-  const [loadingS, setLoadingS] = useState(true);
+export default function Log() {
+  const { activity: activitySlice, sessions: sessionsSlice } = useNexusCore();
+  const [tab, setTab] = useState('activity');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [sortOrder, setSortOrder] = useState('desc');
   const [projectFilter, setProjectFilter] = useState('');
   const [blockersOnly, setBlockersOnly] = useState(false);
 
-  // Fetch both on mount
-  useEffect(() => {
-    api.getActivity(200).then(setEntries).catch(() => []).finally(() => setLoadingA(false));
-    api.getSessions().then(setSessions).catch(() => []).finally(() => setLoadingS(false));
-  }, []);
-
-  useEffect(() => {
-    if (!ws?.subscribe) return;
-    return ws.subscribe((msg) => {
-      if (msg.type === 'activity' && msg.payload) setEntries(prev => [msg.payload, ...prev].slice(0, 200));
-      if (msg.type === 'session_created' && msg.payload) setSessions(prev => [msg.payload, ...prev]);
-      if (msg.type === 'reload') {
-        api.getActivity(200).then(setEntries).catch(() => {});
-        api.getSessions().then(setSessions).catch(() => {});
-      }
-    });
-  }, [ws]);
+  const entries = activitySlice.data || [];
+  const sessions = sessionsSlice.data || [];
+  const loadingA = activitySlice.loading;
+  const loadingS = sessionsSlice.loading;
 
   // Filtered activity
   const typesPresent = useMemo(() => ['all', ...new Set(entries.map(e => e.type)).values()].sort(), [entries]);

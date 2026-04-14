@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Ship, GitBranch, FileText, Brain, CheckCircle2, AlertTriangle, Clock, Layers, Activity } from 'lucide-react';
-import { api } from '../hooks/useApi.js';
+import { useNexusFleet } from '../context/useNexus.js';
 
 function heatColor(heat) {
   if (heat === 'hot') return 'border-nexus-green/30 bg-nexus-green/5';
@@ -121,29 +121,11 @@ function ProjectCard({ project, fleet }) {
   );
 }
 
-export default function Fleet({ ws }) {
-  const [projects, setProjects] = useState([]);
-  const [fleet, setFleet] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  async function fetchAll() {
-    try {
-      const [p, f] = await Promise.all([
-        api.getProjectHealth(),
-        api.getFleetOverview().catch(() => null),
-      ]);
-      setProjects(p || []);
-      if (f) setFleet(f);
-    } catch {} finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => { fetchAll(); }, []);
-  useEffect(() => {
-    if (!ws?.subscribe) return;
-    return ws.subscribe((msg) => { if (msg.type === 'activity' || msg.type === 'reload') fetchAll(); });
-  }, [ws]);
+export default function Fleet() {
+  const { fleet: fleetSlice } = useNexusFleet();
+  const projects = fleetSlice.data?.projects || [];
+  const fleet = fleetSlice.data?.overview || null;
+  const loading = fleetSlice.loading;
 
   if (loading) {
     return (
