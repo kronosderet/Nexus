@@ -4,6 +4,7 @@ import { useNexusCore } from '../context/useNexus.js';
 import {
   ScrollText, BookOpen, Compass, CheckCircle2, Trash2, Settings,
   FileEdit, AlertTriangle, Tag, ChevronDown, ChevronRight, Search, Filter,
+  Clock,
 } from 'lucide-react';
 
 // ── Activity type config ────────────────────────────────
@@ -133,11 +134,11 @@ export default function Log() {
             Log
           </h2>
           <p className="text-xs font-mono text-nexus-text-faint mt-1">
-            {tab === 'activity' ? `${filteredActivity.length} of ${entries.length} entries` : `${filteredSessions.length} of ${sessions.length} sessions`}
+            {tab === 'timeline' ? `${entries.length + sessions.length} events` : tab === 'activity' ? `${filteredActivity.length} of ${entries.length} entries` : `${filteredSessions.length} of ${sessions.length} sessions`}
           </p>
         </div>
         <div className="flex gap-1">
-          {[{ key: 'activity', label: 'Activity', icon: ScrollText }, { key: 'sessions', label: 'Sessions', icon: BookOpen }].map(t => {
+          {[{ key: 'timeline', label: 'Timeline', icon: Clock }, { key: 'activity', label: 'Activity', icon: ScrollText }, { key: 'sessions', label: 'Sessions', icon: BookOpen }].map(t => {
             const Icon = t.icon;
             return (
               <button key={t.key} onClick={() => setTab(t.key)}
@@ -201,8 +202,10 @@ export default function Log() {
       {loading ? (
         <div className="flex items-center gap-3 h-64 justify-center">
           <div className="text-2xl animate-compass text-nexus-amber">◈</div>
-          <span className="font-mono text-sm text-nexus-text-dim">{tab === 'activity' ? 'Reviewing the log...' : 'Retrieving bearings...'}</span>
+          <span className="font-mono text-sm text-nexus-text-dim">Scanning the archives...</span>
         </div>
+      ) : tab === 'timeline' ? (
+        <TimelineView entries={entries} sessions={sessions} search={search} />
       ) : tab === 'activity' ? (
         /* ── Activity stream ─── */
         filteredActivity.length === 0 ? (
@@ -245,6 +248,98 @@ export default function Log() {
           </div>
         )
       )}
+    </div>
+  );
+}
+
+// ── Timeline View ─────────────────────────────────────────
+function TimelineView({ entries, sessions, search }) {
+  const q = search.toLowerCase();
+  const [expanded, setExpanded] = useState({});
+
+  const timeline = useMemo(() => {
+    const items = [];
+    for (const e of entries) {
+      if (q && !e.message.toLowerCase().includes(q)) continue;
+      const config = TYPE_CONFIG[e.type] || TYPE_CONFIG.system;
+      items.push({
+        time: e.created_at, kind: e.type === 'task_done' ? 'task' : e.type === 'decision' ? 'decision' : 'activity',
+        icon: config.icon, color: config.color, label: config.label, text: e.message, id: `a-${e.id}`,
+      });
+    }
+    for (const s of sessions) {
+      if (q && !s.summary.toLowerCase().includes(q) && !s.project.toLowerCase().includes(q)) continue;
+      items.push({
+        time: s.created_at, kind: 'session', icon: BookOpen, color: 'text-nexus-amber',
+        label: s.project, text: s.summary, id: `s-${s.id}`, session: s,
+      });
+    }
+    items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+    return items;
+  }, [entries, sessions, q]);
+
+  const grouped = useMemo(() => {
+    const g = {};
+    for (const item of timeline) { const d = formatDate(item.time); if (!g[d]) g[d] = []; g[d].push(item); }
+    return g;
+  }, [timeline]);
+
+  if (timeline.length === 0) return (
+    <div className="text-center py-12 bg-nexus-surface border border-nexus-border rounded-xl">
+      <Clock size={24} className="mx-auto text-nexus-text-faint mb-2 opacity-40" />
+      <p className="text-xs font-mono text-nexus-text-faint">No events match.</p>
+    </div>
+  );
+
+  const dotSize = { session: 'w-3 h-3', task: 'w-2.5 h-2.5', decision: 'w-2.5 h-2.5', activity: 'w-2 h-2' };
+  const dotColor = { session: 'bg-nexus-amber', task: 'bg-nexus-green', decision: 'bg-nexus-purple', activity: 'bg-nexus-text-faint/40' };
+
+  return (
+    <div className="space-y-6">
+      {Object.entries(grouped).map(([date, items]) => (
+        <div key={date}>
+          <div className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider mb-3 sticky top-0 bg-nexus-bg py-1">{date}</div>
+          <div className="relative ml-4 border-l border-nexus-border/50 pl-6 space-y-1">
+            {items.map(item => {
+              const isSession = item.kind === 'session';
+              const isExp = expanded[item.id];
+              return (
+                <div key={item.id} className="relative">
+                  <div className={`absolute -left-[31px] top-2 rounded-full ${dotSize[item.kind]} ${dotColor[item.kind]}`} />
+                  {isSession ? (
+                    <div className={`py-2 px-3 rounded-lg bg-nexus-surface border ${isExp ? 'border-nexus-amber/20' : 'border-nexus-border'} hover:border-nexus-amber/30 transition-colors`}>
+                      <button onClick={() => setExpanded(p => ({ ...p, [item.id]: !p[item.id] }))} className="w-full text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono text-nexus-text-faint w-10 shrink-0">{formatTime(item.time)}</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20">{item.label}</span>
+                          <span className="text-xs text-nexus-text truncate flex-1">{item.text.slice(0, 80)}{item.text.length > 80 ? '...' : ''}</span>
+                          {isExp ? <ChevronDown size={10} className="text-nexus-text-faint shrink-0" /> : <ChevronRight size={10} className="text-nexus-text-faint shrink-0" />}
+                        </div>
+                      </button>
+                      {isExp && item.session && (
+                        <div className="mt-2 pt-2 border-t border-nexus-border/50 space-y-1 text-[10px] font-mono text-nexus-text-faint">
+                          {item.session.decisions?.length > 0 && <p>{item.session.decisions.length} decisions captured</p>}
+                          {item.session.blockers?.length > 0 && <p className="text-nexus-red">{item.session.blockers.length} blockers</p>}
+                          {item.session.tags?.length > 0 && (
+                            <div className="flex gap-1 flex-wrap">{item.session.tags.map(tag => <span key={tag} className="px-1.5 py-0.5 rounded bg-nexus-purple/10 text-nexus-purple border border-nexus-purple/20">{tag}</span>)}</div>
+                          )}
+                          {item.session.files_touched?.length > 0 && <p>{item.session.files_touched.length} files touched</p>}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2 py-1 px-2 rounded hover:bg-nexus-surface/50 transition-colors">
+                      <span className="text-[10px] font-mono text-nexus-text-faint w-10 shrink-0 pt-0.5">{formatTime(item.time)}</span>
+                      <span className={`text-[9px] font-mono ${item.color}`}>{item.label}</span>
+                      <span className="text-xs text-nexus-text-dim truncate">{item.text}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
