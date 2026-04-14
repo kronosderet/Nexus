@@ -67,8 +67,8 @@ The plugin works standalone — no server needed. For visualization, run the das
 ```bash
 git clone https://github.com/kronosderet/Nexus
 cd Nexus
-npm install && cd server && npm install && cd ../client && npm install && cd ..
-npm run dev
+npm install && cd server && npm install && cd ../client && npm install && npm run build && cd ..
+npm run dashboard
 ```
 
 Open [http://localhost:3001](http://localhost:3001). Eight modules:
@@ -98,21 +98,21 @@ Install hooks: `nexus hooks install` (from the CLI).
 
 ## Local AI (Optional)
 
-For AI-powered features (Overseer, session plan, code audit), install [LM Studio](https://lmstudio.ai) and load a model. Recommended: Gemma 4 26B A4B (Q4_K_M). Nexus auto-detects LM Studio at `localhost:1234`. GPU-aware inference signal adapts to any hardware — no fixed timeouts.
+For AI-powered features (Overseer, session plan, code audit), install [LM Studio](https://lmstudio.ai) and load a model. Tested with Gemma 4 31B and Gemma 4 26B A4B (Q4_K_M). Nexus auto-detects LM Studio at `localhost:1234`. GPU-aware inference with AI semaphore — adapts to any hardware.
 
-Without LM Studio, all 20 non-AI tools work normally.
+Without LM Studio, all 22 non-AI tools work normally.
 
 ## Architecture
 
 | Layer | Stack |
 |---|---|
-| Server | Express 5 + TypeScript (tsx watch) |
-| Client | React 19 + Vite + Tailwind CSS 4 |
-| Store | JSON file at `~/.nexus/nexus.json` (with 3-gen backup rotation) |
-| AI | LM Studio / Ollama (optional, auto-detected) |
-| MCP | 22 tools via @modelcontextprotocol/sdk, stdio transport |
-| Tests | 153 Vitest tests (store + route-level integration) |
-| CLI | 46 commands, ESM, zero external deps |
+| MCP | 22 tools, stdio, standalone (no server needed) |
+| Dashboard | React 19 + Vite + Tailwind CSS 4 (optional, 8 modules) |
+| Server | Express 5 + TypeScript (dashboard only) |
+| Store | JSON at `~/.nexus/nexus.json` (atomic writes, 3-gen backup) |
+| AI | LM Studio / Ollama (optional, auto-detected, GPU-aware) |
+| Scheduler | Risk scan (6h) + digest (24h), automated |
+| Tests | 153 Vitest (store + route-level integration) |
 
 ## Data & Privacy
 

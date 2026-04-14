@@ -7147,6 +7147,17 @@ var init_store = __esm({
         this.data._fuelConfig = config2;
         this._flush();
       }
+      getScheduledScans(type, limit = 10) {
+        const scans = this.data._scheduledScans || [];
+        const filtered = type ? scans.filter((s) => s.type === type) : scans;
+        return filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, limit);
+      }
+      addScheduledScan(scan) {
+        if (!this.data._scheduledScans) this.data._scheduledScans = [];
+        this.data._scheduledScans.push(scan);
+        if (this.data._scheduledScans.length > 50) this.data._scheduledScans = this.data._scheduledScans.slice(-50);
+        this._flush();
+      }
       // ── Tasks ──────────────────────────────────────────────
       getAllTasks() {
         return [...this.data.tasks].sort((a, b) => a.sort_order - b.sort_order);
