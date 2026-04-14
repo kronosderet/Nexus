@@ -270,7 +270,7 @@ export default function Command({ ws }) {
         />
       ) : (
         <KanbanView
-          tasks={tasks} draggingId={draggingId} setDraggingId={setDraggingId}
+          tasks={filtered} draggingId={draggingId} setDraggingId={setDraggingId}
           newTaskTitle={newTaskTitle} setNewTaskTitle={setNewTaskTitle}
           addingTo={addingTo} setAddingTo={setAddingTo}
           onAdd={handleAdd} onUpdate={handleUpdate} onDelete={handleDelete} onDrop={handleDrop}
