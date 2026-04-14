@@ -71,7 +71,7 @@ npm install && cd server && npm install && cd ../client && npm install && npm ru
 npm run dashboard
 ```
 
-Open [http://localhost:3001](http://localhost:3001). Eight modules:
+Open [http://localhost:3001](http://localhost:3001). Seven modules:
 
 | Module | Key | What it shows |
 |---|---|---|
@@ -79,10 +79,9 @@ Open [http://localhost:3001](http://localhost:3001). Eight modules:
 | **Dashboard** | ^2 | System pulse, GPU telemetry, calendar, digest |
 | **Fleet** | ^3 | Per-project cards: health, git, tasks, staleness, cross-project priority |
 | **Fuel** | ^4 | Plan-aware session + weekly gauges, usage intensity, forecast, insights |
-| **Graph** | ^5 | Knowledge Graph: blast radius, centrality, conflicts, holes, visual |
-| **Overseer** | ^6 | Local AI strategist with auto-remediation |
-| **Log** | ^7 | Activity stream + Session history with search/filter |
-| **Terminal** | ^8 | Embedded shell |
+| **Graph** | ^5 | Knowledge Graph: blast radius, centrality, conflicts, holes, interactive visual |
+| **Overseer** | ^6 | Local AI strategist with chat history + scheduled scans |
+| **Log** | ^7 | Activity stream + Session history + Timeline view |
 
 Plus: `Ctrl+K` search, `Ctrl+T` thought stack, `Ctrl+/` keyboard shortcuts.
 
