@@ -6801,6 +6801,35 @@ var require_dist = __commonJS({
   }
 });
 
+// server/lib/aiEndpoints.ts
+async function detectAI() {
+  for (const ep of AI_ENDPOINTS) {
+    try {
+      const url2 = ep.type === "ollama" ? `${ep.base}/api/tags` : `${ep.base}/models`;
+      const res = await fetch(url2, { signal: AbortSignal.timeout(2e3) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const models = ep.type === "ollama" ? (data.models || []).map((m) => m.name) : (data.data || []).filter((m) => !m.id.includes("embed")).map((m) => m.id);
+      if (models.length === 0) continue;
+      return { available: true, provider: ep.name, base: ep.base, type: ep.type, model: models[0] };
+    } catch {
+    }
+  }
+  return { available: false };
+}
+var AI_ENDPOINTS, EMBED_URL, EMBED_MODEL;
+var init_aiEndpoints = __esm({
+  "server/lib/aiEndpoints.ts"() {
+    "use strict";
+    AI_ENDPOINTS = [
+      { name: "LM Studio", base: "http://localhost:1234/v1", type: "openai" },
+      { name: "Ollama", base: "http://localhost:11434", type: "ollama" }
+    ];
+    EMBED_URL = "http://localhost:1234/v1/embeddings";
+    EMBED_MODEL = "text-embedding-nomic-embed-text-v1.5";
+  }
+});
+
 // server/lib/embeddings.ts
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
@@ -6864,14 +6893,13 @@ async function findSimilar(query, candidates, topN = 5, threshold = 0.5) {
   }
   return results.sort((a, b) => b.similarity - a.similarity).slice(0, topN);
 }
-var __dirname, EMBED_CACHE_PATH, EMBED_MODEL, EMBED_URL, cache, savePending;
+var __dirname, EMBED_CACHE_PATH, cache, savePending;
 var init_embeddings = __esm({
   "server/lib/embeddings.ts"() {
     "use strict";
+    init_aiEndpoints();
     __dirname = dirname(fileURLToPath(import.meta.url));
     EMBED_CACHE_PATH = join(__dirname, "..", "..", "nexus-embeddings.json");
-    EMBED_MODEL = "text-embedding-nomic-embed-text-v1.5";
-    EMBED_URL = "http://localhost:1234/v1/embeddings";
     cache = {};
     if (existsSync(EMBED_CACHE_PATH)) {
       try {
@@ -7249,8 +7277,15 @@ var init_store = __esm({
         return bookmark;
       }
       // ── Usage ──────────────────────────────────────────────
-      logUsage({ session_percent, weekly_percent, note = "" }) {
-        const entry = { session_percent, weekly_percent, note, created_at: this._now() };
+      logUsage({ session_percent, weekly_percent, sonnet_weekly_percent, extra_usage, note = "" }) {
+        const entry = {
+          session_percent,
+          weekly_percent,
+          note,
+          created_at: this._now(),
+          ...sonnet_weekly_percent != null ? { sonnet_weekly_percent } : {},
+          ...extra_usage != null ? { extra_usage } : {}
+        };
         this.data.usage.push(entry);
         const cutoff = Date.now() - 30 * 864e5;
         this.data.usage = this.data.usage.filter((u) => new Date(u.created_at).getTime() > cutoff);
@@ -7767,21 +7802,6 @@ __export(localApi_exports, {
 import { mkdirSync, existsSync as existsSync3 } from "fs";
 import { join as join3 } from "path";
 import { homedir } from "os";
-async function detectAI() {
-  for (const ep of AI_ENDPOINTS) {
-    try {
-      const url2 = ep.type === "ollama" ? `${ep.base}/api/tags` : `${ep.base}/models`;
-      const res = await fetch(url2, { signal: AbortSignal.timeout(2e3) });
-      if (!res.ok) continue;
-      const data = await res.json();
-      const models = ep.type === "ollama" ? (data.models || []).map((m) => m.name) : (data.data || []).filter((m) => !m.id.includes("embed")).map((m) => m.id);
-      if (models.length === 0) continue;
-      return { available: true, provider: ep.name, base: ep.base, type: ep.type, model: models[0] };
-    } catch {
-    }
-  }
-  return { available: false };
-}
 async function localApiFetch(path, init = {}) {
   const method = init.method || "GET";
   const body = init.body ? JSON.parse(init.body) : {};
@@ -7896,7 +7916,7 @@ async function localApiFetch(path, init = {}) {
       const current = store.getFuelConfig() || { plan: "pro", timezone: "Europe/Prague", sessionWindowHours: 5, weeklyResetDay: 4, weeklyResetHour: 21 };
       store.setFuelConfig({ ...current, ...updates });
     }
-    const entry = store.logUsage({ session_percent: body.session_percent, weekly_percent: body.weekly_percent, note: body.note });
+    const entry = store.logUsage({ session_percent: body.session_percent, weekly_percent: body.weekly_percent, sonnet_weekly_percent: body.sonnet_weekly_percent, extra_usage: body.extra_usage, note: body.note });
     return { ...entry, timing: {} };
   }
   if (pathname === "/api/estimator") {
@@ -7978,19 +7998,16 @@ async function localApiFetch(path, init = {}) {
   if (pathname === "/api/init") return { checks: {} };
   throw new Error(`404: Unknown route ${method} ${pathname}`);
 }
-var NEXUS_HOME, NexusStore2, store, AI_ENDPOINTS;
+var NEXUS_HOME, NexusStore2, store;
 var init_localApi = __esm({
   async "server/mcp/localApi.ts"() {
     "use strict";
+    init_aiEndpoints();
     NEXUS_HOME = process.env.NEXUS_HOME || join3(homedir(), ".nexus");
     if (!existsSync3(NEXUS_HOME)) mkdirSync(NEXUS_HOME, { recursive: true });
     process.env.NEXUS_DB_PATH = process.env.NEXUS_DB_PATH || join3(NEXUS_HOME, "nexus.json");
     ({ NexusStore: NexusStore2 } = await Promise.resolve().then(() => (init_store(), store_exports)));
     store = new NexusStore2();
-    AI_ENDPOINTS = [
-      { name: "LM Studio", base: "http://localhost:1234/v1", type: "openai" },
-      { name: "Ollama", base: "http://localhost:11434", type: "ollama" }
-    ];
   }
 });
 
@@ -22307,7 +22324,15 @@ var TOOLS = [
         },
         weekly_percent: {
           type: "number",
-          description: 'Weekly fuel REMAINING (0-100). If the user says "94% used", pass 6.'
+          description: 'Weekly fuel REMAINING (0-100) for "All models" limit. If the user says "42% used", pass 58.'
+        },
+        sonnet_weekly_percent: {
+          type: "number",
+          description: 'Optional: "Sonnet only" weekly fuel REMAINING (0-100). Separate from All models limit.'
+        },
+        extra_usage: {
+          type: "boolean",
+          description: "Optional: true if user is on pay-per-use overflow (session limit hit but still working)."
         },
         reset_in_minutes: {
           type: "number",
@@ -22711,6 +22736,8 @@ async function handleTool(name, args) {
       const body = {};
       if (args.session_percent != null) body.session_percent = Number(args.session_percent);
       if (args.weekly_percent != null) body.weekly_percent = Number(args.weekly_percent);
+      if (args.sonnet_weekly_percent != null) body.sonnet_weekly_percent = Number(args.sonnet_weekly_percent);
+      if (args.extra_usage != null) body.extra_usage = !!args.extra_usage;
       if (args.reset_in_minutes != null) body.reset_in_minutes = Number(args.reset_in_minutes);
       if (args.note) body.note = String(args.note);
       if (args.plan) body.plan = args.plan;
