@@ -85,48 +85,48 @@ export default function ClockWidget({ ws }) {
         <p className="text-xs font-mono text-nexus-text-faint capitalize">{dateStr}</p>
       </div>
 
-      {/* Session + Weekly countdowns */}
+      {/* Session + Fuel gauges */}
       {fuel && (
-        <div className="mb-4 space-y-2">
-          {sessionMs != null && (
-            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-nexus-bg border border-nexus-border">
+        <div className="mb-4 space-y-2.5">
+          {/* Session gauge with countdown */}
+          <div className="px-3 py-2.5 rounded-lg bg-nexus-bg border border-nexus-border">
+            <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
-                <Timer size={12} className="text-nexus-text-faint" />
+                <Timer size={11} className="text-nexus-text-faint" />
                 <span className="text-[10px] font-mono text-nexus-text-faint uppercase">Session</span>
               </div>
-              <span className={`text-sm font-mono font-medium tabular-nums ${cdColor(sessionMs)}`}>
-                {sessionMs <= 0 ? 'EXPIRED' : formatCountdown(sessionMs)}
+              <span className={`text-xs font-mono font-medium tabular-nums ${sessionMs != null && sessionMs <= 0 ? 'text-nexus-red' : sessionMs != null && sessionMs < 1800000 ? 'text-nexus-amber' : 'text-nexus-text-dim'}`}>
+                {sessionMs == null ? '—' : sessionMs <= 0 ? 'waiting for reset' : formatCountdown(sessionMs)}
               </span>
             </div>
-          )}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1.5 bg-nexus-border/30 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-700 ${(fuel.session ?? 0) <= 15 ? 'bg-nexus-red' : (fuel.session ?? 0) <= 40 ? 'bg-nexus-amber' : 'bg-nexus-green'}`}
+                  style={{ width: `${Math.max(2, fuel.session ?? 0)}%` }} />
+              </div>
+              <span className="text-[10px] font-mono text-nexus-text-faint tabular-nums w-8 text-right">{fuel.session ?? '?'}%</span>
+            </div>
+          </div>
 
-          {fuel.session != null && fuel.weekly != null && (
-            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-nexus-bg border border-nexus-border">
+          {/* Weekly gauge with reset info */}
+          <div className="px-3 py-2.5 rounded-lg bg-nexus-bg border border-nexus-border">
+            <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
-                <Fuel size={12} className="text-nexus-text-faint" />
-                <span className="text-[10px] font-mono text-nexus-text-faint uppercase">Fuel</span>
+                <Fuel size={11} className="text-nexus-text-faint" />
+                <span className="text-[10px] font-mono text-nexus-text-faint uppercase">Weekly</span>
               </div>
-              <div className="flex gap-3 text-sm font-mono tabular-nums">
-                <span className={cdColor(fuel.session > 15 ? 999999 : 0)}>{fuel.session ?? '?'}%</span>
-                <span className="text-nexus-text-faint">/</span>
-                <span className={cdColor(fuel.weekly > 10 ? 999999 : 0)}>{fuel.weekly ?? '?'}%</span>
+              <span className="text-xs font-mono text-nexus-text-dim tabular-nums">
+                {weeklyMs != null && weeklyMs > 0 ? `resets ${formatCountdown(weeklyMs)}` : '—'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1.5 bg-nexus-border/30 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-700 ${(fuel.weekly ?? 0) <= 15 ? 'bg-nexus-red' : (fuel.weekly ?? 0) <= 40 ? 'bg-nexus-amber' : 'bg-nexus-green'}`}
+                  style={{ width: `${Math.max(2, fuel.weekly ?? 0)}%` }} />
               </div>
+              <span className="text-[10px] font-mono text-nexus-text-faint tabular-nums w-8 text-right">{fuel.weekly ?? '?'}%</span>
             </div>
-          )}
-
-          {proj && (
-            <div className="flex items-center justify-between px-3 py-1.5 text-[10px] font-mono text-nexus-text-faint">
-              <span>Burn: {proj.burnPerHour}%/h</span>
-              <span>Empty ~{proj.emptyAt}</span>
-            </div>
-          )}
-
-          {weeklyMs != null && weeklyMs > 0 && (
-            <div className="flex items-center justify-between px-3 py-1.5 text-[10px] font-mono text-nexus-text-faint">
-              <span>Weekly reset</span>
-              <span>{formatCountdown(weeklyMs)}</span>
-            </div>
-          )}
+          </div>
         </div>
       )}
 
