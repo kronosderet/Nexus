@@ -376,7 +376,7 @@ function buildHistoricalStats(store: NexusStore) {
     : 0;
 
   return {
-    totalReports: history.length,
+    totalReports: raw.length,
     sessionsDetected: sessionStats.length,
     sessionStats: sessionStats.slice(0, 10), // last 10 sessions
     averageBurnRate: avgRate,
