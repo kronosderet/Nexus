@@ -525,18 +525,20 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
         {recentDone.length === 0 ? <EmptyState icon={CheckCircle2} message="Nothing completed recently." /> : (
           <div className="space-y-1">
             {recentDone.slice(0, 8).map(t => {
-              // Calculate actual duration: created_at → updated_at
-              const dur = (t.created_at && t.updated_at)
-                ? Math.round((new Date(t.updated_at).getTime() - new Date(t.created_at).getTime()) / 60000)
-                : null;
+              // Show completion time + age (how long task existed in backlog)
+              const completedAt = t.updated_at ? new Date(t.updated_at).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) : null;
+              const ageMs = (t.created_at && t.updated_at) ? new Date(t.updated_at).getTime() - new Date(t.created_at).getTime() : 0;
+              const ageDays = Math.floor(ageMs / 86400000);
+              const ageLabel = ageDays > 0 ? `${ageDays}d in backlog` : null;
               return (
                 <div key={t.id} className="flex items-start gap-2 px-2 py-1 rounded hover:bg-nexus-bg/50">
                   <CheckCircle2 size={10} className="text-nexus-green mt-0.5 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-nexus-text-dim truncate">{t.title}</p>
                     <div className="flex gap-2 text-[9px] font-mono text-nexus-text-faint">
+                      {completedAt && <span>done {completedAt}</span>}
                       <span>{minutesAgo(t.updated_at)}</span>
-                      {dur != null && dur > 0 && <span>· took {dur < 60 ? `${dur}m` : `${Math.floor(dur/60)}h ${dur%60}m`}</span>}
+                      {ageLabel && <span className="text-nexus-text-faint/50">· {ageLabel}</span>}
                     </div>
                   </div>
                 </div>
@@ -544,24 +546,13 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
             })}
           </div>
         )}
-        {/* Today's slowest (not all-time) */}
+        {/* Today's completed count */}
         {(() => {
           const today = new Date().toDateString();
-          const todayDone = done
-            .filter(t => t.updated_at && t.created_at && new Date(t.updated_at).toDateString() === today)
-            .map(t => ({ ...t, dur: Math.round((new Date(t.updated_at).getTime() - new Date(t.created_at).getTime()) / 60000) }))
-            .filter(t => t.dur > 0)
-            .sort((a, b) => b.dur - a.dur);
-          return todayDone.length > 1 ? (
+          const todayCount = done.filter(t => t.updated_at && new Date(t.updated_at).toDateString() === today).length;
+          return todayCount > 0 ? (
             <div className="pt-2 mt-2 border-t border-nexus-border">
-              <span className="text-[10px] font-mono text-nexus-text-faint flex items-center gap-1 mb-1"><Clock size={9} /> Slowest Today</span>
-              {todayDone.slice(0, 3).map(t => (
-                <div key={t.id} className="flex items-center gap-2 text-[11px] font-mono">
-                  <span className="text-nexus-amber shrink-0">⏱</span>
-                  <span className="text-nexus-text-dim truncate flex-1">{t.title}</span>
-                  <span className="text-nexus-text-faint shrink-0">{t.dur}m</span>
-                </div>
-              ))}
+              <span className="text-[10px] font-mono text-nexus-green">{todayCount} completed today</span>
             </div>
           ) : null;
         })()}
