@@ -2,7 +2,7 @@
 
 **AI Cowork Metabrain for Claude Code**
 
-A local-first metabrain that gives every Claude Code instance persistent memory, a Knowledge Graph, and a strategic AI advisor. 20 native MCP tools. Zero cloud dependencies.
+A local-first metabrain that gives every Claude Code instance persistent memory, a Knowledge Graph, and a strategic AI advisor. 22 native MCP tools. Zero cloud dependencies.
 
 ## Install as Claude Code Plugin
 
@@ -71,17 +71,18 @@ npm install && cd server && npm install && cd ../client && npm install && cd ..
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). Seven modules:
+Open [http://localhost:3001](http://localhost:3001). Eight modules:
 
 | Module | Key | What it shows |
 |---|---|---|
 | **Command** | ^1 | Strategic view (Now/Next/Later/Done) + Kanban board with drag-drop |
-| **Dashboard** | ^2 | System pulse, GPU telemetry, calendar, digest, quick actions |
-| **Fuel** | ^3 | Session + weekly fuel gauges, burn rate, workload planner |
-| **Graph** | ^4 | Knowledge Graph: blast radius, centrality, conflicts, holes, visual |
-| **Overseer** | ^5 | Local AI strategist with auto-remediation |
-| **Log** | ^6 | Activity stream + Session history with search/filter |
-| **Terminal** | ^7 | Embedded PowerShell shell |
+| **Dashboard** | ^2 | System pulse, GPU telemetry, calendar, digest |
+| **Fleet** | ^3 | Per-project cards: health, git, tasks, staleness, cross-project priority |
+| **Fuel** | ^4 | Plan-aware session + weekly gauges, usage intensity, forecast, insights |
+| **Graph** | ^5 | Knowledge Graph: blast radius, centrality, conflicts, holes, visual |
+| **Overseer** | ^6 | Local AI strategist with auto-remediation |
+| **Log** | ^7 | Activity stream + Session history with search/filter |
+| **Terminal** | ^8 | Embedded shell |
 
 Plus: `Ctrl+K` search, `Ctrl+T` thought stack, `Ctrl+/` keyboard shortcuts.
 
