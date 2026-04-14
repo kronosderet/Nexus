@@ -158,6 +158,13 @@ export interface NexusData {
   thoughts: Thought[];
   _sessionTiming?: SessionTiming;
   _fuelConfig?: FuelConfig;
+  _scheduledScans?: ScheduledScan[];
+}
+
+export interface ScheduledScan {
+  type: 'risk' | 'digest';
+  timestamp: string;
+  result: any;
 }
 
 // ── API response types ─────────────────────────────────

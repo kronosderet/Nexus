@@ -190,6 +190,18 @@ export class NexusStore {
   setSessionTiming(timing: SessionTiming): void { this.data._sessionTiming = timing; this._flush(); }
   getFuelConfig(): import('../types.js').FuelConfig | undefined { return this.data._fuelConfig; }
   setFuelConfig(config: import('../types.js').FuelConfig): void { this.data._fuelConfig = config; this._flush(); }
+  getScheduledScans(type?: string, limit = 10): import('../types.js').ScheduledScan[] {
+    const scans = this.data._scheduledScans || [];
+    const filtered = type ? scans.filter(s => s.type === type) : scans;
+    return filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, limit);
+  }
+  addScheduledScan(scan: import('../types.js').ScheduledScan): void {
+    if (!this.data._scheduledScans) this.data._scheduledScans = [];
+    this.data._scheduledScans.push(scan);
+    // Keep last 50 scans max
+    if (this.data._scheduledScans.length > 50) this.data._scheduledScans = this.data._scheduledScans.slice(-50);
+    this._flush();
+  }
 
   // ── Tasks ──────────────────────────────────────────────
   getAllTasks(): Task[] {
