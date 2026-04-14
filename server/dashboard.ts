@@ -130,6 +130,13 @@ async function start() {
   // Fleet overview (cross-project priority)
   app.get('/api/fleet', (_req, res) => res.json(store.getFleetOverview()));
 
+  // Scheduled scan results
+  app.get('/api/scans', (req, res) => {
+    const type = req.query.type as string | undefined;
+    const limit = parseInt(req.query.limit as string) || 10;
+    res.json(store.getScheduledScans(type, limit));
+  });
+
   // Status endpoint
   app.get('/api/status', (_req, res) => res.json({ status: 'online', version: '4.2.0', mode: 'dashboard', message: 'All instruments nominal, Captain.' }));
 
@@ -162,6 +169,51 @@ async function start() {
   });
 
   store.addActivity('system', 'Dashboard online. Setting course.');
+
+  // ── Scheduled Scans: risk scan every 6h, AI digest daily ──
+  async function runRiskScan() {
+    try {
+      const res = await fetch(`http://localhost:${PORT}/api/overseer/risks`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const critical = (data.risks || []).filter((r: any) => r.level === 'critical').length;
+      const warnings = (data.risks || []).filter((r: any) => r.level === 'warning').length;
+      store.addScheduledScan({
+        type: 'risk',
+        timestamp: new Date().toISOString(),
+        result: { risks: data.risks?.length || 0, critical, warnings, items: (data.risks || []).slice(0, 10) },
+      });
+      store._lastRiskScan = { risks: data.risks || [], scannedAt: new Date().toISOString(), critical, warnings };
+      console.log(`  ◈ Scheduled risk scan: ${data.risks?.length || 0} risks (${critical} critical, ${warnings} warnings)`);
+    } catch {}
+  }
+
+  async function runDigest() {
+    try {
+      const res = await fetch(`http://localhost:${PORT}/api/digest?range=7d`);
+      if (!res.ok) return;
+      const data = await res.json();
+      store.addScheduledScan({
+        type: 'digest',
+        timestamp: new Date().toISOString(),
+        result: {
+          totalEvents: data.totalEvents,
+          tasksDone: data.tasksDone,
+          sessions: data.sessions,
+          summary: data.headline,
+          topProjects: data.projectRanking?.slice(0, 5),
+        },
+      });
+      console.log(`  ◈ Scheduled digest: ${data.totalEvents} events, ${data.tasksDone} done, ${data.sessions} sessions`);
+    } catch {}
+  }
+
+  // Run initial scans after 30s (let server fully start)
+  setTimeout(() => { runRiskScan(); runDigest(); }, 30000);
+  // Risk scan every 6 hours
+  setInterval(runRiskScan, 6 * 3600000);
+  // Digest every 24 hours
+  setInterval(runDigest, 24 * 3600000);
 
   // ── File watcher: sync external writes (MCP server → disk → dashboard) ──
   // When the MCP server writes to nexus.json, reload in-memory store and

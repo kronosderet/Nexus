@@ -50,6 +50,7 @@ export const api = {
   getGpuHistory: (hours = 1) => request(`/pulse/gpu/history?hours=${hours}`),
   getProjectHealth: () => request('/pulse/projects'),
   getFleetOverview: () => request('/fleet'),
+  getScheduledScans: (type, limit = 10) => request(`/scans${type ? `?type=${type}&limit=${limit}` : `?limit=${limit}`}`),
 
   // ── Sessions ───────────────────────────────────────────
   getSessions: (project) => request(`/sessions${project ? `?project=${encodeURIComponent(project)}` : ''}`),

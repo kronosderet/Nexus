@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../hooks/useApi.js';
-import { Brain, RefreshCw, AlertTriangle, Shield, Send, Loader2, Play, CheckCircle2, XCircle } from 'lucide-react';
+import { Brain, RefreshCw, AlertTriangle, Shield, Send, Loader2, Play, CheckCircle2, XCircle, Clock } from 'lucide-react';
 
 const RISK_ICONS = {
   critical: { color: 'text-nexus-red', bg: 'bg-nexus-red/10 border-nexus-red/20' },
@@ -229,6 +229,7 @@ export default function Overseer() {
   const [aiStatus, setAiStatus] = useState(null);
   const [gpuInfo, setGpuInfo] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
+  const [scans, setScans] = useState([]);
 
   async function fetchRisks() {
     try {
@@ -275,6 +276,7 @@ export default function Overseer() {
     fetchRisks();
     api.getOverseerStatus().then(setAiStatus).catch(() => {});
     api.getGpuDetail().then(setGpuInfo).catch(() => {});
+    api.getScheduledScans(null, 10).then(setScans).catch(() => {});
     // Load previous Q&A from advice journal
     api.getAdvice({ source: 'ask', limit: 20 }).then(entries => {
       const history = [];
@@ -448,6 +450,41 @@ export default function Overseer() {
               </div>
             )}
           </div>
+
+          {/* Scheduled Scans History */}
+          {scans.length > 0 && (
+            <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5 mt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Clock size={14} className="text-nexus-amber" />
+                <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Automated Scans</span>
+              </div>
+              <div className="space-y-2">
+                {scans.map((s, i) => (
+                  <div key={i} className="px-2.5 py-2 rounded-lg bg-nexus-bg border border-nexus-border">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                        s.type === 'risk' ? 'bg-nexus-red/10 text-nexus-red border border-nexus-red/20'
+                        : 'bg-nexus-blue/10 text-nexus-blue border border-nexus-blue/20'
+                      }`}>{s.type === 'risk' ? 'RISK SCAN' : 'DIGEST'}</span>
+                      <span className="text-[9px] font-mono text-nexus-text-faint ml-auto">
+                        {new Date(s.timestamp).toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    {s.type === 'risk' && s.result && (
+                      <p className="text-[10px] font-mono text-nexus-text-dim">
+                        {s.result.risks} risks ({s.result.critical} critical, {s.result.warnings} warnings)
+                      </p>
+                    )}
+                    {s.type === 'digest' && s.result && (
+                      <p className="text-[10px] font-mono text-nexus-text-dim">
+                        {s.result.summary || `${s.result.totalEvents} events, ${s.result.tasksDone} done, ${s.result.sessions} sessions`}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
