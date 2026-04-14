@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Fuel as FuelIcon, Clock, Timer, Zap, TrendingUp, BarChart3, History, Info } from 'lucide-react';
-import { api } from '../hooks/useApi.js';
+import { useNexusFuel } from '../context/useNexus.js';
 
 function color(pct) {
   if (pct == null) return 'text-nexus-text-faint';
@@ -44,35 +44,15 @@ function Stat({ label, value, sub, color: c }) {
   );
 }
 
-export default function FuelModule({ ws }) {
-  const [fuel, setFuel] = useState(null);
-  const [workload, setWorkload] = useState(null);
-  const [history, setHistory] = useState(null);
-  const [timing, setTiming] = useState(null);
+export default function FuelModule() {
+  // All fuel data from shared context — no local fetch, no ws.subscribe, no polling
+  const { estimator, workload, timing: timingSlice, history: historySlice } = useNexusFuel();
   const [showAllSessions, setShowAllSessions] = useState(false);
 
-  async function fetchAll() {
-    try {
-      const [f, w, h, t] = await Promise.all([
-        api.getEstimator(),
-        api.getEstimatorWorkload(),
-        api.getEstimatorHistory().catch(() => null),
-        api.getUsageLatest().catch(() => null),
-      ]);
-      setFuel(f);
-      setWorkload(w);
-      if (h) setHistory(h);
-      if (t) setTiming(t);
-    } catch (err) {
-      console.error('Fuel fetch error', err);
-    }
-  }
-
-  useEffect(() => { fetchAll(); const i = setInterval(fetchAll, 120000); return () => clearInterval(i); }, []);
-  useEffect(() => {
-    if (!ws?.subscribe) return;
-    return ws.subscribe((msg) => { if (msg.type === 'usage_update' || msg.type === 'reload') fetchAll(); });
-  }, [ws]);
+  const fuel = estimator.data;
+  const wl = workload.data;
+  const timingData = timingSlice.data;
+  const history = historySlice.data;
 
   if (!fuel?.tracked) {
     return (
@@ -88,11 +68,11 @@ export default function FuelModule({ ws }) {
   const weekly = fuel.estimated?.weekly ?? 0;
   const used = Math.round(100 - session);
   const intensity = usageIntensity(used);
-  const cs = workload?.currentSession;
+  const cs = wl?.currentSession;
   const sessionsLeft = fuel.weekly?.sessionsLeft;
-  const plan = timing?.timing?.plan;
-  const sessionReset = timing?.timing?.session;
-  const weeklyReset = timing?.timing?.weekly;
+  const plan = timingData?.timing?.plan;
+  const sessionReset = timingData?.timing?.session;
+  const weeklyReset = timingData?.timing?.weekly;
   const costs = fuel.costs;
   const capacity = fuel.capacity;
   const forecast = fuel.forecast;
@@ -119,7 +99,7 @@ export default function FuelModule({ ws }) {
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs font-mono">
             <span className="text-nexus-amber font-medium">{plan.label}</span>
             <span className="text-nexus-text-faint">{PLAN_PRICING[plan.name] || ''}</span>
-            <span className="text-nexus-text-faint">{plan.multiplier}x Pro capacity</span>
+            <span className="text-nexus-text-faint">{plan.multiplier}x capacity</span>
             <span className="text-nexus-text-faint">5h session windows</span>
             {weeklyReset && <span className="text-nexus-text-faint">Weekly resets {weeklyReset.resetsAt}</span>}
           </div>
@@ -128,7 +108,6 @@ export default function FuelModule({ ws }) {
 
       {/* Main gauges */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-        {/* Session */}
         <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Session</span>
@@ -142,11 +121,10 @@ export default function FuelModule({ ws }) {
             {sessionReset?.expired && (
               <p className="text-nexus-amber"><Timer size={10} className="inline mr-1" />Waiting for next session window</p>
             )}
-            {(session <= 0 || timing?.extra_usage) && <p className="text-nexus-red">On extra usage (session limit reached)</p>}
+            {(session <= 0 || timingData?.extra_usage) && <p className="text-nexus-red">On extra usage (session limit reached)</p>}
           </div>
         </div>
 
-        {/* Weekly */}
         <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Weekly</span>
@@ -155,7 +133,7 @@ export default function FuelModule({ ws }) {
           <Bar percent={weekly} height="h-3" />
           <div className="mt-3 space-y-1 text-xs font-mono text-nexus-text-faint">
             <p>All models: {weekly}% remaining</p>
-            {timing?.sonnet_weekly_percent != null && <p>Sonnet only: {Math.round(timing.sonnet_weekly_percent)}% remaining</p>}
+            {timingData?.sonnet_weekly_percent != null && <p>Sonnet only: {Math.round(timingData.sonnet_weekly_percent)}% remaining</p>}
             {sessionsLeft != null && sessionsLeft > 0 && <p>~{sessionsLeft} sessions until reset</p>}
             {weeklyReset?.countdown && <p><Clock size={10} className="inline mr-1" />Resets {weeklyReset.countdown}</p>}
             {forecast && (
@@ -167,7 +145,7 @@ export default function FuelModule({ ws }) {
         </div>
       </div>
 
-      {/* This Session summary */}
+      {/* This Session */}
       <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5 mb-4">
         <div className="flex items-center gap-2 mb-3">
           <Zap size={14} className="text-nexus-amber" />
@@ -179,13 +157,11 @@ export default function FuelModule({ ws }) {
           <Stat label="Capacity" value={
             cs?.recommendation?.action === 'wrap_up' ? 'Wrap Up' :
             cs?.recommendation?.action === 'small_tasks' ? 'Small Tasks' :
-            cs?.recommendation?.action === 'medium_tasks' ? 'Medium Tasks' :
-            'Full Capacity'
+            cs?.recommendation?.action === 'medium_tasks' ? 'Medium Tasks' : 'Full Capacity'
           } sub={cs?.recommendation?.message} color={
             cs?.recommendation?.action === 'wrap_up' ? 'text-nexus-red' :
             cs?.recommendation?.action === 'small_tasks' ? 'text-nexus-amber' :
-            cs?.recommendation?.action === 'medium_tasks' ? 'text-nexus-blue' :
-            'text-nexus-green'
+            cs?.recommendation?.action === 'medium_tasks' ? 'text-nexus-blue' : 'text-nexus-green'
           } />
           {capacity?.promptsRemaining != null && (
             <Stat label="Prompts left" value={`~${capacity.promptsRemaining}`}
@@ -194,7 +170,7 @@ export default function FuelModule({ ws }) {
         </div>
       </div>
 
-      {/* Smart Insights — per-prompt/per-task costs (grows with data) */}
+      {/* Learned Costs */}
       {costs && (
         <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5 mb-4">
           <div className="flex items-center gap-2 mb-3">
@@ -216,9 +192,9 @@ export default function FuelModule({ ws }) {
         </div>
       )}
 
-      {/* Session History (newest first, expandable) */}
+      {/* Session History */}
       {history?.sessionStats?.length > 0 && (() => {
-        const stats = [...history.sessionStats]; // already newest first from server
+        const stats = [...history.sessionStats];
         const visible = showAllSessions ? stats : stats.slice(0, 5);
         const hasMore = stats.length > 5;
         return (
@@ -240,10 +216,8 @@ export default function FuelModule({ ws }) {
             ))}
           </div>
           {hasMore && (
-            <button
-              onClick={() => setShowAllSessions(prev => !prev)}
-              className="text-[10px] font-mono text-nexus-amber hover:text-nexus-text mt-2 transition-colors"
-            >
+            <button onClick={() => setShowAllSessions(prev => !prev)}
+              className="text-[10px] font-mono text-nexus-amber hover:text-nexus-text mt-2 transition-colors">
               {showAllSessions ? 'Show less' : `Show all ${stats.length} sessions`}
             </button>
           )}
