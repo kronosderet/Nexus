@@ -359,11 +359,14 @@ function StatCard({ label, value, sub, color = 'text-nexus-text' }) {
 
 // ── Visual / Force-Directed View ─────────────────────────
 const PROJECT_PALETTE = [
-  { name: 'amber', stroke: '#f59e0b', fill: '#f59e0b' },
-  { name: 'green', stroke: '#22c55e', fill: '#22c55e' },
-  { name: 'blue', stroke: '#3b82f6', fill: '#3b82f6' },
+  { name: 'amber',  stroke: '#f59e0b', fill: '#f59e0b' },
+  { name: 'green',  stroke: '#22c55e', fill: '#22c55e' },
+  { name: 'blue',   stroke: '#3b82f6', fill: '#3b82f6' },
   { name: 'purple', stroke: '#a855f7', fill: '#a855f7' },
-  { name: 'red', stroke: '#ef4444', fill: '#ef4444' },
+  { name: 'red',    stroke: '#ef4444', fill: '#ef4444' },
+  { name: 'cyan',   stroke: '#06b6d4', fill: '#06b6d4' },
+  { name: 'pink',   stroke: '#ec4899', fill: '#ec4899' },
+  { name: 'lime',   stroke: '#84cc16', fill: '#84cc16' },
 ];
 
 function hashProjectColor(project) {
@@ -593,9 +596,9 @@ function VisualView({ graph }) {
                 <line
                   key={e.id}
                   x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                  stroke={isHi || isSel ? style.stroke : '#334155'}
-                  strokeOpacity={isHi || isSel ? 0.9 : 0.3}
-                  strokeWidth={isHi || isSel ? 1.5 : 0.8}
+                  stroke={style.stroke}
+                  strokeOpacity={isHi || isSel ? 0.9 : 0.4}
+                  strokeWidth={isHi || isSel ? 2 : 0.8}
                   strokeDasharray={style.dash}
                 />
               );
