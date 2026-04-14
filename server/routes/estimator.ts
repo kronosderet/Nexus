@@ -378,7 +378,7 @@ function buildHistoricalStats(store: NexusStore) {
   return {
     totalReports: raw.length,
     sessionsDetected: sessionStats.length,
-    sessionStats: sessionStats.slice(0, 10), // last 10 sessions
+    sessionStats, // all sessions (client handles pagination)
     averageBurnRate: avgRate,
     averageSessionDuration: sessionStats.length > 0
       ? Math.round(sessionStats.reduce((s, x) => s + x.duration, 0) / sessionStats.length * 10) / 10
