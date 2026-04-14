@@ -6801,10 +6801,40 @@ var require_dist = __commonJS({
   }
 });
 
+// server/lib/aiEndpoints.ts
+async function detectAI() {
+  for (const ep of AI_ENDPOINTS) {
+    try {
+      const url2 = ep.type === "ollama" ? `${ep.base}/api/tags` : `${ep.base}/models`;
+      const res = await fetch(url2, { signal: AbortSignal.timeout(2e3) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const models = ep.type === "ollama" ? (data.models || []).map((m) => m.name) : (data.data || []).filter((m) => !m.id.includes("embed")).map((m) => m.id);
+      if (models.length === 0) continue;
+      return { available: true, provider: ep.name, base: ep.base, type: ep.type, model: models[0] };
+    } catch {
+    }
+  }
+  return { available: false };
+}
+var AI_ENDPOINTS, EMBED_URL, EMBED_MODEL;
+var init_aiEndpoints = __esm({
+  "server/lib/aiEndpoints.ts"() {
+    "use strict";
+    AI_ENDPOINTS = [
+      { name: "LM Studio", base: "http://localhost:1234/v1", type: "openai" },
+      { name: "Ollama", base: "http://localhost:11434", type: "ollama" }
+    ];
+    EMBED_URL = "http://localhost:1234/v1/embeddings";
+    EMBED_MODEL = "text-embedding-nomic-embed-text-v1.5";
+  }
+});
+
 // server/lib/embeddings.ts
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { createHash } from "crypto";
 function cosineSim(a, b) {
   let dot = 0, magA = 0, magB = 0;
   for (let i = 0; i < a.length; i++) {
@@ -6827,10 +6857,10 @@ function saveCache() {
       writeFileSync(EMBED_CACHE_PATH, JSON.stringify(cache));
     } catch {
     }
-  }, 5e3);
+  }, 2e3);
 }
 async function getEmbedding(text) {
-  const key = text.slice(0, 200);
+  const key = createHash("sha256").update(text.slice(0, 1e3)).digest("hex").slice(0, 32);
   if (cache[key]?.vec) return cache[key].vec;
   try {
     const res = await fetch(EMBED_URL, {
@@ -6863,14 +6893,13 @@ async function findSimilar(query, candidates, topN = 5, threshold = 0.5) {
   }
   return results.sort((a, b) => b.similarity - a.similarity).slice(0, topN);
 }
-var __dirname, EMBED_CACHE_PATH, EMBED_MODEL, EMBED_URL, cache, savePending;
+var __dirname, EMBED_CACHE_PATH, cache, savePending;
 var init_embeddings = __esm({
   "server/lib/embeddings.ts"() {
     "use strict";
+    init_aiEndpoints();
     __dirname = dirname(fileURLToPath(import.meta.url));
     EMBED_CACHE_PATH = join(__dirname, "..", "..", "nexus-embeddings.json");
-    EMBED_MODEL = "text-embedding-nomic-embed-text-v1.5";
-    EMBED_URL = "http://localhost:1234/v1/embeddings";
     cache = {};
     if (existsSync(EMBED_CACHE_PATH)) {
       try {
@@ -6899,31 +6928,43 @@ __export(store_exports, {
 import { readFileSync as readFileSync2, writeFileSync as writeFileSync2, existsSync as existsSync2, renameSync } from "fs";
 import { join as join2, dirname as dirname2 } from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
-var __dirname2, DB_PATH, BAK_PATH, BAK2_PATH, TMP_PATH, NexusStore;
+function getDbPath() {
+  return process.env.NEXUS_DB_PATH || join2(__dirname2, "..", "..", "nexus.json");
+}
+function getBakPath() {
+  return getDbPath() + ".bak";
+}
+function getBak2Path() {
+  return getDbPath() + ".bak.2";
+}
+function getTmpPath() {
+  return getDbPath() + ".tmp";
+}
+var __dirname2, NexusStore;
 var init_store = __esm({
   "server/db/store.ts"() {
     "use strict";
     init_embeddings();
     __dirname2 = dirname2(fileURLToPath2(import.meta.url));
-    DB_PATH = process.env.NEXUS_DB_PATH || join2(__dirname2, "..", "..", "nexus.json");
-    BAK_PATH = DB_PATH + ".bak";
-    BAK2_PATH = DB_PATH + ".bak.2";
-    TMP_PATH = DB_PATH + ".tmp";
     NexusStore = class {
       data;
       _lastRiskScan;
       _nextId;
+      _nextLedgerId = 1;
+      _nextThoughtId = 1;
+      _nextEdgeId = 1;
+      _edgeMutex = false;
       constructor() {
-        if (existsSync2(DB_PATH)) {
+        if (existsSync2(getDbPath())) {
           try {
-            this.data = JSON.parse(readFileSync2(DB_PATH, "utf-8"));
+            this.data = JSON.parse(readFileSync2(getDbPath(), "utf-8"));
           } catch (err) {
-            console.error(`\u25C8 WARNING: ${DB_PATH} corrupted (${err.message}). Attempting backup recovery...`);
-            if (existsSync2(BAK_PATH)) {
+            console.error(`\u25C8 WARNING: ${getDbPath()} corrupted (${err.message}). Attempting backup recovery...`);
+            if (existsSync2(getBakPath())) {
               try {
-                this.data = JSON.parse(readFileSync2(BAK_PATH, "utf-8"));
-                console.error(`\u25C8 Recovered from ${BAK_PATH}. Data may be slightly behind.`);
-                writeFileSync2(DB_PATH, JSON.stringify(this.data, null, 2));
+                this.data = JSON.parse(readFileSync2(getBakPath(), "utf-8"));
+                console.error(`\u25C8 Recovered from ${getBakPath()}. Data may be slightly behind.`);
+                writeFileSync2(getDbPath(), JSON.stringify(this.data, null, 2));
               } catch {
                 console.error(`\u25C8 Backup also corrupted. Starting fresh.`);
                 this.data = this._seed();
@@ -6945,13 +6986,40 @@ var init_store = __esm({
         if (!this.data.bookmarks) this.data.bookmarks = [];
         if (!this.data.advice) this.data.advice = [];
         if (!this.data.thoughts) this.data.thoughts = [];
+        const safeMax = (arr) => arr.reduce((m, v) => v > m ? v : m, 0);
         this._nextId = {
-          tasks: Math.max(0, ...this.data.tasks.map((t) => t.id)) + 1,
-          activity: Math.max(0, ...this.data.activity.map((a) => a.id)) + 1,
-          sessions: Math.max(0, ...this.data.sessions.map((s) => s.id)) + 1,
-          scratchpads: Math.max(0, ...this.data.scratchpads.map((s) => s.id)) + 1,
-          bookmarks: Math.max(0, ...this.data.bookmarks.map((b) => b.id)) + 1
+          tasks: safeMax(this.data.tasks.map((t) => t.id)) + 1,
+          activity: safeMax(this.data.activity.map((a) => a.id)) + 1,
+          sessions: safeMax(this.data.sessions.map((s) => s.id)) + 1,
+          scratchpads: safeMax(this.data.scratchpads.map((s) => s.id)) + 1,
+          bookmarks: safeMax(this.data.bookmarks.map((b) => b.id)) + 1
         };
+        this._nextLedgerId = safeMax((this.data.ledger || []).map((e) => e.id)) + 1;
+        this._nextThoughtId = safeMax((this.data.thoughts || []).map((t) => t.id)) + 1;
+        this._nextEdgeId = safeMax((this.data.graph_edges || []).map((e) => e.id)) + 1;
+      }
+      /** Re-read data from disk (for external changes, e.g. MCP writes while dashboard is running). */
+      reload() {
+        if (!existsSync2(getDbPath())) return false;
+        try {
+          const raw = readFileSync2(getDbPath(), "utf-8");
+          const data = JSON.parse(raw);
+          this.data = data;
+          const safeMax = (arr) => arr.reduce((m, v) => v > m ? v : m, 0);
+          this._nextId = {
+            tasks: safeMax((data.tasks || []).map((t) => t.id)) + 1,
+            activity: safeMax((data.activity || []).map((a) => a.id)) + 1,
+            sessions: safeMax((data.sessions || []).map((s) => s.id)) + 1,
+            scratchpads: safeMax((data.scratchpads || []).map((s) => s.id)) + 1,
+            bookmarks: safeMax((data.bookmarks || []).map((b) => b.id)) + 1
+          };
+          this._nextLedgerId = safeMax((data.ledger || []).map((e) => e.id)) + 1;
+          this._nextThoughtId = safeMax((data.thoughts || []).map((t) => t.id)) + 1;
+          this._nextEdgeId = safeMax((data.graph_edges || []).map((e) => e.id)) + 1;
+          return true;
+        } catch {
+          return false;
+        }
       }
       _seed() {
         return {
@@ -6981,16 +7049,35 @@ var init_store = __esm({
         this._flushing = true;
         try {
           const json2 = JSON.stringify(this.data, null, 2);
-          writeFileSync2(TMP_PATH, json2);
+          writeFileSync2(getTmpPath(), json2);
+          let rotatedBak = false;
           try {
-            if (existsSync2(BAK_PATH)) renameSync(BAK_PATH, BAK2_PATH);
+            if (existsSync2(getBakPath())) {
+              renameSync(getBakPath(), getBak2Path());
+              rotatedBak = true;
+            }
           } catch {
           }
           try {
-            if (existsSync2(DB_PATH)) renameSync(DB_PATH, BAK_PATH);
-          } catch {
+            if (existsSync2(getDbPath())) renameSync(getDbPath(), getBakPath());
+          } catch (err) {
+            if (rotatedBak && existsSync2(getBak2Path())) {
+              try {
+                renameSync(getBak2Path(), getBakPath());
+              } catch {
+              }
+            }
+            throw err;
           }
-          renameSync(TMP_PATH, DB_PATH);
+          try {
+            renameSync(getTmpPath(), getDbPath());
+          } catch (err) {
+            try {
+              writeFileSync2(getDbPath(), json2);
+            } catch {
+            }
+            throw err;
+          }
         } finally {
           this._flushing = false;
         }
@@ -7007,7 +7094,7 @@ var init_store = __esm({
         return this.data.ledger || [];
       }
       getActiveDecisions() {
-        return (this.data.ledger || []).filter((d) => !d.deprecated);
+        return (this.data.ledger || []).filter((d) => !d.deprecated && d.lifecycle !== "deprecated");
       }
       getDecisionById(id) {
         return (this.data.ledger || []).find((d) => d.id === id) || null;
@@ -7016,6 +7103,24 @@ var init_store = __esm({
         const d = this.getDecisionById(id);
         if (!d) return null;
         d.deprecated = true;
+        d.lifecycle = "deprecated";
+        this._flush();
+        return d;
+      }
+      updateDecision(id, updates) {
+        const d = this.getDecisionById(id);
+        if (!d) return null;
+        if (updates.decision != null) d.decision = updates.decision;
+        if (updates.context != null) d.context = updates.context;
+        if (updates.alternatives != null) d.alternatives = updates.alternatives;
+        if (updates.tags != null) d.tags = updates.tags;
+        if (updates.project != null) d.project = updates.project;
+        if (updates.lifecycle != null) {
+          d.lifecycle = updates.lifecycle;
+          d.deprecated = updates.lifecycle === "deprecated";
+        }
+        if (updates.confidence != null) d.confidence = updates.confidence;
+        if (updates.last_reviewed_at != null) d.last_reviewed_at = updates.last_reviewed_at;
         this._flush();
         return d;
       }
@@ -7035,12 +7140,30 @@ var init_store = __esm({
         this.data._sessionTiming = timing;
         this._flush();
       }
+      getFuelConfig() {
+        return this.data._fuelConfig;
+      }
+      setFuelConfig(config2) {
+        this.data._fuelConfig = config2;
+        this._flush();
+      }
+      getScheduledScans(type, limit = 10) {
+        const scans = this.data._scheduledScans || [];
+        const filtered = type ? scans.filter((s) => s.type === type) : scans;
+        return filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, limit);
+      }
+      addScheduledScan(scan) {
+        if (!this.data._scheduledScans) this.data._scheduledScans = [];
+        this.data._scheduledScans.push(scan);
+        if (this.data._scheduledScans.length > 50) this.data._scheduledScans = this.data._scheduledScans.slice(-50);
+        this._flush();
+      }
       // ── Tasks ──────────────────────────────────────────────
       getAllTasks() {
         return [...this.data.tasks].sort((a, b) => a.sort_order - b.sort_order);
       }
-      createTask({ title, description = "", status = "backlog", priority = 0 }) {
-        const maxOrder = this.data.tasks.filter((t) => t.status === status).reduce((max, t) => Math.max(max, t.sort_order), 0);
+      createTask({ title, description = "", status = "backlog", priority = 0, decision_ids }) {
+        const maxOrder = this.data.tasks.reduce((max, t) => t.status === status && t.sort_order > max ? t.sort_order : max, 0);
         const task = {
           id: this._id("tasks"),
           title,
@@ -7049,6 +7172,7 @@ var init_store = __esm({
           priority,
           sort_order: maxOrder + 1,
           linked_files: "[]",
+          ...decision_ids?.length ? { decision_ids } : {},
           created_at: this._now(),
           updated_at: this._now()
         };
@@ -7061,8 +7185,18 @@ var init_store = __esm({
         if (idx === -1) return null;
         const old = { ...this.data.tasks[idx] };
         this.data.tasks[idx] = { ...old, ...updates, id, updated_at: this._now() };
+        let resolvedThoughts = 0;
+        if (updates.status === "done") {
+          for (const t of this.data.thoughts || []) {
+            if (t.status === "active" && t.related_task_id === id) {
+              t.status = "resolved";
+              t.popped_at = this._now();
+              resolvedThoughts++;
+            }
+          }
+        }
         this._flush();
-        return { task: this.data.tasks[idx], old };
+        return { task: this.data.tasks[idx], old, resolvedThoughts };
       }
       deleteTask(id) {
         const idx = this.data.tasks.findIndex((t) => t.id === id);
@@ -7084,7 +7218,7 @@ var init_store = __esm({
           created_at: this._now()
         };
         this.data.activity.push(entry);
-        if (this.data.activity.length > 500) this.data.activity = this.data.activity.slice(-500);
+        if (this.data.activity.length > 750) this.data.activity = this.data.activity.slice(-500);
         this._flush();
         return entry;
       }
@@ -7154,8 +7288,15 @@ var init_store = __esm({
         return bookmark;
       }
       // ── Usage ──────────────────────────────────────────────
-      logUsage({ session_percent, weekly_percent, note = "" }) {
-        const entry = { session_percent, weekly_percent, note, created_at: this._now() };
+      logUsage({ session_percent, weekly_percent, sonnet_weekly_percent, extra_usage, note = "" }) {
+        const entry = {
+          session_percent,
+          weekly_percent,
+          note,
+          created_at: this._now(),
+          ...sonnet_weekly_percent != null ? { sonnet_weekly_percent } : {},
+          ...extra_usage != null ? { extra_usage } : {}
+        };
         this.data.usage.push(entry);
         const cutoff = Date.now() - 30 * 864e5;
         this.data.usage = this.data.usage.filter((u) => new Date(u.created_at).getTime() > cutoff);
@@ -7190,7 +7331,7 @@ var init_store = __esm({
       getSession(id) {
         return this.data.sessions.find((s) => s.id === id) || null;
       }
-      createSession({ project, summary, decisions = [], blockers = [], files_touched = [], tags = [] }) {
+      createSession({ project, summary, decisions = [], blockers = [], files_touched = [], tags = [], completed_task_ids }) {
         const session = {
           id: this._id("sessions"),
           project,
@@ -7199,6 +7340,7 @@ var init_store = __esm({
           blockers,
           files_touched,
           tags,
+          ...completed_task_ids?.length ? { completed_task_ids } : {},
           created_at: this._now()
         };
         this.data.sessions.push(session);
@@ -7210,6 +7352,50 @@ var init_store = __esm({
         const tasks = this.data.tasks.filter((t) => t.status !== "done" && t.title.toLowerCase().includes(project.toLowerCase()));
         return { sessions, activeTasks: tasks };
       }
+      /** Record that a task was completed during the most recent session today. */
+      recordTaskCompletion(taskId) {
+        const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+        const session = [...this.data.sessions].filter((s) => s.created_at.startsWith(today)).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+        if (!session) return;
+        if (!session.completed_task_ids) session.completed_task_ids = [];
+        if (!session.completed_task_ids.includes(taskId)) {
+          session.completed_task_ids.push(taskId);
+          this._flush();
+        }
+      }
+      /** Link an advice entry to a decision it led to. */
+      linkAdviceToDecision(adviceId, decisionId) {
+        const idx = (this.data.advice || []).findIndex((a) => a.id === adviceId);
+        if (idx === -1) return null;
+        this.data.advice[idx].decision_id = decisionId;
+        this._flush();
+        return this.data.advice[idx];
+      }
+      /** Cross-project priority matrix: rank all open tasks by urgency. */
+      getFleetOverview() {
+        const tasks = this.data.tasks.filter((t) => t.status !== "done");
+        const now = Date.now();
+        const staleness = {};
+        const projects = /* @__PURE__ */ new Set();
+        for (const s of this.data.sessions) projects.add(s.project.toLowerCase());
+        for (const proj of projects) {
+          const latest = this.data.sessions.filter((s) => s.project.toLowerCase() === proj).reduce((best, s) => {
+            const t = Date.parse(s.created_at);
+            return t > best ? t : best;
+          }, 0);
+          staleness[proj] = latest ? Math.floor((now - latest) / 864e5) : 999;
+        }
+        const scored = tasks.map((t) => {
+          const ageDays = Math.floor((now - Date.parse(t.created_at)) / 864e5);
+          const ageFactor = Math.min(3, 1 + ageDays / 7);
+          const proj = (t.title.match(/\[(\w+)\]/)?.[1] || "general").toLowerCase();
+          const staleFactor = Math.min(2, 1 + (staleness[proj] || 0) / 14);
+          const score = Math.round((t.priority + 1) * ageFactor * staleFactor * 100) / 100;
+          return { ...t, score, ageDays };
+        });
+        scored.sort((a, b) => b.score - a.score);
+        return { topTasks: scored.slice(0, 15), staleness };
+      }
       // ── Ledger ─────────────────────────────────────────────
       getLedger({ project, tag, limit = 50 } = {}) {
         let entries = [...this.data.ledger];
@@ -7220,13 +7406,14 @@ var init_store = __esm({
       recordDecision({ decision, context = "", project = "general", alternatives = [], tags = [] }) {
         if (!this.data.ledger) this.data.ledger = [];
         const entry = {
-          id: (this.data.ledger.length > 0 ? Math.max(...this.data.ledger.map((e) => e.id)) : 0) + 1,
+          id: this._nextLedgerId++,
           decision,
           context,
           project,
           alternatives,
           tags,
-          created_at: this._now()
+          created_at: this._now(),
+          lifecycle: "active"
         };
         this.data.ledger.push(entry);
         const linked = this._autoLinkDecision(entry);
@@ -7267,25 +7454,31 @@ var init_store = __esm({
         }
         return linked;
       }
-      /** Semantic auto-link via embeddings (async, non-blocking). */
+      /** Semantic auto-link via embeddings (async, non-blocking, mutex-guarded). */
       async _semanticAutoLink(newDec) {
         const others = this.data.ledger.filter((d) => d.id !== newDec.id && !d.deprecated);
         if (others.length === 0) return;
         const queryText = `${newDec.decision} ${newDec.context || ""}`;
         const candidateTexts = others.map((d) => `${d.decision} ${d.context || ""}`);
         const similar = await findSimilar(queryText, candidateTexts, 5, 0.55);
-        for (const match of similar) {
-          const existing = others[match.index];
-          const alreadyLinked = this.data.graph_edges.some(
-            (e) => e.from === newDec.id && e.to === existing.id || e.from === existing.id && e.to === newDec.id
-          );
-          if (alreadyLinked) continue;
-          this.addEdge(
-            newDec.id,
-            existing.id,
-            "related",
-            `semantic-linked (${Math.round(match.similarity * 100)}% cosine similarity)`
-          );
+        while (this._edgeMutex) await new Promise((r) => setTimeout(r, 10));
+        this._edgeMutex = true;
+        try {
+          for (const match of similar) {
+            const existing = others[match.index];
+            const alreadyLinked = this.data.graph_edges.some(
+              (e) => e.from === newDec.id && e.to === existing.id || e.from === existing.id && e.to === newDec.id
+            );
+            if (alreadyLinked) continue;
+            this.addEdge(
+              newDec.id,
+              existing.id,
+              "related",
+              `semantic-linked (${Math.round(match.similarity * 100)}% cosine similarity)`
+            );
+          }
+        } finally {
+          this._edgeMutex = false;
         }
       }
       /** Extract significant words (>3 chars, lowercased, deduped) from text. */
@@ -7299,7 +7492,7 @@ var init_store = __esm({
       addEdge(fromId, toId, relationship = "related", note = "") {
         const exists = this.data.graph_edges.find((e) => e.from === fromId && e.to === toId && e.rel === relationship);
         if (exists) return exists;
-        const edge = { id: this.data.graph_edges.length + 1, from: fromId, to: toId, rel: relationship, note, created_at: this._now() };
+        const edge = { id: this._nextEdgeId++, from: fromId, to: toId, rel: relationship, note, created_at: this._now() };
         this.data.graph_edges.push(edge);
         this._flush();
         return edge;
@@ -7337,7 +7530,7 @@ var init_store = __esm({
       }
       getGraph() {
         return {
-          nodes: this.data.ledger.map((d) => ({ id: d.id, label: d.decision.slice(0, 50), project: d.project, tags: d.tags || [] })),
+          nodes: this.data.ledger.map((d) => ({ id: d.id, label: d.decision.slice(0, 50), project: d.project, tags: d.tags || [], lifecycle: d.lifecycle })),
           edges: this.data.graph_edges.map((e) => ({ id: e.id, from: e.from, to: e.to, rel: e.rel, note: e.note }))
         };
       }
@@ -7454,7 +7647,7 @@ var init_store = __esm({
       pushThought(opts) {
         if (!this.data.thoughts) this.data.thoughts = [];
         const thought = {
-          id: (this.data.thoughts.length > 0 ? Math.max(...this.data.thoughts.map((t) => t.id)) : 0) + 1,
+          id: this._nextThoughtId++,
           text: opts.text,
           context: opts.context ?? "",
           project: opts.project ?? "general",
@@ -7473,8 +7666,17 @@ var init_store = __esm({
         if (id != null) {
           target = thoughts.find((t) => t.id === id && t.status === "active");
         } else {
-          const active = thoughts.filter((t) => t.status === "active");
-          target = active.sort((a, b) => new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime())[0];
+          let latest;
+          let latestTime = 0;
+          for (const t of thoughts) {
+            if (t.status !== "active") continue;
+            const time3 = new Date(t.pushed_at).getTime();
+            if (time3 > latestTime) {
+              latestTime = time3;
+              latest = t;
+            }
+          }
+          target = latest;
         }
         if (!target) return null;
         target.popped_at = this._now();
@@ -7509,12 +7711,12 @@ var init_store = __esm({
         const completed = tasks.filter(
           (t) => t.status === "done" && t.created_at && t.updated_at && t.created_at !== t.updated_at
         );
-        const withDuration = completed.map((t) => ({
-          id: t.id,
-          title: t.title,
-          status: t.status,
-          minutes: Math.round((new Date(t.updated_at).getTime() - new Date(t.created_at).getTime()) / 6e4)
-        })).filter((t) => t.minutes >= 0 && t.minutes < 24 * 60);
+        const now = Date.now();
+        const withDuration = completed.map((t) => {
+          const created = Date.parse(t.created_at);
+          const updated = Date.parse(t.updated_at);
+          return { id: t.id, title: t.title, status: t.status, minutes: Math.round((updated - created) / 6e4) };
+        }).filter((t) => t.minutes >= 0 && t.minutes < 24 * 60);
         if (withDuration.length === 0) {
           return { slowTasks: [], fastTasks: [], stuckTasks: [], averageCompletionMinutes: null, insights: ["Insufficient data for self-critique. Complete more tasks."] };
         }
@@ -7523,7 +7725,7 @@ var init_store = __esm({
         const stuck = tasks.filter((t) => t.status === "in_progress").map((t) => ({
           id: t.id,
           title: t.title,
-          ageHours: Math.round((Date.now() - new Date(t.created_at).getTime()) / 36e5)
+          ageHours: Math.round((now - Date.parse(t.created_at)) / 36e5)
         })).filter((t) => t.ageHours > 24);
         const insights = [];
         insights.push(`Average completion time: ${Math.round(avg)} min across ${withDuration.length} completed tasks.`);
@@ -7611,21 +7813,6 @@ __export(localApi_exports, {
 import { mkdirSync, existsSync as existsSync3 } from "fs";
 import { join as join3 } from "path";
 import { homedir } from "os";
-async function detectAI() {
-  for (const ep of AI_ENDPOINTS) {
-    try {
-      const url2 = ep.type === "ollama" ? `${ep.base}/api/tags` : `${ep.base}/models`;
-      const res = await fetch(url2, { signal: AbortSignal.timeout(2e3) });
-      if (!res.ok) continue;
-      const data = await res.json();
-      const models = ep.type === "ollama" ? (data.models || []).map((m) => m.name) : (data.data || []).filter((m) => !m.id.includes("embed")).map((m) => m.id);
-      if (models.length === 0) continue;
-      return { available: true, provider: ep.name, base: ep.base, type: ep.type, model: models[0] };
-    } catch {
-    }
-  }
-  return { available: false };
-}
 async function localApiFetch(path, init = {}) {
   const method = init.method || "GET";
   const body = init.body ? JSON.parse(init.body) : {};
@@ -7636,15 +7823,16 @@ async function localApiFetch(path, init = {}) {
   }
   if (pathname === "/api/tasks" && method === "POST") {
     if (!body.title?.trim()) throw new Error("400: Task title required.");
-    const task = store.createTask({ title: body.title.trim(), description: body.description, status: body.status, priority: body.priority });
+    const task = store.createTask({ title: body.title.trim(), description: body.description, status: body.status, priority: body.priority, decision_ids: body.decision_ids });
     store.addActivity("task_created", `Plotted -- "${body.title}"`);
     return task;
   }
   if (pathname.match(/^\/api\/tasks\/\d+$/) && method === "PATCH") {
     const id = parseInt(pathname.split("/").pop());
-    const task = store.updateTask(id, body);
-    if (!task) throw new Error("404: Task not found.");
-    return task;
+    const result = store.updateTask(id, body);
+    if (!result) throw new Error("404: Task not found.");
+    if (body.status === "done") store.recordTaskCompletion(id);
+    return { ...result.task, resolvedThoughts: result.resolvedThoughts || 0 };
   }
   if (pathname.match(/^\/api\/tasks\/\d+$/) && method === "DELETE") {
     const id = parseInt(pathname.split("/").pop());
@@ -7681,6 +7869,28 @@ async function localApiFetch(path, init = {}) {
     store.addActivity("decision", `Decision recorded -- [${entry.project}] ${body.decision.slice(0, 60)}`);
     return entry;
   }
+  if (pathname.match(/^\/api\/ledger\/\d+$/) && method === "PATCH") {
+    const id = parseInt(pathname.split("/").pop());
+    const updates = {};
+    if (body.decision !== void 0) updates.decision = body.decision;
+    if (body.context !== void 0) updates.context = body.context;
+    if (body.project !== void 0) updates.project = body.project;
+    if (body.tags !== void 0) updates.tags = body.tags;
+    if (body.lifecycle !== void 0) updates.lifecycle = body.lifecycle;
+    if (body.confidence !== void 0) updates.confidence = body.confidence;
+    if (body.last_reviewed_at !== void 0) updates.last_reviewed_at = body.last_reviewed_at;
+    if (body.deprecated !== void 0) {
+      const d = store.getDecisionById(id);
+      if (d) {
+        d.deprecated = !!body.deprecated;
+        store._flush();
+      }
+    }
+    if (Object.keys(updates).length > 0) store.updateDecision(id, updates);
+    const result = store.getDecisionById(id);
+    if (!result) throw new Error("404: Decision not found.");
+    return result;
+  }
   if (pathname === "/api/ledger/link" && method === "POST") {
     return store.addEdge(body.from, body.to, body.rel || "related", body.note || "");
   }
@@ -7710,7 +7920,14 @@ async function localApiFetch(path, init = {}) {
     return thought;
   }
   if (pathname === "/api/usage" && method === "POST") {
-    const entry = store.logUsage({ session_percent: body.session_percent, weekly_percent: body.weekly_percent, note: body.note });
+    if (body.plan || body.timezone) {
+      const updates = {};
+      if (body.plan) updates.plan = body.plan;
+      if (body.timezone) updates.timezone = body.timezone;
+      const current = store.getFuelConfig() || { plan: "pro", timezone: "Europe/Prague", sessionWindowHours: 5, weeklyResetDay: 4, weeklyResetHour: 21 };
+      store.setFuelConfig({ ...current, ...updates });
+    }
+    const entry = store.logUsage({ session_percent: body.session_percent, weekly_percent: body.weekly_percent, sonnet_weekly_percent: body.sonnet_weekly_percent, extra_usage: body.extra_usage, note: body.note });
     return { ...entry, timing: {} };
   }
   if (pathname === "/api/estimator") {
@@ -7780,23 +7997,28 @@ async function localApiFetch(path, init = {}) {
     }).sort((a, b) => b.total - a.total);
     return { centrality: centrality.slice(0, 20), averageConnections: centrality.length ? Math.round(centrality.reduce((s, c) => s + c.total, 0) / centrality.length * 10) / 10 : 0 };
   }
+  if (pathname === "/api/fleet") return store.getFleetOverview();
+  if (pathname.match(/^\/api\/advice\/\d+\/link-decision$/) && method === "PATCH") {
+    const id = parseInt(pathname.split("/")[3]);
+    if (!body.decision_id) throw new Error("400: decision_id required.");
+    const result = store.linkAdviceToDecision(id, body.decision_id);
+    if (!result) throw new Error("404: Advice not found.");
+    return result;
+  }
   if (pathname === "/api/status") return { status: "online", mode: "standalone" };
   if (pathname === "/api/init") return { checks: {} };
   throw new Error(`404: Unknown route ${method} ${pathname}`);
 }
-var NEXUS_HOME, NexusStore2, store, AI_ENDPOINTS;
+var NEXUS_HOME, NexusStore2, store;
 var init_localApi = __esm({
   async "server/mcp/localApi.ts"() {
     "use strict";
+    init_aiEndpoints();
     NEXUS_HOME = process.env.NEXUS_HOME || join3(homedir(), ".nexus");
     if (!existsSync3(NEXUS_HOME)) mkdirSync(NEXUS_HOME, { recursive: true });
     process.env.NEXUS_DB_PATH = process.env.NEXUS_DB_PATH || join3(NEXUS_HOME, "nexus.json");
     ({ NexusStore: NexusStore2 } = await Promise.resolve().then(() => (init_store(), store_exports)));
     store = new NexusStore2();
-    AI_ENDPOINTS = [
-      { name: "LM Studio", base: "http://localhost:1234/v1", type: "openai" },
-      { name: "Ollama", base: "http://localhost:11434", type: "ollama" }
-    ];
   }
 });
 
@@ -21829,10 +22051,10 @@ var StdioServerTransport = class {
 };
 
 // server/mcp/index.ts
-var STANDALONE = true;
+var STANDALONE = process.env.NEXUS_STANDALONE === "1";
 var NEXUS_BASE = process.env.NEXUS_BASE_URL || "http://localhost:3001";
 var SERVER_NAME = "nexus";
-var SERVER_VERSION = "4.1.0";
+var SERVER_VERSION = "4.2.0";
 var localApiFetch2 = null;
 if (STANDALONE) {
   try {
@@ -21856,15 +22078,21 @@ async function nexusFetch(path, init = {}) {
     });
   }
   let res;
+  const doFetch = () => fetch(`${NEXUS_BASE}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...init
+  });
   try {
-    res = await fetch(`${NEXUS_BASE}${path}`, {
-      headers: { "Content-Type": "application/json" },
-      ...init
-    });
+    res = await doFetch();
   } catch (err) {
-    throw new Error(
-      `Nexus server unreachable at ${NEXUS_BASE}. Start with: nexus-dev.bat, or set NEXUS_STANDALONE=1 for direct mode. (${err.message})`
-    );
+    try {
+      await new Promise((r) => setTimeout(r, 500));
+      res = await doFetch();
+    } catch {
+      throw new Error(
+        `Nexus server unreachable at ${NEXUS_BASE}. Start with: nexus-dev.bat, or set NEXUS_STANDALONE=1 for direct mode. (${err.message})`
+      );
+    }
   }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -22040,6 +22268,23 @@ var TOOLS = [
     }
   },
   {
+    name: "nexus_update_decision",
+    description: "Update an existing decision in The Ledger. Use to refine decision text, add context/rationale, update tags, or correct project assignment \u2014 without breaking existing graph edges.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "number", description: "Decision id to update." },
+        decision: { type: "string", description: "New decision text (optional)." },
+        rationale: { type: "string", description: "New context/rationale (optional)." },
+        project: { type: "string", description: "New project assignment (optional)." },
+        tags: { type: "array", items: { type: "string" }, description: "New tags (optional)." },
+        lifecycle: { type: "string", enum: ["proposed", "active", "validated", "deprecated"], description: "Decision lifecycle state (optional)." },
+        confidence: { type: "number", description: "Confidence score 0-1 (optional)." }
+      },
+      required: ["id"]
+    }
+  },
+  {
     name: "nexus_push_thought",
     description: "Push a thought onto the LIFO Thought Stack \u2014 the interrupt-recovery working memory. Call this BEFORE switching context, getting interrupted, or stopping mid-task. When you (or another Claude instance) return, call nexus_pop_thought to recover what you were doing. This is the cross-session continuity primitive.",
     inputSchema: {
@@ -22056,6 +22301,10 @@ var TOOLS = [
         project: {
           type: "string",
           description: "Optional: which project this thought belongs to."
+        },
+        related_task_id: {
+          type: "number",
+          description: "Optional: link to a task ID. Thought auto-resolves when that task completes."
         }
       },
       required: ["text"]
@@ -22086,7 +22335,15 @@ var TOOLS = [
         },
         weekly_percent: {
           type: "number",
-          description: 'Weekly fuel REMAINING (0-100). If the user says "94% used", pass 6.'
+          description: 'Weekly fuel REMAINING (0-100) for "All models" limit. If the user says "42% used", pass 58.'
+        },
+        sonnet_weekly_percent: {
+          type: "number",
+          description: 'Optional: "Sonnet only" weekly fuel REMAINING (0-100). Separate from All models limit.'
+        },
+        extra_usage: {
+          type: "boolean",
+          description: "Optional: true if user is on pay-per-use overflow (session limit hit but still working)."
         },
         reset_in_minutes: {
           type: "number",
@@ -22095,6 +22352,15 @@ var TOOLS = [
         note: {
           type: "string",
           description: 'Optional free-text note attached to this reading (e.g. "before starting MCP tool work").'
+        },
+        plan: {
+          type: "string",
+          enum: ["free", "pro", "max5", "max20", "team", "team_premium", "enterprise", "api"],
+          description: "Optional: Claude subscription plan. Set once and it persists. Affects capacity estimates."
+        },
+        timezone: {
+          type: "string",
+          description: 'Optional: IANA timezone (e.g. "Europe/Prague", "America/New_York"). Affects reset time display.'
         }
       }
     }
@@ -22121,6 +22387,11 @@ var TOOLS = [
         priority: {
           type: "number",
           description: "Optional priority 0-2 (0=low, 1=normal, 2=high)."
+        },
+        decision_ids: {
+          type: "array",
+          items: { type: "number" },
+          description: "Optional: IDs of decisions this task implements or relates to."
         }
       },
       required: ["title"]
@@ -22333,18 +22604,24 @@ var TOOLS = [
         }
       }
     }
+  },
+  {
+    name: "nexus_fleet_overview",
+    description: "Get cross-project priority matrix: ranks ALL open tasks across ALL projects by priority \xD7 age \xD7 project_staleness. Returns top 15 most urgent items. Use when deciding what to work on when multiple projects compete for attention.",
+    inputSchema: { type: "object", properties: {} }
   }
 ];
 async function handleTool(name, args) {
   switch (name) {
     case "nexus_brief": {
       const project = args?.project || "Nexus";
+      const withTimeout = (p, fallback) => Promise.race([p, new Promise((r) => setTimeout(() => r(fallback), 1e4))]);
       const [tasks, sessions, ledger, fuel, risks] = await Promise.all([
-        nexusFetch("/api/tasks").catch(() => []),
-        nexusFetch("/api/sessions").catch(() => []),
-        nexusFetch("/api/ledger").catch(() => []),
-        nexusFetch("/api/estimator").catch(() => null),
-        nexusFetch("/api/overseer/risks").catch(() => ({ risks: [] }))
+        withTimeout(nexusFetch("/api/tasks"), []),
+        withTimeout(nexusFetch("/api/sessions"), []),
+        withTimeout(nexusFetch("/api/ledger"), []),
+        withTimeout(nexusFetch("/api/estimator"), null),
+        withTimeout(nexusFetch("/api/overseer/risks"), { risks: [] })
       ]);
       const projectLower = project.toLowerCase();
       const allProjects = /* @__PURE__ */ new Set();
@@ -22410,6 +22687,22 @@ async function handleTool(name, args) {
       return `\u25C8 Decision #${result.id} recorded for ${args.project}
   ${args.decision}`;
     }
+    case "nexus_update_decision": {
+      if (args?.id == null) throw new Error("id is required");
+      const body = {};
+      if (args.decision) body.decision = args.decision;
+      if (args.rationale) body.context = args.rationale;
+      if (args.project) body.project = args.project;
+      if (args.tags) body.tags = args.tags;
+      if (args.lifecycle) body.lifecycle = args.lifecycle;
+      if (args.confidence != null) body.confidence = args.confidence;
+      const result = await nexusFetch(`/api/ledger/${Number(args.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(body)
+      });
+      return `\u25C8 Decision #${result.id} updated
+  ${result.decision}`;
+    }
     case "nexus_push_thought": {
       if (!args?.text) throw new Error("text is required");
       const result = await nexusFetch("/api/thoughts", {
@@ -22417,7 +22710,8 @@ async function handleTool(name, args) {
         body: JSON.stringify({
           text: args.text,
           context: args.context || void 0,
-          project: args.project || void 0
+          project: args.project || void 0,
+          related_task_id: args.related_task_id || void 0
         })
       });
       return `\u25C8 Thought #${result.id} pushed onto the stack.
@@ -22453,8 +22747,12 @@ async function handleTool(name, args) {
       const body = {};
       if (args.session_percent != null) body.session_percent = Number(args.session_percent);
       if (args.weekly_percent != null) body.weekly_percent = Number(args.weekly_percent);
+      if (args.sonnet_weekly_percent != null) body.sonnet_weekly_percent = Number(args.sonnet_weekly_percent);
+      if (args.extra_usage != null) body.extra_usage = !!args.extra_usage;
       if (args.reset_in_minutes != null) body.reset_in_minutes = Number(args.reset_in_minutes);
       if (args.note) body.note = String(args.note);
+      if (args.plan) body.plan = args.plan;
+      if (args.timezone) body.timezone = args.timezone;
       const result = await nexusFetch("/api/usage", {
         method: "POST",
         body: JSON.stringify(body)
@@ -22486,6 +22784,7 @@ async function handleTool(name, args) {
       };
       if (args.description) body.description = args.description;
       if (args.priority != null) body.priority = Number(args.priority);
+      if (args.decision_ids) body.decision_ids = args.decision_ids;
       const result = await nexusFetch("/api/tasks", {
         method: "POST",
         body: JSON.stringify(body)
@@ -22499,8 +22798,11 @@ async function handleTool(name, args) {
         method: "PATCH",
         body: JSON.stringify({ status: "done" })
       });
-      return `\u25C8 Landmark reached #${result.id}
-  ${result.title}`;
+      const lines = [`\u25C8 Landmark reached #${result.id}`, `  ${result.title}`];
+      if (result.resolvedThoughts > 0) {
+        lines.push(`  \u25C8 Auto-resolved ${result.resolvedThoughts} linked thought${result.resolvedThoughts > 1 ? "s" : ""}`);
+      }
+      return lines.join("\n");
     }
     case "nexus_log_activity": {
       if (!args?.message) throw new Error("message is required");
@@ -22744,6 +23046,25 @@ ${data.answer || "(no response)"}`;
         results.push(`  Recent session #${summary.id} documents what was done.`);
       }
       return results.join("\n");
+    }
+    case "nexus_fleet_overview": {
+      const data = await nexusFetch("/api/fleet");
+      const lines = ["\u25C8 Fleet Overview \u2014 Cross-Project Priority Matrix", ""];
+      if (data.topTasks?.length) {
+        for (const t of data.topTasks) {
+          const prio = t.priority === 2 ? "!!" : t.priority === 1 ? "! " : "  ";
+          lines.push(`  ${prio}#${t.id} [${t.status}] ${t.title.slice(0, 80)}  (score: ${t.score}, ${t.ageDays}d old)`);
+        }
+      } else {
+        lines.push("  No open tasks across any project.");
+      }
+      if (Object.keys(data.staleness || {}).length) {
+        lines.push("", "Project staleness (days since last session):");
+        for (const [proj, days] of Object.entries(data.staleness).sort((a, b) => b[1] - a[1])) {
+          lines.push(`  ${proj}: ${days}d`);
+        }
+      }
+      return lines.join("\n");
     }
     default:
       throw new Error(`Unknown tool: ${name}`);
