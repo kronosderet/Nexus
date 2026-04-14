@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../hooks/useApi.js';
 import { Activity, Cpu, HardDrive, GitBranch, FolderOpen, Clock, Flame, Thermometer, Zap, Gauge } from 'lucide-react';
-// ProjectHealth moved to Fleet module
+// ProjectHealth in Fleet module
 import DigestWidget from '../components/DigestWidget.jsx';
 import QuickActions from '../components/QuickActions.jsx';
 import ClockWidget from '../components/ClockWidget.jsx';
