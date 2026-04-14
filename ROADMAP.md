@@ -75,6 +75,16 @@
 - /nexus-health skill: one-command installation verification
 - Quick Actions: Start/Ship/Park task workflows (composite server endpoints)
 - push_thought now accepts related_task_id for auto-resolve linkage
+- MCPB standalone mode: NEXUS_STANDALONE=1 in manifest (MCP works without dashboard)
+- Critical DB path race fix: lazy getDbPath() in esbuild bundle
+- Plan-aware fuel system: FuelConfig with plan/timezone/schedule, 8 plan presets
+- Fuel module rewrite: usage intensity labels, weekly forecast, smart insights
+- Fleet module (8th dashboard module): per-project cards, cross-project priority
+- ClockWidget: client-side 1s tick with live session/weekly countdowns
+- Start/Ship/Park composite workflow buttons in Command UI
+- Shared AI endpoint config (lib/aiEndpoints.ts)
+- Dual weekly tracking: All models + Sonnet only limits
+- 11 Overseer 31B audit patches on fuel pipeline
 
 ## Current — v4.3
 
