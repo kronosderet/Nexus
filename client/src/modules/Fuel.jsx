@@ -142,7 +142,7 @@ export default function FuelModule({ ws }) {
             {sessionReset?.expired && (
               <p className="text-nexus-amber"><Timer size={10} className="inline mr-1" />Waiting for next session window</p>
             )}
-            {session <= 0 && <p className="text-nexus-red">Session depleted — on extra usage</p>}
+            {(session <= 0 || timing?.extra_usage) && <p className="text-nexus-red">Session depleted — on extra usage</p>}
           </div>
         </div>
 
@@ -155,6 +155,7 @@ export default function FuelModule({ ws }) {
           <Bar percent={weekly} height="h-3" />
           <div className="mt-3 space-y-1 text-xs font-mono text-nexus-text-faint">
             <p>All models: {weekly}% remaining</p>
+            {timing?.sonnet_weekly_percent != null && <p>Sonnet only: {timing.sonnet_weekly_percent}% remaining</p>}
             {sessionsLeft != null && sessionsLeft > 0 && <p>~{sessionsLeft} sessions until reset</p>}
             {weeklyReset?.countdown && <p><Clock size={10} className="inline mr-1" />Resets {weeklyReset.countdown}</p>}
             {forecast && (

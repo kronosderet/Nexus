@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { GitBranch, Target, AlertTriangle, BarChart3, Link2, RefreshCw, Search, ChevronRight, Network } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
 
-export default function GraphModule() {
+export default function GraphModule({ ws }) {
   const [view, setView] = useState('overview'); // overview, blast, centrality, contradictions, holes, visual
   const [graph, setGraph] = useState(null);
   const [centrality, setCentrality] = useState(null);
@@ -51,6 +51,10 @@ export default function GraphModule() {
   }
 
   useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    if (!ws?.subscribe) return;
+    return ws.subscribe((msg) => { if (msg.type === 'reload' || msg.type === 'decision_update') fetchAll(); });
+  }, [ws]);
 
   if (loading) {
     return (
