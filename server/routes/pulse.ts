@@ -132,7 +132,7 @@ function scanProjects() {
   try {
     for (const name of readdirSync(projectsDir)) {
       try {
-        if (!statSync(join(projectsDir, name)).isDirectory() || name.startsWith('.')) continue;
+        if (!statSync(join(projectsDir, name)).isDirectory() || name.startsWith('.') || name === 'node_modules' || name === 'archive') continue;
         const fullPath = join(projectsDir, name);
         const hasGit = (() => { try { statSync(join(fullPath, '.git')); return true; } catch { return false; } })();
         results.push({ name, path: fullPath, hasGit });
