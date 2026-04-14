@@ -282,7 +282,7 @@ export default function Overseer() {
       const history = [];
       for (const e of (entries || []).reverse()) {
         if (e.question) history.push({ role: 'user', text: e.question, time: e.created_at });
-        if (e.recommendation) history.push({ role: 'overseer', text: e.recommendation, time: e.created_at, adviceId: e.id });
+        if (e.recommendation) history.push({ role: 'overseer', text: e.recommendation, time: e.created_at, adviceId: e.id, outcome: e.outcome });
       }
       if (history.length > 0) setChatHistory(history);
     }).catch(() => {});
@@ -381,6 +381,13 @@ export default function Overseer() {
                       <span className={`text-[9px] font-mono ${msg.role === 'user' ? 'text-nexus-amber' : 'text-nexus-text-faint'}`}>
                         {msg.role === 'user' ? 'You' : '◈ Overseer'}
                       </span>
+                      {msg.outcome && (
+                        <span className={`text-[8px] font-mono px-1 rounded ${
+                          msg.outcome === 'worked' ? 'bg-nexus-green/10 text-nexus-green' :
+                          msg.outcome === 'partial' ? 'bg-nexus-amber/10 text-nexus-amber' :
+                          'bg-nexus-red/10 text-nexus-red'
+                        }`}>{msg.outcome}</span>
+                      )}
                       <span className="text-[8px] font-mono text-nexus-text-faint ml-auto">
                         {new Date(msg.time).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
                       </span>

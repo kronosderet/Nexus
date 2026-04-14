@@ -591,6 +591,9 @@ function VisualView({ graph }) {
               const color = hashProjectColor(n.project);
               const r = nodeRadius(n.id);
               const isHi = hoveredId === n.id;
+              const lc = n.lifecycle;
+              const lcColor = lc === 'validated' ? '#22c55e' : lc === 'proposed' ? '#60a5fa' : lc === 'deprecated' ? '#6b7280' : '#f59e0b';
+              const lcLetter = lc === 'validated' ? 'V' : lc === 'proposed' ? 'P' : lc === 'deprecated' ? 'D' : 'A';
               return (
                 <g key={n.id}>
                   <circle
@@ -606,6 +609,11 @@ function VisualView({ graph }) {
                     onMouseEnter={() => setHoveredId(n.id)}
                     onMouseLeave={() => setHoveredId(null)}
                   />
+                  {lc && r >= 6 && (
+                    <text x={p.x} y={p.y + 3} textAnchor="middle" fill={lcColor} fontSize={8} fontWeight="bold" fontFamily="ui-monospace" pointerEvents="none">
+                      {lcLetter}
+                    </text>
+                  )}
                 </g>
               );
             })}
@@ -630,7 +638,7 @@ function VisualView({ graph }) {
                   fontSize={10}
                   fontFamily="ui-monospace, monospace"
                 >
-                  #{hovered.id} {String(hovered.label || '').slice(0, 40)}
+                  #{hovered.id} [{hovered.lifecycle || 'active'}] {String(hovered.label || '').slice(0, 35)}
                 </text>
               </g>
             )}

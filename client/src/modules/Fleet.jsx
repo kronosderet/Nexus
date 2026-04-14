@@ -67,6 +67,16 @@ function ProjectCard({ project, fleet }) {
           </span>
         </div>
 
+        {/* Decisions */}
+        <div className="flex items-center gap-1.5">
+          <Brain size={10} className="text-nexus-text-faint" />
+          <span className="text-[10px] font-mono text-nexus-text-faint">
+            {project.decisions > 0 ? (
+              <><span className="text-nexus-text">{project.decisions}</span> decisions</>
+            ) : 'No decisions'}
+          </span>
+        </div>
+
         {/* Activity */}
         <div className="flex items-center gap-1.5">
           <Activity size={10} className="text-nexus-text-faint" />
