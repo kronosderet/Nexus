@@ -86,14 +86,24 @@
 - Dual weekly tracking: All models + Sonnet only limits
 - 11 Overseer 31B audit patches on fuel pipeline
 
+### v4.2.1 — Dashboard Maturity (shipped in v4.2 sessions)
+- NexusProvider: 3 grouped contexts (Core/Fuel/Fleet), 6 modules migrated, ~18→8 API calls
+- Activity Timeline: merged chronological stream with session/task/decision markers
+- Graph Visual Overhaul: 5 edge type styles, project toggles, click-to-detail sidebar, responsive canvas, 8-color palette
+- Overseer Chat History: persistent Q&A backed by advice journal
+- Overseer Scheduled Scans: risk every 6h, digest every 24h
+- family-coop project integration (M:\family coop NAS)
+- Project name normalization: cleaned 29 decisions + 19 sessions
+- Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
+
 ## Current — v4.3
 
-### Dashboard & UX
-- Shared React Context (single NexusProvider, reduce redundant API calls)
-- Overseer Chat History (persistent Q&A backed by advice journal)
-- Activity Timeline View (visual chronological canvas)
-- Graph Visual Overhaul (project colors, edge toggles, node sidebar)
-- Overseer Scheduled Scans (daily risk + weekly AI digest)
+### Next priorities
+- Version bump to 4.3.0
+- MCPB rebuild with all v4.2 changes
+- Remaining AI endpoint consolidation (ai.ts, plan.ts, autoSummary.ts, smartSearch.ts)
+- Task project field support in Command/Kanban
+- family-coop scheduled message checking
 
 ## Future — v5.0 Vision
 
