@@ -224,11 +224,11 @@ export default function Overseer() {
   const [risks, setRisks] = useState(null);
   const [loading, setLoading] = useState(false);
   const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState(null);
   const [asking, setAsking] = useState(false);
   const [context, setContext] = useState(null);
   const [aiStatus, setAiStatus] = useState(null);
   const [gpuInfo, setGpuInfo] = useState(null);
+  const [chatHistory, setChatHistory] = useState([]);
 
   async function fetchRisks() {
     try {
@@ -255,13 +255,17 @@ export default function Overseer() {
 
   async function askOverseer() {
     if (!question.trim()) return;
+    const q = question.trim();
     setAsking(true);
-    setAnswer(null);
+    setQuestion('');
+    // Add question to history immediately
+    setChatHistory(prev => [...prev, { role: 'user', text: q, time: new Date().toISOString() }]);
     try {
-      const data = await api.askOverseer({ question });
-      setAnswer(data.answer || data.error);
+      const data = await api.askOverseer({ question: q });
+      const answer = data.answer || data.error || 'No response';
+      setChatHistory(prev => [...prev, { role: 'overseer', text: answer, time: new Date().toISOString(), adviceId: data.adviceId }]);
     } catch (err) {
-      setAnswer(`Error: ${err.message}`);
+      setChatHistory(prev => [...prev, { role: 'overseer', text: `Error: ${err.message}`, time: new Date().toISOString() }]);
     } finally {
       setAsking(false);
     }
@@ -269,9 +273,17 @@ export default function Overseer() {
 
   useEffect(() => {
     fetchRisks();
-    // Fetch AI model + GPU info on mount
     api.getOverseerStatus().then(setAiStatus).catch(() => {});
     api.getGpuDetail().then(setGpuInfo).catch(() => {});
+    // Load previous Q&A from advice journal
+    api.getAdvice({ source: 'ask', limit: 20 }).then(entries => {
+      const history = [];
+      for (const e of (entries || []).reverse()) {
+        if (e.question) history.push({ role: 'user', text: e.question, time: e.created_at });
+        if (e.recommendation) history.push({ role: 'overseer', text: e.recommendation, time: e.created_at, adviceId: e.id });
+      }
+      if (history.length > 0) setChatHistory(history);
+    }).catch(() => {});
   }, []);
 
   return (
@@ -344,19 +356,59 @@ export default function Overseer() {
             )}
           </div>
 
-          {/* Ask the Overseer */}
+          {/* Ask the Overseer — Chat interface */}
           <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
             <div className="flex items-center gap-2 mb-3">
               <Send size={14} className="text-nexus-amber" />
               <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Ask the Overseer</span>
+              {chatHistory.length > 0 && (
+                <span className="text-[9px] font-mono text-nexus-text-faint ml-auto">{Math.floor(chatHistory.filter(m => m.role === 'user').length)} questions asked</span>
+              )}
             </div>
+
+            {/* Chat history */}
+            {chatHistory.length > 0 && (
+              <div className="mb-3 max-h-80 overflow-y-auto space-y-2 pr-1">
+                {chatHistory.map((msg, i) => (
+                  <div key={i} className={`p-2.5 rounded-lg ${
+                    msg.role === 'user'
+                      ? 'bg-nexus-amber/5 border border-nexus-amber/10 ml-8'
+                      : 'bg-nexus-bg border border-nexus-border mr-4'
+                  }`}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className={`text-[9px] font-mono ${msg.role === 'user' ? 'text-nexus-amber' : 'text-nexus-text-faint'}`}>
+                        {msg.role === 'user' ? 'You' : '◈ Overseer'}
+                      </span>
+                      <span className="text-[8px] font-mono text-nexus-text-faint ml-auto">
+                        {new Date(msg.time).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    {msg.role === 'user' ? (
+                      <p className="text-xs text-nexus-text">{msg.text}</p>
+                    ) : (
+                      <AnalysisBlock text={msg.text} />
+                    )}
+                  </div>
+                ))}
+                {asking && (
+                  <div className="p-2.5 rounded-lg bg-nexus-bg border border-nexus-border mr-4">
+                    <div className="flex items-center gap-2">
+                      <Loader2 size={12} className="animate-spin text-nexus-amber" />
+                      <span className="text-xs font-mono text-nexus-text-faint">Overseer is thinking...</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Input */}
             <div className="flex gap-2">
               <input
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && askOverseer()}
+                onKeyDown={(e) => e.key === 'Enter' && !asking && askOverseer()}
                 maxLength={5000}
-                placeholder="What should I prioritize this week? / Is Firewall at risk? / ..."
+                placeholder="What should I prioritize? / Is Firewall at risk? / ..."
                 className="flex-1 bg-nexus-bg border border-nexus-border rounded-lg px-3 py-2 text-sm text-nexus-text placeholder:text-nexus-text-faint focus:border-nexus-amber focus:outline-none"
               />
               <button
@@ -367,11 +419,6 @@ export default function Overseer() {
                 {asking ? <Loader2 size={14} className="animate-spin" /> : 'Ask'}
               </button>
             </div>
-            {answer && (
-              <div className="mt-3 p-3 bg-nexus-bg rounded-lg">
-                <AnalysisBlock text={answer} />
-              </div>
-            )}
           </div>
         </div>
 
