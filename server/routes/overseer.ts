@@ -519,6 +519,94 @@ Group by severity. Be terse. Maximum 30 findings.`;
     });
   });
 
+  // v4.3 #197 — Overseer proposes typed edges between a subject decision and candidates.
+  // Advisory-only: returns a taskId. Caller polls /ask/result/:taskId and parses the JSON
+  // edge list, then commits chosen edges via POST /ledger/link (i.e. nexus_link_decisions).
+  router.post('/propose-edges', async (req: Request, res: Response) => {
+    const { decision_id, candidate_pool_size = 10, project_scope } = req.body || {};
+    const id = Number(decision_id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'decision_id required.' });
+
+    const subject = store.getAllDecisions().find((d: any) => d.id === id);
+    if (!subject) return res.status(404).json({ error: `Decision #${id} not found.` });
+
+    const ai = await detectAI();
+    if (!ai.available) return res.json({ error: 'No local AI available. Install LM Studio and load a model.' });
+
+    // Candidate selection: project-matched first, then recent.
+    const all = store.getAllDecisions().filter((d: any) => d.id !== id && !d.deprecated);
+    const scoped = project_scope
+      ? all.filter((d: any) => (d.project || '').toLowerCase() === String(project_scope).toLowerCase())
+      : all.filter((d: any) => (d.project || '').toLowerCase() === (subject.project || '').toLowerCase());
+    const pool = (scoped.length >= 3 ? scoped : all)
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, Math.max(3, Math.min(30, Number(candidate_pool_size) || 10)));
+
+    if (pool.length === 0) return res.json({ error: 'No candidate decisions available to propose edges against.' });
+
+    const taskId = `propose-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    asyncTasks.set(taskId, {
+      status: 'pending',
+      question: `Edge proposals for decision #${id}`,
+      startedAt: Date.now(),
+    });
+
+    const systemMsg = `You are Nexus's edge proposer. Your job is to identify typed relationships between a SUBJECT decision and a pool of CANDIDATE decisions from the same knowledge graph.
+
+Edge types (pick the BEST fit, or omit if nothing fits):
+- led_to      — the subject directly CAUSED the candidate (strong causal chain)
+- depends_on  — the subject REQUIRES the candidate to exist/be true
+- contradicts — the two decisions CONFLICT with each other
+- replaced    — the subject supersedes the candidate (the candidate is now obsolete)
+- related     — weakly connected but real
+- informs     — candidate provides CONTEXT for the subject without being a hard requirement
+- experimental — tentative link you're not sure about; worth revisiting
+
+Rules:
+- Be conservative. Only propose edges with real signal. "related" is the default when unsure.
+- Direction matters. from→to means "from" acts on "to" via the rel.
+- Output VALID JSON ONLY. No prose before or after. No markdown fences. No code blocks.
+- Schema:
+  { "proposals": [ { "from_id": N, "to_id": N, "rel": "...", "confidence": 0.0-1.0, "reason": "one short sentence" } ] }
+- Max 5 proposals. Quality over quantity.
+- If nothing fits, return { "proposals": [] }.`;
+
+    const userMsg = `SUBJECT decision:
+  #${subject.id} [${subject.project}] ${subject.decision}${subject.context ? `\n  context: ${subject.context.slice(0, 300)}` : ''}
+
+CANDIDATE decisions (${pool.length}):
+${pool.map((d: any) => `  #${d.id} [${d.project}] ${d.decision.slice(0, 180)}`).join('\n')}
+
+Propose edges from the SUBJECT to one or more CANDIDATES. Remember: JSON only, max 5 proposals.`;
+
+    // Fire and forget — same pattern as /ask/start
+    ask(ai, systemMsg, userMsg, 800)
+      .then((answer) => {
+        const task = asyncTasks.get(taskId);
+        if (task) {
+          task.status = 'done';
+          task.answer = answer;
+          task.model = ai.model;
+          task.adviceId = null;
+        }
+      })
+      .catch((err) => {
+        const task = asyncTasks.get(taskId);
+        if (task) {
+          task.status = 'error';
+          task.error = err.message;
+        }
+      });
+
+    res.json({
+      taskId,
+      status: 'pending',
+      subject: { id: subject.id, decision: subject.decision, project: subject.project },
+      candidates: pool.length,
+      message: `Overseer is proposing edges. Poll /overseer/ask/result/${taskId}`,
+    });
+  });
+
   // Quick risk scan (lightweight, no AI needed)
   router.get('/risks', (req: Request, res: Response) => {
     const ctx = gatherContext(store);
