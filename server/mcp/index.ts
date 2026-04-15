@@ -63,7 +63,7 @@ import {
 const STANDALONE = process.env.NEXUS_STANDALONE === '1';
 const NEXUS_BASE = process.env.NEXUS_BASE_URL || 'http://localhost:3001';
 const SERVER_NAME = 'nexus';
-const SERVER_VERSION = '4.3.0';
+const SERVER_VERSION = '4.3.1';
 
 // In standalone mode, import the local API adapter (direct store access, no Express needed)
 let localApiFetch: ((path: string, init?: any) => Promise<any>) | null = null;
@@ -335,7 +335,8 @@ const TOOLS: Tool[] = [
     description:
       'Record a strategic decision into The Ledger (the long-term decision graph). ' +
       'Use this for architectural choices, design decisions, scope boundaries, or "why we did it this way" notes. ' +
-      'Decisions become first-class nodes in the knowledge graph and feed into Overseer analysis, blast-radius queries, and the Compass module.',
+      'Decisions become first-class nodes in the knowledge graph and feed into Overseer analysis, blast-radius queries, and the Compass module. ' +
+      'TIP: pass emit_cc_memory=true and Nexus returns a ready-to-write CC memory-file suggestion (YAML frontmatter + body) + recommended filename; use the Write tool to persist it under ~/.claude/projects/<cwd-encoded>/memory/ so the decision survives in CC\'s native memory surface.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -350,6 +351,10 @@ const TOOLS: Tool[] = [
         rationale: {
           type: 'string',
           description: 'Optional: why this decision was made (alternatives considered, constraints, etc.).',
+        },
+        emit_cc_memory: {
+          type: 'boolean',
+          description: 'Optional (v4.3+): when true, Nexus response includes a suggested CC memory file (YAML frontmatter + body + recommended filename) so you can persist the decision as a CC memory via the Write tool. Default false.',
         },
       },
       required: ['decision', 'project'],
@@ -914,7 +919,47 @@ async function handleTool(name: string, args: any): Promise<string> {
         method: 'POST',
         body: JSON.stringify(body),
       });
-      return `◈ Decision #${result.id} recorded for ${args.project}\n  ${args.decision}`;
+      let out = `◈ Decision #${result.id} recorded for ${args.project}\n  ${args.decision}`;
+
+      // v4.3 #198 Phase B — optional CC memory emission. Nexus composes a ready-to-write
+      // memory file; Claude uses the Write tool to persist it. Keeps the MCP boundary clean
+      // (Nexus doesn't need to know the user's CWD encoding).
+      if (args.emit_cc_memory) {
+        const slug = String(args.decision)
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '')
+          .slice(0, 50) || `decision_${result.id}`;
+        const filename = `reference_${slug}.md`;
+        const projectName = String(args.project);
+        const name = `Decision #${result.id}: ${String(args.decision).slice(0, 60)}`;
+        const description = String(args.decision).slice(0, 180).replace(/[\n\r]/g, ' ');
+        const memoryFile = [
+          '---',
+          `name: ${name.replace(/[\n\r]/g, ' ')}`,
+          `description: ${description}`,
+          `type: reference`,
+          '---',
+          '',
+          `**Project:** ${projectName}`,
+          `**Recorded:** ${new Date().toISOString()}`,
+          `**Nexus decision ID:** #${result.id}`,
+          '',
+          `## Decision`,
+          '',
+          String(args.decision),
+          '',
+          args.rationale ? `## Rationale\n\n${args.rationale}\n` : '',
+          `---\n\n_Auto-emitted by nexus_record_decision. Edit freely; the Ledger remains the source of truth — update the decision there via nexus_update_decision._`,
+        ].filter(Boolean).join('\n');
+
+        out += '\n\n◈ CC memory suggestion:';
+        out += `\n  Recommended path: <CC memory dir for ${projectName}>/${filename}`;
+        out += `\n  Use the Write tool to persist. Target dir: find your project's dir under ~/.claude/projects/<cwd-encoded>/memory/`;
+        out += `\n\n--- FILE CONTENT START ---\n${memoryFile}\n--- FILE CONTENT END ---`;
+      }
+
+      return out;
     }
 
     case 'nexus_update_decision': {

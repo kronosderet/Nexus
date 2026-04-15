@@ -22284,7 +22284,7 @@ var StdioServerTransport = class {
 var STANDALONE = process.env.NEXUS_STANDALONE === "1";
 var NEXUS_BASE = process.env.NEXUS_BASE_URL || "http://localhost:3001";
 var SERVER_NAME = "nexus";
-var SERVER_VERSION = "4.3.0";
+var SERVER_VERSION = "4.3.1";
 var localApiFetch2 = null;
 if (STANDALONE) {
   try {
@@ -22500,7 +22500,7 @@ var TOOLS = [
   },
   {
     name: "nexus_record_decision",
-    description: 'Record a strategic decision into The Ledger (the long-term decision graph). Use this for architectural choices, design decisions, scope boundaries, or "why we did it this way" notes. Decisions become first-class nodes in the knowledge graph and feed into Overseer analysis, blast-radius queries, and the Compass module.',
+    description: `Record a strategic decision into The Ledger (the long-term decision graph). Use this for architectural choices, design decisions, scope boundaries, or "why we did it this way" notes. Decisions become first-class nodes in the knowledge graph and feed into Overseer analysis, blast-radius queries, and the Compass module. TIP: pass emit_cc_memory=true and Nexus returns a ready-to-write CC memory-file suggestion (YAML frontmatter + body) + recommended filename; use the Write tool to persist it under ~/.claude/projects/<cwd-encoded>/memory/ so the decision survives in CC's native memory surface.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -22515,6 +22515,10 @@ var TOOLS = [
         rationale: {
           type: "string",
           description: "Optional: why this decision was made (alternatives considered, constraints, etc.)."
+        },
+        emit_cc_memory: {
+          type: "boolean",
+          description: "Optional (v4.3+): when true, Nexus response includes a suggested CC memory file (YAML frontmatter + body + recommended filename) so you can persist the decision as a CC memory via the Write tool. Default false."
         }
       },
       required: ["decision", "project"]
@@ -22977,8 +22981,49 @@ async function handleTool(name, args) {
         method: "POST",
         body: JSON.stringify(body)
       });
-      return `\u25C8 Decision #${result.id} recorded for ${args.project}
+      let out = `\u25C8 Decision #${result.id} recorded for ${args.project}
   ${args.decision}`;
+      if (args.emit_cc_memory) {
+        const slug = String(args.decision).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 50) || `decision_${result.id}`;
+        const filename = `reference_${slug}.md`;
+        const projectName = String(args.project);
+        const name2 = `Decision #${result.id}: ${String(args.decision).slice(0, 60)}`;
+        const description = String(args.decision).slice(0, 180).replace(/[\n\r]/g, " ");
+        const memoryFile = [
+          "---",
+          `name: ${name2.replace(/[\n\r]/g, " ")}`,
+          `description: ${description}`,
+          `type: reference`,
+          "---",
+          "",
+          `**Project:** ${projectName}`,
+          `**Recorded:** ${(/* @__PURE__ */ new Date()).toISOString()}`,
+          `**Nexus decision ID:** #${result.id}`,
+          "",
+          `## Decision`,
+          "",
+          String(args.decision),
+          "",
+          args.rationale ? `## Rationale
+
+${args.rationale}
+` : "",
+          `---
+
+_Auto-emitted by nexus_record_decision. Edit freely; the Ledger remains the source of truth \u2014 update the decision there via nexus_update_decision._`
+        ].filter(Boolean).join("\n");
+        out += "\n\n\u25C8 CC memory suggestion:";
+        out += `
+  Recommended path: <CC memory dir for ${projectName}>/${filename}`;
+        out += `
+  Use the Write tool to persist. Target dir: find your project's dir under ~/.claude/projects/<cwd-encoded>/memory/`;
+        out += `
+
+--- FILE CONTENT START ---
+${memoryFile}
+--- FILE CONTENT END ---`;
+      }
+      return out;
     }
     case "nexus_update_decision": {
       if (args?.id == null) throw new Error("id is required");

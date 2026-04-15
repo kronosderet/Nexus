@@ -108,6 +108,8 @@ Nexus becomes the reasoning layer ON TOP of CC's native scaffolding (memory, pla
 - **#191 AMPLIFY: Chapter Narrator (advisory)** — SessionStart hook emits `mark_chapter()` suggestions; `/nexus-brief` skill documents the convention
 - **#195 OWN: Knowledge Graph v3** — 2 new edge types: `informs` (context without dependency), `experimental` (tentative, revisit). Graph visualizer updated with distinct styles.
 - **#194 AMPLIFY: Calendar-aware fuel** — new `nexus_calendar_runway` tool + `/nexus-runway` skill. Claude fetches upcoming events via Calendar MCP, Nexus classifies the fit against fuel runway (comfortable / tight / wrap_now / unreachable).
+- **#196 OWN+HARMONIZE: Overseer reads CC scaffolding** — `gatherContext` now includes 5 recent CC plans + 10 CC memory entries in the Overseer's prompt. Lets the Overseer cross-reference Nexus decisions against what CC has recorded about the user's workflow.
+- **#198 HARMONIZE: Memory Bridge Phase B (advisory write path)** — `nexus_record_decision` gains `emit_cc_memory: true` param. When set, Nexus composes a ready-to-write memory file (YAML frontmatter + body + recommended filename) that Claude can persist via the Write tool. Closes the write half of the Memory Bridge. First-run import of existing memories remains queued as #200.
 
 ### Queued for v4.3
 - **#188 HARMONIZE: Memory Bridge** — read/write `~/.claude/projects/*/memory/` in brief + record_decision

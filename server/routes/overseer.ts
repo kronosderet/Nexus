@@ -7,6 +7,8 @@ import { createGpuAwareSignal } from '../lib/gpuSignal.ts';
 import { acquireAiLock } from '../lib/aiSemaphore.ts';
 import { aiFetch } from '../lib/aiFetch.ts';
 import { PROJECTS_DIR } from '../lib/config.ts';
+import { scanPlans } from '../lib/planIndex.ts';
+import { scanCCMemories } from '../lib/memoryIndex.ts';
 
 type BroadcastFn = (data: any) => void;
 
@@ -104,12 +106,29 @@ function gatherContext(store: NexusStore) {
   const judgedAdvice = allAdvice.filter(a => a.accepted !== null).slice(0, 10);
   const advicePatterns = store.getAdvicePatterns();
 
+  // v4.3 #196: CC scaffolding — plans + memory files. Read-only glimpse so the
+  // Overseer can cross-reference Nexus decisions with what CC has stored about
+  // the user's workflow. Bounded small (5 plans, 10 memories) to keep the
+  // context prompt under control; larger surveys belong to the /nexus-audit flow.
+  let ccPlans: any[] = [];
+  let ccMemories: any[] = [];
+  try {
+    const p = scanPlans(5);
+    if (p.available) ccPlans = p.plans;
+  } catch {}
+  try {
+    const m = scanCCMemories(10);
+    if (m.available) ccMemories = m.memories;
+  } catch {}
+
   return {
     tasks, sessions, activity, usage, repos, ledger,
     topCentral, blindSpots,
     graphStats: { nodes: graph.nodes.length, edges: graph.edges.length },
     judgedAdvice,
     advicePatterns,
+    ccPlans,
+    ccMemories,
   };
 }
 
@@ -143,6 +162,27 @@ function buildContextPrompt(ctx: any) {
     for (const d of ctx.ledger.slice(0, 10)) {
       lines.push(`  [${d.project}] ${d.decision}${d.alternatives.length ? ` (alternatives: ${d.alternatives.join(', ')})` : ''}`);
     }
+  }
+
+  // v4.3 #196: CC scaffolding — surfaces what the user's Claude Code has recorded
+  // about the project (plans it wrote, memory files it persisted). Lets the Overseer
+  // flag inconsistencies between Nexus decisions and CC's own record.
+  if (ctx.ccPlans?.length > 0) {
+    lines.push('\nCC PLANS (from ~/.claude/plans/):');
+    for (const p of ctx.ccPlans) {
+      const age = p.ageDays === 0 ? 'today' : `${p.ageDays}d ago`;
+      const proj = p.project ? `[${p.project}] ` : '';
+      lines.push(`  ${proj}${p.title.slice(0, 80)} (${age})`);
+    }
+  }
+  if (ctx.ccMemories?.length > 0) {
+    lines.push('\nCC MEMORY (from ~/.claude/projects/*/memory/):');
+    for (const m of ctx.ccMemories) {
+      const proj = m.project ? `[${m.project}] ` : '';
+      const head = (m.description || m.name || m.filename).slice(0, 90);
+      lines.push(`  ${proj}[${m.type}] ${head}`);
+    }
+    lines.push('  (flag stale/outdated CC memory entries that conflict with current Ledger decisions)');
   }
 
   // Advice Journal: your own track record (the learning loop)
