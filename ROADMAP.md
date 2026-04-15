@@ -107,6 +107,7 @@ Nexus becomes the reasoning layer ON TOP of CC's native scaffolding (memory, pla
 - **#190 HARMONIZE: Kill redundant activity logging** — UserPromptSubmit hook now a no-op stub; CC session JSONL is the raw log
 - **#191 AMPLIFY: Chapter Narrator (advisory)** — SessionStart hook emits `mark_chapter()` suggestions; `/nexus-brief` skill documents the convention
 - **#195 OWN: Knowledge Graph v3** — 2 new edge types: `informs` (context without dependency), `experimental` (tentative, revisit). Graph visualizer updated with distinct styles.
+- **#194 AMPLIFY: Calendar-aware fuel** — new `nexus_calendar_runway` tool + `/nexus-runway` skill. Claude fetches upcoming events via Calendar MCP, Nexus classifies the fit against fuel runway (comfortable / tight / wrap_now / unreachable).
 
 ### Queued for v4.3
 - **#188 HARMONIZE: Memory Bridge** — read/write `~/.claude/projects/*/memory/` in brief + record_decision

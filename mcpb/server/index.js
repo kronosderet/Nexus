@@ -22340,6 +22340,9 @@ function formatBrief(data, project) {
     );
     if (data.fuel.runwayMinutes != null) {
       lines.push(`Runway: ${data.fuel.runwayMinutes}m`);
+      if (data.fuel.session != null && data.fuel.session <= 80 && data.fuel.session >= 20) {
+        lines.push(`  tip: check calendar with /nexus-runway to plan around meetings`);
+      }
     }
   }
   if (data.activeTasks?.length) {
@@ -22859,6 +22862,32 @@ var TOOLS = [
     name: "nexus_fleet_overview",
     description: "Get cross-project priority matrix: ranks ALL open tasks across ALL projects by priority \xD7 age \xD7 project_staleness. Returns top 15 most urgent items. Use when deciding what to work on when multiple projects compete for attention.",
     inputSchema: { type: "object", properties: {} }
+  },
+  {
+    name: "nexus_calendar_runway",
+    description: "Compute fuel-runway overlap against upcoming calendar events and recommend a wrap-up time. Nexus cannot fetch the calendar itself \u2014 call mcp__{calendar}__list_events first (startTime=now, endTime=now+5h), map results to {start, title}, then pass them here. Nexus then checks the next meeting against current session fuel + runway and classifies the fit (comfortable / tight / wrap_now / unreachable). Use before a long coding session to know if you have time for the task at hand.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        events: {
+          type: "array",
+          description: "Upcoming events from the calendar MCP, ordered any way \u2014 Nexus sorts internally.",
+          items: {
+            type: "object",
+            properties: {
+              start: { type: "string", description: "ISO 8601 timestamp of event start." },
+              title: { type: "string", description: 'Event title (optional; falls back to "(untitled)").' }
+            },
+            required: ["start"]
+          }
+        },
+        buffer_minutes: {
+          type: "number",
+          description: "Context-switch buffer before the meeting. Default 15."
+        }
+      },
+      required: ["events"]
+    }
   }
 ];
 async function handleTool(name, args) {
@@ -23333,6 +23362,59 @@ ${data.answer || "(no response)"}`;
         for (const [proj, days] of Object.entries(data.staleness).sort((a, b) => b[1] - a[1])) {
           lines.push(`  ${proj}: ${days}d`);
         }
+      }
+      return lines.join("\n");
+    }
+    case "nexus_calendar_runway": {
+      const rawEvents = Array.isArray(args?.events) ? args.events : [];
+      const buffer = Number.isFinite(args?.buffer_minutes) ? Math.max(0, args.buffer_minutes) : 15;
+      const fuel = await nexusFetch("/api/estimator");
+      if (!fuel?.tracked) {
+        return "\u25C8 No fuel data yet \u2014 report usage with nexus_log_usage, then try again.";
+      }
+      const sessionPct = Math.round(fuel?.estimated?.session ?? 0);
+      const runwayMin = fuel?.session?.minutesRemaining ?? null;
+      const now = Date.now();
+      const horizonMin = runwayMin ? Math.max(runwayMin * 2, 300) : 300;
+      const upcoming = rawEvents.map((e) => {
+        const startMs = new Date(e?.start || 0).getTime();
+        const title = (e?.title || e?.summary || "(untitled)").toString().slice(0, 80);
+        const minutesAway = Math.round((startMs - now) / 6e4);
+        return { title, startMs, minutesAway };
+      }).filter((e) => Number.isFinite(e.startMs) && e.minutesAway > 0 && e.minutesAway <= horizonMin).sort((a, b) => a.startMs - b.startMs);
+      if (upcoming.length === 0) {
+        return `\u25C8 Runway clear.
+  Session fuel: ${sessionPct}%${runwayMin ? ` (~${runwayMin}m runway)` : ""}
+  No calendar events within runway. Build freely, Captain.`;
+      }
+      const next = upcoming[0];
+      const wrapBy = next.minutesAway - buffer;
+      let fits;
+      if (runwayMin != null && next.minutesAway > runwayMin + buffer) fits = "unreachable";
+      else if (wrapBy < 5) fits = "wrap_now";
+      else if (wrapBy < 30) fits = "tight";
+      else fits = "comfortable";
+      const lines = [
+        `\u25C8 Next: "${next.title}" in ${next.minutesAway}m`,
+        `  Session fuel: ${sessionPct}%${runwayMin ? ` (~${runwayMin}m runway)` : ""}`,
+        ""
+      ];
+      switch (fits) {
+        case "unreachable":
+          lines.push(`  \u26A0 Fuel runs out before the meeting. Log a session summary and preserve remaining fuel.`);
+          break;
+        case "wrap_now":
+          lines.push(`  \u26A0 Wrap up now \u2014 meeting in ${next.minutesAway}m, only ${Math.max(0, wrapBy)}m until your ${buffer}m buffer.`);
+          break;
+        case "tight":
+          lines.push(`  \u25E6 Tight window \u2014 wrap by ${wrapBy}m from now (${buffer}m buffer before meeting).`);
+          break;
+        case "comfortable":
+          lines.push(`  \u2713 Comfortable \u2014 wrap by ${wrapBy}m from now. Plenty of room for focused work.`);
+          break;
+      }
+      if (upcoming.length > 1) {
+        lines.push("", `  Then (within runway): ${upcoming.slice(1, 4).map((e) => `"${e.title}" +${e.minutesAway}m`).join(", ")}`);
       }
       return lines.join("\n");
     }

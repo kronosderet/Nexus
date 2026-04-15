@@ -21,7 +21,7 @@ Nexus gives Claude Code a persistent brain across conversations:
 /plugin install nexus@nexus-marketplace
 ```
 
-## Available tools (22)
+## Available tools (23)
 
 **Read:** nexus_brief, nexus_get_plan, nexus_check_guard, nexus_search, nexus_get_critique, nexus_predict_gaps, nexus_get_blast_radius, nexus_ask_overseer
 
@@ -29,7 +29,7 @@ Nexus gives Claude Code a persistent brain across conversations:
 
 **Async AI:** nexus_ask_overseer_start, nexus_get_overseer_result
 
-**Composite:** nexus_bridge_session, nexus_fleet_overview
+**Composite:** nexus_bridge_session, nexus_fleet_overview, nexus_calendar_runway
 
 ## Skills
 
