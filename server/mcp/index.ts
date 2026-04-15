@@ -144,6 +144,11 @@ function formatBrief(data: any, project: string): string {
     );
     if (data.fuel.runwayMinutes != null) {
       lines.push(`Runway: ${data.fuel.runwayMinutes}m`);
+      // v4.3 #194 — discoverable nudge toward calendar-aware runway check.
+      // Only suggest when fuel is in a range where planning matters (not fresh, not critical).
+      if (data.fuel.session != null && data.fuel.session <= 80 && data.fuel.session >= 20) {
+        lines.push(`  tip: check calendar with /nexus-runway to plan around meetings`);
+      }
     }
   }
 
@@ -763,6 +768,37 @@ const TOOLS: Tool[] = [
       'Use when deciding what to work on when multiple projects compete for attention.',
     inputSchema: { type: 'object', properties: {} },
   },
+  {
+    name: 'nexus_calendar_runway',
+    description:
+      'Compute fuel-runway overlap against upcoming calendar events and recommend a wrap-up time. ' +
+      'Nexus cannot fetch the calendar itself — call mcp__{calendar}__list_events first (startTime=now, ' +
+      'endTime=now+5h), map results to {start, title}, then pass them here. Nexus then checks the next ' +
+      'meeting against current session fuel + runway and classifies the fit (comfortable / tight / wrap_now / ' +
+      'unreachable). Use before a long coding session to know if you have time for the task at hand.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        events: {
+          type: 'array',
+          description: 'Upcoming events from the calendar MCP, ordered any way — Nexus sorts internally.',
+          items: {
+            type: 'object',
+            properties: {
+              start: { type: 'string', description: 'ISO 8601 timestamp of event start.' },
+              title: { type: 'string', description: 'Event title (optional; falls back to "(untitled)").' },
+            },
+            required: ['start'],
+          },
+        },
+        buffer_minutes: {
+          type: 'number',
+          description: 'Context-switch buffer before the meeting. Default 15.',
+        },
+      },
+      required: ['events'],
+    },
+  },
 ];
 
 // ── Tool handlers ────────────────────────────────────────
@@ -1291,6 +1327,74 @@ async function handleTool(name: string, args: any): Promise<string> {
           lines.push(`  ${proj}: ${days}d`);
         }
       }
+      return lines.join('\n');
+    }
+
+    case 'nexus_calendar_runway': {
+      const rawEvents: any[] = Array.isArray(args?.events) ? args.events : [];
+      const buffer = Number.isFinite(args?.buffer_minutes) ? Math.max(0, args.buffer_minutes) : 15;
+
+      // Pull current fuel + runway. Nexus owns this data in both HTTP and standalone modes.
+      const fuel: any = await nexusFetch('/api/estimator');
+      if (!fuel?.tracked) {
+        return '◈ No fuel data yet — report usage with nexus_log_usage, then try again.';
+      }
+      const sessionPct = Math.round(fuel?.estimated?.session ?? 0);
+      const runwayMin = fuel?.session?.minutesRemaining ?? null;
+
+      // Normalize + sort events, drop past entries, keep only those within reach.
+      const now = Date.now();
+      const horizonMin = runwayMin ? Math.max(runwayMin * 2, 300) : 300;
+      const upcoming = rawEvents
+        .map((e) => {
+          const startMs = new Date(e?.start || 0).getTime();
+          const title = (e?.title || e?.summary || '(untitled)').toString().slice(0, 80);
+          const minutesAway = Math.round((startMs - now) / 60000);
+          return { title, startMs, minutesAway };
+        })
+        .filter((e) => Number.isFinite(e.startMs) && e.minutesAway > 0 && e.minutesAway <= horizonMin)
+        .sort((a, b) => a.startMs - b.startMs);
+
+      if (upcoming.length === 0) {
+        return (
+          `◈ Runway clear.\n` +
+          `  Session fuel: ${sessionPct}%${runwayMin ? ` (~${runwayMin}m runway)` : ''}\n` +
+          `  No calendar events within runway. Build freely, Captain.`
+        );
+      }
+
+      const next = upcoming[0];
+      const wrapBy = next.minutesAway - buffer;
+      let fits: 'comfortable' | 'tight' | 'wrap_now' | 'unreachable';
+      if (runwayMin != null && next.minutesAway > runwayMin + buffer) fits = 'unreachable';
+      else if (wrapBy < 5) fits = 'wrap_now';
+      else if (wrapBy < 30) fits = 'tight';
+      else fits = 'comfortable';
+
+      const lines: string[] = [
+        `◈ Next: "${next.title}" in ${next.minutesAway}m`,
+        `  Session fuel: ${sessionPct}%${runwayMin ? ` (~${runwayMin}m runway)` : ''}`,
+        '',
+      ];
+      switch (fits) {
+        case 'unreachable':
+          lines.push(`  ⚠ Fuel runs out before the meeting. Log a session summary and preserve remaining fuel.`);
+          break;
+        case 'wrap_now':
+          lines.push(`  ⚠ Wrap up now — meeting in ${next.minutesAway}m, only ${Math.max(0, wrapBy)}m until your ${buffer}m buffer.`);
+          break;
+        case 'tight':
+          lines.push(`  ◦ Tight window — wrap by ${wrapBy}m from now (${buffer}m buffer before meeting).`);
+          break;
+        case 'comfortable':
+          lines.push(`  ✓ Comfortable — wrap by ${wrapBy}m from now. Plenty of room for focused work.`);
+          break;
+      }
+
+      if (upcoming.length > 1) {
+        lines.push('', `  Then (within runway): ${upcoming.slice(1, 4).map(e => `"${e.title}" +${e.minutesAway}m`).join(', ')}`);
+      }
+
       return lines.join('\n');
     }
 

@@ -2,7 +2,7 @@
 
 **AI Cowork Metabrain for Claude Code**
 
-A local-first metabrain that gives every Claude Code instance persistent memory, a Knowledge Graph, and a strategic AI advisor. 22 native MCP tools. Zero cloud dependencies.
+A local-first metabrain that gives every Claude Code instance persistent memory, a Knowledge Graph, and a strategic AI advisor. 23 native MCP tools. Zero cloud dependencies.
 
 ## Install as Claude Code Plugin
 
@@ -48,7 +48,7 @@ Nexus solves the biggest problem with AI-assisted development: **Claude forgets 
 - **Self-Critique** — identifies slow tasks, stuck items, completion patterns
 - **Local AI Overseer** (optional) — strategic analysis via LM Studio with up to 200k context
 
-## 22 Native MCP Tools
+## 23 Native MCP Tools
 
 After installing, Claude Code can call these directly — no shell-outs, no CLI:
 
@@ -58,7 +58,7 @@ After installing, Claude Code can call these directly — no shell-outs, no CLI:
 
 **Async AI:** `nexus_ask_overseer_start`, `nexus_get_overseer_result`
 
-**Composite:** `nexus_bridge_session`, `nexus_fleet_overview`
+**Composite:** `nexus_bridge_session`, `nexus_fleet_overview`, `nexus_calendar_runway`
 
 ## Dashboard (Optional)
 
