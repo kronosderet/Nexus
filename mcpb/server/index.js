@@ -7883,6 +7883,142 @@ var init_planIndex = __esm({
   }
 });
 
+// server/lib/memoryIndex.ts
+var memoryIndex_exports = {};
+__export(memoryIndex_exports, {
+  scanCCMemories: () => scanCCMemories
+});
+import { homedir as homedir2 } from "os";
+import { join as join4 } from "path";
+import { existsSync as existsSync4, readdirSync as readdirSync2, readFileSync as readFileSync4, statSync as statSync2 } from "fs";
+function inferProject(encodedDir, content) {
+  for (const h of DIR_HINTS) {
+    if (h.patterns.some((p) => p.test(encodedDir))) return h.project;
+  }
+  for (const h of CONTENT_HINTS) {
+    if (h.patterns.some((p) => p.test(content))) return h.project;
+  }
+  return null;
+}
+function parseFrontmatter(content) {
+  const fields = {};
+  if (!content.startsWith("---")) return { fields, bodyStart: 0 };
+  const closeIdx = content.indexOf("\n---", 3);
+  if (closeIdx < 0) return { fields, bodyStart: 0 };
+  const raw = content.slice(3, closeIdx).trim();
+  for (const line of raw.split("\n")) {
+    const m = line.match(/^([A-Za-z_][A-Za-z0-9_-]*):\s*(.*)$/);
+    if (m) fields[m[1]] = m[2].trim().replace(/^["']|["']$/g, "");
+  }
+  return { fields, bodyStart: closeIdx + 4 };
+}
+function typeFromFilename(filename) {
+  const stem = filename.replace(/\.md$/, "");
+  const prefix = stem.split("_")[0];
+  const known = ["user", "feedback", "project", "reference", "plan", "system"];
+  return known.includes(prefix) ? prefix : "other";
+}
+function scanCCMemories(limit = 50) {
+  if (!existsSync4(PROJECTS_ROOT)) {
+    return { available: false, memories: [], totalFiles: 0, projectDirs: 0, memoriesDir: PROJECTS_ROOT };
+  }
+  const now = Date.now();
+  const entries = [];
+  let totalFiles = 0;
+  let projectDirs = 0;
+  let projectDirNames = [];
+  try {
+    projectDirNames = readdirSync2(PROJECTS_ROOT);
+  } catch {
+    return { available: false, memories: [], totalFiles: 0, projectDirs: 0, memoriesDir: PROJECTS_ROOT };
+  }
+  for (const dirName of projectDirNames) {
+    const memoryDir = join4(PROJECTS_ROOT, dirName, "memory");
+    let dirStat;
+    try {
+      dirStat = statSync2(memoryDir);
+    } catch {
+      continue;
+    }
+    if (!dirStat.isDirectory()) continue;
+    projectDirs++;
+    let files = [];
+    try {
+      files = readdirSync2(memoryDir).filter((f) => f.endsWith(".md") && f !== "MEMORY.md");
+    } catch {
+      continue;
+    }
+    for (const file2 of files) {
+      totalFiles++;
+      const fullPath = join4(memoryDir, file2);
+      let stat;
+      try {
+        stat = statSync2(fullPath);
+      } catch {
+        continue;
+      }
+      let content = "";
+      try {
+        content = readFileSync4(fullPath, "utf-8").slice(0, 6e3);
+      } catch {
+      }
+      const { fields, bodyStart } = parseFrontmatter(content);
+      const type = fields.type || typeFromFilename(file2);
+      const name = (fields.name || file2.replace(/^[a-z]+_/, "").replace(/\.md$/, "").replace(/_/g, " ")).slice(0, 80);
+      const description = (fields.description || "").slice(0, 200);
+      const body = content.slice(bodyStart).replace(/\s+/g, " ").trim();
+      const snippet = body.slice(0, 220);
+      const project = inferProject(dirName, content);
+      const mtime = stat.mtime.toISOString();
+      const ageDays = Math.max(0, Math.round((now - stat.mtime.getTime()) / 864e5));
+      entries.push({
+        filename: file2,
+        path: fullPath,
+        encodedProject: dirName,
+        project,
+        type,
+        name,
+        description,
+        snippet,
+        mtime,
+        ageDays
+      });
+    }
+  }
+  entries.sort((a, b) => new Date(b.mtime).getTime() - new Date(a.mtime).getTime());
+  return {
+    available: true,
+    memories: entries.slice(0, Math.max(1, limit)),
+    totalFiles,
+    projectDirs,
+    memoriesDir: PROJECTS_ROOT
+  };
+}
+var PROJECTS_ROOT, DIR_HINTS, CONTENT_HINTS;
+var init_memoryIndex = __esm({
+  "server/lib/memoryIndex.ts"() {
+    "use strict";
+    PROJECTS_ROOT = process.env.NEXUS_CC_PROJECTS_DIR || join4(homedir2(), ".claude", "projects");
+    DIR_HINTS = [
+      { project: "Nexus", patterns: [/C--Projects$/i] },
+      // C:\Projects hosts Nexus work
+      { project: "Firewall", patterns: [/Firewall/i] },
+      { project: "Shadowrun", patterns: [/Shadowrun/i] },
+      { project: "Level", patterns: [/Level/i] },
+      { project: "rts", patterns: [/\brts\b/i] },
+      { project: "claude-md", patterns: [/Claude-MD$/i] }
+      // the top-level Claude-MD dir
+    ];
+    CONTENT_HINTS = [
+      { project: "Nexus", patterns: [/[\\/]Projects[\\/]Nexus\b/i, /\bNexus\b/] },
+      { project: "Firewall", patterns: [/Firewall[- ]?Godot\b/i, /\bFirewall\b/] },
+      { project: "Shadowrun", patterns: [/\bShadowrun\b/i, /\bSR3\b/] },
+      { project: "Level", patterns: [/[Mm]:[\\/]Level\b/, /Level Magazine/i] },
+      { project: "rts", patterns: [/\bNoosphere\b/i, /Claude-MD[\\/]rts\b/i] }
+    ];
+  }
+});
+
 // server/mcp/localApi.ts
 var localApi_exports = {};
 __export(localApi_exports, {
@@ -7890,9 +8026,9 @@ __export(localApi_exports, {
   localApiFetch: () => localApiFetch,
   store: () => store
 });
-import { mkdirSync, existsSync as existsSync4 } from "fs";
-import { join as join4 } from "path";
-import { homedir as homedir2 } from "os";
+import { mkdirSync, existsSync as existsSync5 } from "fs";
+import { join as join5 } from "path";
+import { homedir as homedir3 } from "os";
 async function localApiFetch(path, init = {}) {
   const method = init.method || "GET";
   const body = init.body ? JSON.parse(init.body) : {};
@@ -8040,6 +8176,14 @@ async function localApiFetch(path, init = {}) {
     const limit = Number.isFinite(raw) && raw > 0 ? Math.min(raw, 200) : 30;
     return scanPlans2(limit);
   }
+  if (pathname === "/api/cc-memory") {
+    const { scanCCMemories: scanCCMemories2 } = await Promise.resolve().then(() => (init_memoryIndex(), memoryIndex_exports));
+    const raw = parseInt(params.get("limit") || "");
+    const limit = Number.isFinite(raw) && raw > 0 ? Math.min(raw, 200) : 50;
+    const typeFilter = params.get("type");
+    const index = scanCCMemories2(limit * 2);
+    return typeFilter ? { ...index, memories: index.memories.filter((m) => m.type === typeFilter).slice(0, limit) } : { ...index, memories: index.memories.slice(0, limit) };
+  }
   if (pathname === "/api/overseer/risks") {
     const tasks = store.getAllTasks();
     const usage = store.getLatestUsage();
@@ -8100,9 +8244,9 @@ var init_localApi = __esm({
   async "server/mcp/localApi.ts"() {
     "use strict";
     init_aiEndpoints();
-    NEXUS_HOME = process.env.NEXUS_HOME || join4(homedir2(), ".nexus");
-    if (!existsSync4(NEXUS_HOME)) mkdirSync(NEXUS_HOME, { recursive: true });
-    process.env.NEXUS_DB_PATH = process.env.NEXUS_DB_PATH || join4(NEXUS_HOME, "nexus.json");
+    NEXUS_HOME = process.env.NEXUS_HOME || join5(homedir3(), ".nexus");
+    if (!existsSync5(NEXUS_HOME)) mkdirSync(NEXUS_HOME, { recursive: true });
+    process.env.NEXUS_DB_PATH = process.env.NEXUS_DB_PATH || join5(NEXUS_HOME, "nexus.json");
     ({ NexusStore: NexusStore2 } = await Promise.resolve().then(() => (init_store(), store_exports)));
     store = new NexusStore2();
   }
@@ -22233,6 +22377,16 @@ function formatBrief(data, project) {
       lines.push(`  \u203A ${tag}${p.title.slice(0, 80)} (${age})`);
     }
   }
+  if (data.ccMemories?.length) {
+    lines.push("");
+    const totalSuffix = data.totalMemories && data.totalMemories > data.ccMemories.length ? ` (${data.ccMemories.length} of ${data.totalMemories})` : ` (${data.ccMemories.length})`;
+    lines.push(`CC memory${totalSuffix}:`);
+    for (const m of data.ccMemories.slice(0, 5)) {
+      const typeTag = `[${m.type}]`;
+      const headline = (m.description || m.name || m.filename).slice(0, 90);
+      lines.push(`  \u203A ${typeTag} ${headline}`);
+    }
+  }
   if (data.risks?.length) {
     lines.push("");
     lines.push("Risks:");
@@ -22712,13 +22866,14 @@ async function handleTool(name, args) {
     case "nexus_brief": {
       const project = args?.project || "Nexus";
       const withTimeout = (p, fallback) => Promise.race([p, new Promise((r) => setTimeout(() => r(fallback), 1e4))]);
-      const [tasks, sessions, ledger, fuel, risks, plansIndex] = await Promise.all([
+      const [tasks, sessions, ledger, fuel, risks, plansIndex, memoriesIndex] = await Promise.all([
         withTimeout(nexusFetch("/api/tasks"), []),
         withTimeout(nexusFetch("/api/sessions"), []),
         withTimeout(nexusFetch("/api/ledger"), []),
         withTimeout(nexusFetch("/api/estimator"), null),
         withTimeout(nexusFetch("/api/overseer/risks"), { risks: [] }),
-        withTimeout(nexusFetch("/api/cc-plans?limit=10"), { available: false, plans: [], totalFiles: 0 })
+        withTimeout(nexusFetch("/api/cc-plans?limit=10"), { available: false, plans: [], totalFiles: 0 }),
+        withTimeout(nexusFetch("/api/cc-memory?limit=40"), { available: false, memories: [], totalFiles: 0 })
       ]);
       const projectLower = project.toLowerCase();
       const allProjects = /* @__PURE__ */ new Set();
@@ -22743,8 +22898,12 @@ async function handleTool(name, args) {
       const keyDecisions = (Array.isArray(ledger) ? ledger : []).filter((d) => d.project === project || d.project?.toLowerCase() === projectLower).slice(0, 5);
       const pi = plansIndex || {};
       const allPlans = Array.isArray(pi.plans) ? pi.plans : [];
-      const matched = allPlans.filter((p) => p.project && p.project.toLowerCase() === projectLower);
-      const recentPlans = matched.length > 0 ? matched : allPlans.slice(0, 5);
+      const matchedPlans = allPlans.filter((p) => p.project && p.project.toLowerCase() === projectLower);
+      const recentPlans = matchedPlans.length > 0 ? matchedPlans : allPlans.slice(0, 5);
+      const mi = memoriesIndex || {};
+      const allMemories = Array.isArray(mi.memories) ? mi.memories : [];
+      const matchedMemories = allMemories.filter((m) => m.project && m.project.toLowerCase() === projectLower);
+      const ccMemories = matchedMemories.length > 0 ? matchedMemories : allMemories.slice(0, 5);
       return formatBrief(
         {
           fuel: fuel?.estimated ? {
@@ -22757,6 +22916,8 @@ async function handleTool(name, args) {
           keyDecisions,
           recentPlans,
           totalPlans: pi.totalFiles ?? 0,
+          ccMemories,
+          totalMemories: mi.totalFiles ?? 0,
           risks: risks.risks || []
         },
         project

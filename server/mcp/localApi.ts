@@ -205,6 +205,18 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
     return scanPlans(limit);
   }
 
+  // ── CC memory files (Memory Bridge) ───────────────
+  if (pathname === '/api/cc-memory') {
+    const { scanCCMemories } = await import('../lib/memoryIndex.ts');
+    const raw = parseInt(params.get('limit') || '');
+    const limit = Number.isFinite(raw) && raw > 0 ? Math.min(raw, 200) : 50;
+    const typeFilter = params.get('type');
+    const index = scanCCMemories(limit * 2);
+    return typeFilter
+      ? { ...index, memories: index.memories.filter((m: any) => m.type === typeFilter).slice(0, limit) }
+      : { ...index, memories: index.memories.slice(0, limit) };
+  }
+
   // ── Overseer risks ────────────────────────────────
   if (pathname === '/api/overseer/risks') {
     // Lightweight risk scan — no AI needed

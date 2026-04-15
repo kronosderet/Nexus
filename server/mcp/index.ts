@@ -188,6 +188,19 @@ function formatBrief(data: any, project: string): string {
     }
   }
 
+  if (data.ccMemories?.length) {
+    lines.push('');
+    const totalSuffix = data.totalMemories && data.totalMemories > data.ccMemories.length
+      ? ` (${data.ccMemories.length} of ${data.totalMemories})`
+      : ` (${data.ccMemories.length})`;
+    lines.push(`CC memory${totalSuffix}:`);
+    for (const m of data.ccMemories.slice(0, 5)) {
+      const typeTag = `[${m.type}]`;
+      const headline = (m.description || m.name || m.filename).slice(0, 90);
+      lines.push(`  › ${typeTag} ${headline}`);
+    }
+  }
+
   if (data.risks?.length) {
     lines.push('');
     lines.push('Risks:');
@@ -759,13 +772,14 @@ async function handleTool(name: string, args: any): Promise<string> {
       // Per-call 10s timeout via Promise.race to prevent hanging on slow routes
       const withTimeout = <T>(p: Promise<T>, fallback: T) =>
         Promise.race([p, new Promise<T>(r => setTimeout(() => r(fallback), 10000))]);
-      const [tasks, sessions, ledger, fuel, risks, plansIndex] = await Promise.all([
+      const [tasks, sessions, ledger, fuel, risks, plansIndex, memoriesIndex] = await Promise.all([
         withTimeout(nexusFetch('/api/tasks'), []),
         withTimeout(nexusFetch('/api/sessions'), []),
         withTimeout(nexusFetch('/api/ledger'), []),
         withTimeout(nexusFetch('/api/estimator'), null),
         withTimeout(nexusFetch('/api/overseer/risks'), { risks: [] }),
         withTimeout(nexusFetch('/api/cc-plans?limit=10'), { available: false, plans: [], totalFiles: 0 }),
+        withTimeout(nexusFetch('/api/cc-memory?limit=40'), { available: false, memories: [], totalFiles: 0 }),
       ]);
 
       const projectLower = project.toLowerCase();
@@ -802,8 +816,14 @@ async function handleTool(name: string, args: any): Promise<string> {
       // fall back to most-recent across projects if none match.
       const pi: any = plansIndex || {};
       const allPlans: any[] = Array.isArray(pi.plans) ? pi.plans : [];
-      const matched = allPlans.filter((p) => p.project && p.project.toLowerCase() === projectLower);
-      const recentPlans = matched.length > 0 ? matched : allPlans.slice(0, 5);
+      const matchedPlans = allPlans.filter((p) => p.project && p.project.toLowerCase() === projectLower);
+      const recentPlans = matchedPlans.length > 0 ? matchedPlans : allPlans.slice(0, 5);
+
+      // Same pattern for CC memories — show project-matched first, newest fallback.
+      const mi: any = memoriesIndex || {};
+      const allMemories: any[] = Array.isArray(mi.memories) ? mi.memories : [];
+      const matchedMemories = allMemories.filter((m) => m.project && m.project.toLowerCase() === projectLower);
+      const ccMemories = matchedMemories.length > 0 ? matchedMemories : allMemories.slice(0, 5);
 
       return formatBrief(
         {
@@ -819,6 +839,8 @@ async function handleTool(name: string, args: any): Promise<string> {
           keyDecisions,
           recentPlans,
           totalPlans: pi.totalFiles ?? 0,
+          ccMemories,
+          totalMemories: mi.totalFiles ?? 0,
           risks: (risks as any).risks || [],
         },
         project
