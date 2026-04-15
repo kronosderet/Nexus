@@ -41,7 +41,7 @@ Or use slash commands directly: `/nexus-brief`, `/nexus-status`, `/nexus-plan`
 Nexus solves the biggest problem with AI-assisted development: **Claude forgets everything between conversations.** Nexus doesn't.
 
 - **Session Memory** — every conversation is automatically logged with decisions, blockers, and outcomes
-- **Knowledge Graph** — 90+ architectural decisions with typed edges (led_to, depends_on, contradicts, replaced, related) and blast-radius analysis
+- **Knowledge Graph** — 90+ architectural decisions with 7 typed edges (led_to, depends_on, contradicts, replaced, related, informs, experimental) and blast-radius analysis
 - **Thought Stack** — push context before interruptions, pop when you return. Works across Claude instances.
 - **Decision Guard** — checks for redundant work before you start
 - **Fuel Intelligence** — tracks Claude usage, burn rates, and session planning

@@ -505,11 +505,11 @@ const commands = {
 ## Nexus Integration for ${project}
 
 ### What is Nexus?
-Local AI-powered mission control (v4.1). Tracks tasks, sessions, decisions,
+Local AI-powered mission control (v4.3). Tracks tasks, sessions, decisions,
 fuel usage, and git state across all projects. Features:
-  • Knowledge Graph of 87+ decisions with 5 typed edge types + blast-radius analysis
+  • Knowledge Graph of 140+ decisions with 7 typed edge types + blast-radius analysis
   • Local AI Overseer (Gemma 4 via LM Studio) with self-improving Advice Journal
-  • 18 native MCP tools — every Nexus operation callable from Claude Desktop natively
+  • 22 native MCP tools — every Nexus operation callable from Claude Desktop natively
   • Compass module — Now/Next/Later/Done strategic dashboard replacing Scratchpad
   • Smart Fuel Intelligence with autonomous session planning
   • Predictive Task Generation from graph gaps (6 gap categories)

@@ -93,10 +93,12 @@ function main() {
 
   // Active thoughts — auto-pop the top one as recovery context
   const thoughts = (data.thoughts || []).filter(t => t.status === 'active');
+  let resumedThought = null;
   if (thoughts.length > 0) {
     // Auto-pop the most recent thought (LIFO) and inject as recovery instruction
     const sorted = [...thoughts].sort((a, b) => new Date(b.pushed_at) - new Date(a.pushed_at));
     const top = sorted[0];
+    resumedThought = top;
     lines.push(`◈ RESUME: ${top.text}`);
     if (top.context) lines.push(`  Context: ${top.context}`);
     if (top.project) lines.push(`  Project: ${top.project}`);
@@ -120,6 +122,22 @@ function main() {
     const uncommitted = status ? status.split('\n').length : 0;
     lines.push(`Git: ${branch}${uncommitted > 0 ? `, ${uncommitted} uncommitted` : ', clean'}`);
   } catch {}
+
+  // Chapter title suggestion — the Cartographer nudges Claude to anchor the
+  // CC transcript TOC via mcp__ccd_session__mark_chapter. Claude chooses whether
+  // to honor the suggestion. (#191 Chapter Narrator — pragmatic form.)
+  // Priority: resumed thought > in-progress task > default project setting course.
+  let chapterTitle;
+  if (resumedThought) {
+    const excerpt = resumedThought.text.slice(0, 32).replace(/[\n"]/g, ' ').trim();
+    chapterTitle = `Resume: ${excerpt}${resumedThought.text.length > 32 ? '…' : ''}`;
+  } else if (inProgress.length > 0) {
+    const excerpt = inProgress[0].title.slice(0, 34).replace(/[\n"]/g, ' ').trim();
+    chapterTitle = `Continuing: ${excerpt}${inProgress[0].title.length > 34 ? '…' : ''}`;
+  } else {
+    chapterTitle = `Setting course on ${project}`;
+  }
+  lines.push(`◈ Chapter: mark_chapter("${chapterTitle}")`);
 
   lines.push(`[/Nexus Metabrain]`);
   console.log(lines.join('\n'));

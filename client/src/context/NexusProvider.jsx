@@ -63,10 +63,10 @@ const WS_MAP = {
   activity:         ['activity'],
   thought:          ['thoughts'],
   session_created:  ['sessions'],
-  usage_update:     ['estimator', 'workload', 'timing'],
+  usage_update:     ['estimator', 'workload', 'timing', 'fuelIntel'],
   gpu_snapshot:     ['pulse'],
   decision_update:  ['graph'],
-  reload:           ['tasks', 'activity', 'sessions', 'thoughts', 'estimator', 'workload', 'timing', 'pulse', 'fleet', 'graph'],
+  reload:           ['tasks', 'activity', 'sessions', 'thoughts', 'estimator', 'workload', 'timing', 'history', 'fuelIntel', 'pulse', 'fleet', 'graph'],
 };
 
 // ── Provider ─────────────────────────────────────────
@@ -82,6 +82,7 @@ export default function NexusProvider({ ws, children }) {
   const workload  = useSlice(useCallback(() => api.getEstimatorWorkload(), []));
   const timing    = useSlice(useCallback(() => api.getUsageLatest(), []));
   const history   = useSlice(useCallback(() => api.getEstimatorHistory(), []));
+  const fuelIntel = useSlice(useCallback(() => api.getFuelIntel(), []));
 
   // Fleet slices
   const pulse     = useSlice(useCallback(() => api.getPulse(), []), 60000);
@@ -99,7 +100,7 @@ export default function NexusProvider({ ws, children }) {
 
   // Slice lookup for WS invalidation
   const slices = useRef({});
-  slices.current = { tasks, activity, sessions, thoughts, estimator, workload, timing, pulse, fleet, graph };
+  slices.current = { tasks, activity, sessions, thoughts, estimator, workload, timing, history, fuelIntel, pulse, fleet, graph };
 
   // Centralized WebSocket listener
   useEffect(() => {
@@ -143,8 +144,8 @@ export default function NexusProvider({ ws, children }) {
     _ensureAll: () => { tasks.ensure(); activity.ensure(); sessions.ensure(); thoughts.ensure(); },
   };
   const fuelVal = {
-    estimator, workload, timing, history,
-    _ensureAll: () => { estimator.ensure(); workload.ensure(); timing.ensure(); history.ensure(); },
+    estimator, workload, timing, history, fuelIntel,
+    _ensureAll: () => { estimator.ensure(); workload.ensure(); timing.ensure(); history.ensure(); fuelIntel.ensure(); },
   };
   const fleetVal = {
     pulse, fleet, graph,

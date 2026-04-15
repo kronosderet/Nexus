@@ -380,11 +380,15 @@ function hashProjectColor(project) {
 
 // Edge type visual styles
 const EDGE_STYLES = {
-  led_to:     { stroke: '#f59e0b', dash: 'none',   label: 'Led to' },
-  depends_on: { stroke: '#3b82f6', dash: '6,3',    label: 'Depends on' },
-  contradicts:{ stroke: '#ef4444', dash: '2,3',     label: 'Contradicts' },
-  replaced:   { stroke: '#6b7280', dash: '8,4',     label: 'Replaced' },
-  related:    { stroke: '#64748b', dash: '2,2',     label: 'Related' },
+  led_to:      { stroke: '#f59e0b', dash: 'none',    label: 'Led to' },
+  depends_on:  { stroke: '#3b82f6', dash: '6,3',     label: 'Depends on' },
+  contradicts: { stroke: '#ef4444', dash: '2,3',     label: 'Contradicts' },
+  replaced:    { stroke: '#6b7280', dash: '8,4',     label: 'Replaced' },
+  related:     { stroke: '#64748b', dash: '2,2',     label: 'Related' },
+  // v4.3: informs = context without dependency (softer than depends_on). Purple + medium dash.
+  informs:     { stroke: '#a855f7', dash: '4,2',     label: 'Informs' },
+  // v4.3: experimental = tentative, revisit. Teal + sparse pencil-like dots.
+  experimental:{ stroke: '#14b8a6', dash: '1,3',     label: 'Experimental' },
 };
 
 function VisualView({ graph }) {

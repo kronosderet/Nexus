@@ -175,6 +175,19 @@ function formatBrief(data: any, project: string): string {
     }
   }
 
+  if (data.recentPlans?.length) {
+    lines.push('');
+    const totalSuffix = data.totalPlans && data.totalPlans > data.recentPlans.length
+      ? ` (${data.recentPlans.length} of ${data.totalPlans})`
+      : ` (${data.recentPlans.length})`;
+    lines.push(`Recent CC plans${totalSuffix}:`);
+    for (const p of data.recentPlans.slice(0, 3)) {
+      const tag = p.project ? `[${p.project}] ` : '';
+      const age = p.ageDays === 0 ? 'today' : p.ageDays === 1 ? '1d ago' : `${p.ageDays}d ago`;
+      lines.push(`  › ${tag}${p.title.slice(0, 80)} (${age})`);
+    }
+  }
+
   if (data.risks?.length) {
     lines.push('');
     lines.push('Risks:');
@@ -557,7 +570,7 @@ const TOOLS: Tool[] = [
     name: 'nexus_link_decisions',
     description:
       'Create a typed edge between two existing decisions in The Ledger (the knowledge graph). ' +
-      'Use this when you notice that one decision led to, depends on, contradicts, or replaces another. ' +
+      'Use this when you notice that one decision led to, depends on, informs, contradicts, or replaces another. ' +
       'The graph feeds blast-radius analysis, centrality ranking, contradiction detection, and fragmented-project ' +
       'detection in the Holes view.',
     inputSchema: {
@@ -573,8 +586,8 @@ const TOOLS: Tool[] = [
         },
         rel: {
           type: 'string',
-          enum: ['led_to', 'depends_on', 'contradicts', 'replaced', 'related'],
-          description: 'Edge type. "led_to" = causal, "depends_on" = prerequisite, "contradicts" = conflict, "replaced" = supersession, "related" = weak association.',
+          enum: ['led_to', 'depends_on', 'contradicts', 'replaced', 'related', 'informs', 'experimental'],
+          description: 'Edge type. "led_to" = causal, "depends_on" = prerequisite, "contradicts" = conflict, "replaced" = supersession, "related" = weak association, "informs" = provides context without being a requirement, "experimental" = tentative link, revisit later.',
         },
         note: {
           type: 'string',
@@ -746,12 +759,13 @@ async function handleTool(name: string, args: any): Promise<string> {
       // Per-call 10s timeout via Promise.race to prevent hanging on slow routes
       const withTimeout = <T>(p: Promise<T>, fallback: T) =>
         Promise.race([p, new Promise<T>(r => setTimeout(() => r(fallback), 10000))]);
-      const [tasks, sessions, ledger, fuel, risks] = await Promise.all([
+      const [tasks, sessions, ledger, fuel, risks, plansIndex] = await Promise.all([
         withTimeout(nexusFetch('/api/tasks'), []),
         withTimeout(nexusFetch('/api/sessions'), []),
         withTimeout(nexusFetch('/api/ledger'), []),
         withTimeout(nexusFetch('/api/estimator'), null),
         withTimeout(nexusFetch('/api/overseer/risks'), { risks: [] }),
+        withTimeout(nexusFetch('/api/cc-plans?limit=10'), { available: false, plans: [], totalFiles: 0 }),
       ]);
 
       const projectLower = project.toLowerCase();
@@ -784,6 +798,13 @@ async function handleTool(name: string, args: any): Promise<string> {
         .filter((d: any) => d.project === project || d.project?.toLowerCase() === projectLower)
         .slice(0, 5);
 
+      // Filter CC plans by project (if inferred) — show project-matched ones first,
+      // fall back to most-recent across projects if none match.
+      const pi: any = plansIndex || {};
+      const allPlans: any[] = Array.isArray(pi.plans) ? pi.plans : [];
+      const matched = allPlans.filter((p) => p.project && p.project.toLowerCase() === projectLower);
+      const recentPlans = matched.length > 0 ? matched : allPlans.slice(0, 5);
+
       return formatBrief(
         {
           fuel: fuel?.estimated
@@ -796,6 +817,8 @@ async function handleTool(name: string, args: any): Promise<string> {
           activeTasks,
           priorSessions,
           keyDecisions,
+          recentPlans,
+          totalPlans: pi.totalFiles ?? 0,
           risks: (risks as any).risks || [],
         },
         project

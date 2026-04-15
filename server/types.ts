@@ -79,7 +79,8 @@ export interface GraphEdge {
   id: number;
   from: number;
   to: number;
-  rel: 'led_to' | 'replaced' | 'depends_on' | 'contradicts' | 'related';
+  // v4.3: added 'informs' (context without dependency) and 'experimental' (tentative, revisit)
+  rel: 'led_to' | 'replaced' | 'depends_on' | 'contradicts' | 'related' | 'informs' | 'experimental';
   note: string;
   created_at: string;
 }

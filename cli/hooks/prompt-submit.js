@@ -1,75 +1,33 @@
 #!/usr/bin/env node
-/**
- * Claude Code UserPromptSubmit hook — logs each prompt to Nexus.
- *
- * STANDALONE: reads/writes ~/.nexus/nexus.json directly (no server needed).
- * Must be FAST (<500ms) — runs before Claude starts responding.
- */
+// Claude Code UserPromptSubmit hook — reserved stub (v4.3+).
+//
+// CHANGED in v4.3 (task #190): This hook used to log every user prompt to
+// Nexus's activity stream as "User: <first 200 chars>". That was redundant:
+//
+//   1. CC's session JSONL under ~/.claude/projects/ already captures the full
+//      transcript verbatim — the raw log IS the transcript.
+//   2. Nexus's activity stream is meant for SEMANTIC events (deploys, fixes,
+//      decisions, task state changes) — not every "ok" and "next" a user types.
+//   3. 500-entry cap meant genuine events got rotated out by prompt noise.
+//
+// The v4.3 philosophy pivot (Decision #144): Nexus reads from CC's scaffolding
+// rather than duplicating it. The session JSONL IS the prompt log.
+//
+// This stub is kept wired in settings.json so future work can reuse the hook
+// slot for semantic classification — e.g. only log prompts that match patterns
+// like "commit", "deploy", "remember this decision", or cross a confidence
+// threshold for being a significant intent. Until that exists, this is a no-op.
+//
+// STANDALONE: no store access needed.
+// Must still be FAST (<50ms) — runs before Claude starts responding.
 
-import { readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
-import { join } from 'node:path';
-import { homedir } from 'node:os';
-
-const NEXUS_DB = process.env.NEXUS_DB_PATH || join(homedir(), '.nexus', 'nexus.json');
+import { readFileSync } from 'node:fs';
 
 function main() {
-  // Read hook payload from stdin
-  let payload;
-  try {
-    payload = JSON.parse(readFileSync(0, 'utf-8').trim());
-  } catch {
-    return;
-  }
-
-  // Extract the latest user message from the transcript
-  let promptText = '';
-  try {
-    if (payload.transcript_path) {
-      const lines = readFileSync(payload.transcript_path, 'utf-8').trim().split('\n');
-      for (let i = lines.length - 1; i >= 0; i--) {
-        try {
-          const entry = JSON.parse(lines[i]);
-          if (entry.type === 'human' || entry.role === 'user') {
-            if (typeof entry.message === 'string') promptText = entry.message;
-            else if (typeof entry.content === 'string') promptText = entry.content;
-            else if (Array.isArray(entry.message?.content)) {
-              promptText = entry.message.content.filter(b => b.type === 'text').map(b => b.text).join(' ');
-            }
-            if (promptText) break;
-          }
-        } catch {}
-      }
-    }
-  } catch {}
-
-  if (!promptText || promptText.length < 3) return;
-
-  // Read store directly
-  if (!existsSync(NEXUS_DB)) return;
-  let data;
-  try {
-    data = JSON.parse(readFileSync(NEXUS_DB, 'utf-8'));
-  } catch {
-    return;
-  }
-
-  // Log activity
-  if (!data.activity) data.activity = [];
-  const maxId = data.activity.length > 0 ? Math.max(...data.activity.map(a => a.id)) : 0;
-  const summary = promptText.slice(0, 200) + (promptText.length > 200 ? '...' : '');
-  data.activity.push({
-    id: maxId + 1,
-    type: 'prompt',
-    message: `User: ${summary}`,
-    meta: '{}',
-    created_at: new Date().toISOString(),
-  });
-  if (data.activity.length > 500) data.activity = data.activity.slice(-500);
-
-  // Quick write (not atomic — speed matters here)
-  try {
-    writeFileSync(NEXUS_DB, JSON.stringify(data, null, 2));
-  } catch {}
+  // Drain stdin and discard — CC's transcript is the truth.
+  // Reading prevents a dangling pipe warning from the parent process.
+  try { readFileSync(0, 'utf-8'); } catch {}
+  // No-op. Future: semantic classification gate.
 }
 
 try { main(); } catch {}

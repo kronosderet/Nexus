@@ -96,11 +96,25 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.3
+## Current — v4.3 (in flight)
 
-### Next priorities
-- Version bump to 4.3.0
-- MCPB rebuild with all v4.2 changes
+### Philosophy pivot (Decision #144)
+Nexus becomes the reasoning layer ON TOP of CC's native scaffolding (memory, plans, scheduled-tasks, chapters, spawn-task, hooks, skills) — not a parallel universe. Every v4.3 item buckets into HARMONIZE (integrate with CC), AMPLIFY (compose on top), or OWN (Nexus-unique).
+
+### Shipped in v4.3
+- **#205-#207 Housekeeping** — version bump 4.2.0 → 4.3.0, MCPB rebuild, digest filter case-insensitive + trim
+- **#189 HARMONIZE: Plan Archaeology** — `nexus_brief` reads `~/.claude/plans/` and surfaces recent plans, project-filtered
+- **#190 HARMONIZE: Kill redundant activity logging** — UserPromptSubmit hook now a no-op stub; CC session JSONL is the raw log
+- **#191 AMPLIFY: Chapter Narrator (advisory)** — SessionStart hook emits `mark_chapter()` suggestions; `/nexus-brief` skill documents the convention
+- **#195 OWN: Knowledge Graph v3** — 2 new edge types: `informs` (context without dependency), `experimental` (tentative, revisit). Graph visualizer updated with distinct styles.
+
+### Queued for v4.3
+- **#188 HARMONIZE: Memory Bridge** — read/write `~/.claude/projects/*/memory/` in brief + record_decision
+- **#192 AMPLIFY: Thought Stack ⇄ spawn_task** — bidirectional
+- **#193 AMPLIFY: Migrate Overseer scans to `mcp__scheduled-tasks__*`**
+- **#194 AMPLIFY: Calendar-aware fuel**
+- **#196 OWN+HARMONIZE: Overseer reads CC scaffolding** — plans, memory, session JSONLs
+- **#197 OWN: KG auto-edge generation** — Overseer-powered edge suggestions beyond keyword/embedding overlap
 - Remaining AI endpoint consolidation (ai.ts, plan.ts, autoSummary.ts, smartSearch.ts)
 - Task project field support in Command/Kanban
 - family-coop scheduled message checking
