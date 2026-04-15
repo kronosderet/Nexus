@@ -63,7 +63,7 @@ import {
 const STANDALONE = process.env.NEXUS_STANDALONE === '1';
 const NEXUS_BASE = process.env.NEXUS_BASE_URL || 'http://localhost:3001';
 const SERVER_NAME = 'nexus';
-const SERVER_VERSION = '4.2.0';
+const SERVER_VERSION = '4.3.0';
 
 // In standalone mode, import the local API adapter (direct store access, no Express needed)
 let localApiFetch: ((path: string, init?: any) => Promise<any>) | null = null;
@@ -375,7 +375,10 @@ const TOOLS: Tool[] = [
       'Push a thought onto the LIFO Thought Stack — the interrupt-recovery working memory. ' +
       'Call this BEFORE switching context, getting interrupted, or stopping mid-task. ' +
       'When you (or another Claude instance) return, call nexus_pop_thought to recover what you were doing. ' +
-      'This is the cross-session continuity primitive.',
+      'This is the cross-session continuity primitive. ' +
+      'TIP: when you pass related_task_id, also consider calling mcp__ccd_session__spawn_task ' +
+      'to surface the thought as a CC side-task chip — spawned-task completion calling ' +
+      'nexus_complete_task on the linked task will auto-pop this thought (bidirectional bridge).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -905,9 +908,16 @@ async function handleTool(name: string, args: any): Promise<string> {
           related_task_id: args.related_task_id || undefined,
         }),
       });
-      return `◈ Thought #${result.id} pushed onto the stack.\n  "${args.text}"${
+      const base = `◈ Thought #${result.id} pushed onto the stack.\n  "${args.text}"${
         args.context ? `\n  context: ${args.context}` : ''
       }`;
+      // #192 bridge suggestion: when linked to a task, nudge toward spawn_task.
+      // The spawned side-task session calling nexus_complete_task(related_task_id)
+      // will auto-pop this thought via the existing resolve-linked-thoughts logic.
+      if (args.related_task_id) {
+        return base + `\n\n  ◈ Bridge: consider mcp__ccd_session__spawn_task("Resolve #${args.related_task_id}", ...) to run this as a CC side-task. Completing the spawned task via nexus_complete_task(${args.related_task_id}) will auto-pop this thought.`;
+      }
+      return base;
     }
 
     case 'nexus_pop_thought': {
