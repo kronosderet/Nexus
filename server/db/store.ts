@@ -77,6 +77,65 @@ export class NexusStore {
     this._nextLedgerId = safeMax((this.data.ledger || []).map(e => e.id)) + 1;
     this._nextThoughtId = safeMax((this.data.thoughts || []).map(t => t.id)) + 1;
     this._nextEdgeId = safeMax((this.data.graph_edges || []).map(e => e.id)) + 1;
+
+    // v4.3.5 migration — backfill missing fields from schema drift (idempotent).
+    // Runs on every load; does nothing if data is already migrated.
+    this._runMigrations();
+  }
+
+  /** Idempotent schema migrations — inspect data and backfill missing fields. */
+  private _runMigrations(): void {
+    let changed = 0;
+
+    // v4.3.5 C1: Backfill `project` on tasks (v4.2 added the field but never migrated old tasks).
+    const tasksNeedingProject = this.data.tasks.filter(t => !t.project);
+    if (tasksNeedingProject.length > 0) {
+      // Build project name lookup from existing decisions (canonical casing).
+      const decisionProjectById = new Map<number, string>();
+      for (const d of this.data.ledger) {
+        if (d.project) decisionProjectById.set(d.id, d.project);
+      }
+      // Known project names, ordered by specificity (most specific markers first).
+      // MYE / Ego Hunter / harmony_field uniquely identify Resonance even though the
+      // project shares "P3B" phase-naming with Shadowrun — so Resonance checks first.
+      const knownProjects: Array<{ name: string; patterns: RegExp[] }> = [
+        { name: 'resonance godot',patterns: [/\bResonance\b/i, /\bharmony_field\b/i, /\bMYE\b/, /\bEgo Hunter\b/i, /\bmoxie\b/i] },
+        { name: 'noosphere',      patterns: [/\bNoosphere\b/i, /\bPULSE\b/, /\btensor field\b/i] },
+        { name: 'Firewall-Godot', patterns: [/\bfirewall\b/i, /\bEP1e\b/i] },
+        { name: 'Level',          patterns: [/\bLevel\b/, /\bbyline\b/i, /\bOCR\b/i, /322 PDF/i] },
+        { name: 'Shadowrun',      patterns: [/\bshadowrun\b/i, /\bSR3\b/, /\bP3B\b/, /\bC\d+\b.*\b(BF|FA|TN|damage)\b/] },
+        { name: 'family-coop',    patterns: [/\bfamily[- ]coop\b/i] },
+        { name: 'Nexus',          patterns: [/\bnexus\b/i, /\bv4\.\d/i, /\bmcp\b/i, /\bmcpb\b/i] },
+      ];
+      const inferProject = (t: any): string => {
+        // 1. From decision_ids (most authoritative)
+        if (Array.isArray(t.decision_ids) && t.decision_ids.length > 0) {
+          const projects = t.decision_ids
+            .map((id: number) => decisionProjectById.get(id))
+            .filter(Boolean) as string[];
+          if (projects.length > 0) {
+            // Most common
+            const counts: Record<string, number> = {};
+            for (const p of projects) counts[p] = (counts[p] || 0) + 1;
+            return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+          }
+        }
+        // 2. Pattern-match against title + description
+        const haystack = `${t.title || ''} ${t.description || ''}`;
+        for (const kp of knownProjects) {
+          if (kp.patterns.some(p => p.test(haystack))) return kp.name;
+        }
+        // 3. Default
+        return 'Nexus';
+      };
+      for (const t of tasksNeedingProject) {
+        t.project = inferProject(t);
+        changed++;
+      }
+      console.error(`◈ Migration v4.3.5 C1: backfilled \`project\` on ${tasksNeedingProject.length} tasks.`);
+    }
+
+    if (changed > 0) this._flush();
   }
 
   /** Re-read data from disk (for external changes, e.g. MCP writes while dashboard is running). */

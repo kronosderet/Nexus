@@ -6997,6 +6997,48 @@ var init_store = __esm({
         this._nextLedgerId = safeMax((this.data.ledger || []).map((e) => e.id)) + 1;
         this._nextThoughtId = safeMax((this.data.thoughts || []).map((t) => t.id)) + 1;
         this._nextEdgeId = safeMax((this.data.graph_edges || []).map((e) => e.id)) + 1;
+        this._runMigrations();
+      }
+      /** Idempotent schema migrations — inspect data and backfill missing fields. */
+      _runMigrations() {
+        let changed = 0;
+        const tasksNeedingProject = this.data.tasks.filter((t) => !t.project);
+        if (tasksNeedingProject.length > 0) {
+          const decisionProjectById = /* @__PURE__ */ new Map();
+          for (const d of this.data.ledger) {
+            if (d.project) decisionProjectById.set(d.id, d.project);
+          }
+          const knownProjects = [
+            { name: "resonance godot", patterns: [/\bResonance\b/i, /\bharmony_field\b/i, /\bMYE\b/, /\bEgo Hunter\b/i, /\bmoxie\b/i] },
+            { name: "noosphere", patterns: [/\bNoosphere\b/i, /\bPULSE\b/, /\btensor field\b/i] },
+            { name: "Firewall-Godot", patterns: [/\bfirewall\b/i, /\bEP1e\b/i] },
+            { name: "Level", patterns: [/\bLevel\b/, /\bbyline\b/i, /\bOCR\b/i, /322 PDF/i] },
+            { name: "Shadowrun", patterns: [/\bshadowrun\b/i, /\bSR3\b/, /\bP3B\b/, /\bC\d+\b.*\b(BF|FA|TN|damage)\b/] },
+            { name: "family-coop", patterns: [/\bfamily[- ]coop\b/i] },
+            { name: "Nexus", patterns: [/\bnexus\b/i, /\bv4\.\d/i, /\bmcp\b/i, /\bmcpb\b/i] }
+          ];
+          const inferProject2 = (t) => {
+            if (Array.isArray(t.decision_ids) && t.decision_ids.length > 0) {
+              const projects = t.decision_ids.map((id) => decisionProjectById.get(id)).filter(Boolean);
+              if (projects.length > 0) {
+                const counts = {};
+                for (const p of projects) counts[p] = (counts[p] || 0) + 1;
+                return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+              }
+            }
+            const haystack = `${t.title || ""} ${t.description || ""}`;
+            for (const kp of knownProjects) {
+              if (kp.patterns.some((p) => p.test(haystack))) return kp.name;
+            }
+            return "Nexus";
+          };
+          for (const t of tasksNeedingProject) {
+            t.project = inferProject2(t);
+            changed++;
+          }
+          console.error(`\u25C8 Migration v4.3.5 C1: backfilled \`project\` on ${tasksNeedingProject.length} tasks.`);
+        }
+        if (changed > 0) this._flush();
       }
       /** Re-read data from disk (for external changes, e.g. MCP writes while dashboard is running). */
       reload() {
@@ -8200,6 +8242,54 @@ async function localApiFetch(path, init = {}) {
     const ai = await detectAI();
     if (!ai.available) return { error: "No local AI available. Install LM Studio for Overseer features." };
     return { error: "Overseer ask requires the full Nexus server. Use nexus_ask_overseer_start for async queries." };
+  }
+  if (pathname === "/api/auto-summary" && (method === "GET" || method === "POST")) {
+    const project = (method === "POST" ? body.project : params.get("project")) || "Nexus";
+    const lastSessions = store.getSessions({ project, limit: 1 });
+    const lastSessionTime = lastSessions[0] ? new Date(lastSessions[0].created_at).getTime() : 0;
+    const windowStart = Math.max(lastSessionTime, Date.now() - 4 * 36e5);
+    const activity = store.getActivity(200).filter((a) => new Date(a.created_at).getTime() > windowStart);
+    const completedTasks = store.getAllTasks().filter(
+      (t) => t.status === "done" && new Date(t.updated_at).getTime() > windowStart
+    );
+    const recentDecisions = (store.data.ledger || []).filter(
+      (d) => new Date(d.created_at).getTime() > windowStart
+    );
+    if (activity.length === 0 && completedTasks.length === 0 && recentDecisions.length === 0) {
+      return { error: "No activity to summarize since last session." };
+    }
+    const bits = [];
+    if (completedTasks.length > 0) bits.push(`${completedTasks.length} task${completedTasks.length === 1 ? "" : "s"} completed`);
+    if (recentDecisions.length > 0) bits.push(`${recentDecisions.length} decision${recentDecisions.length === 1 ? "" : "s"} recorded`);
+    if (activity.length > 0) bits.push(`${activity.length} activity event${activity.length === 1 ? "" : "s"}`);
+    const summary = `Standalone session log: ${bits.join(", ")}.`;
+    const result = {
+      raw: summary,
+      parsed: {
+        summary,
+        decisions: recentDecisions.slice(0, 5).map((d) => d.decision.slice(0, 120)),
+        blockers: [],
+        tags: ["standalone", "counts-summary"]
+      },
+      context: {
+        completedTasks: completedTasks.length,
+        decisions: recentDecisions.length,
+        activityEvents: activity.length
+      },
+      model: "standalone-counts"
+    };
+    if (method === "POST") {
+      const session = store.createSession({
+        project,
+        summary: result.parsed.summary,
+        decisions: result.parsed.decisions,
+        blockers: result.parsed.blockers,
+        tags: [...result.parsed.tags, "auto-summary"]
+      });
+      store.addActivity("auto_summary", `Session auto-logged for ${project} (standalone, counts-based)`);
+      return session;
+    }
+    return result;
   }
   if (pathname === "/api/overseer/propose-edges" && method === "POST") {
     const ai = await detectAI();

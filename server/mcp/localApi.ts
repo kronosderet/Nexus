@@ -239,6 +239,64 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
     return { error: 'Overseer ask requires the full Nexus server. Use nexus_ask_overseer_start for async queries.' };
   }
 
+  // v4.3.5 C2 — auto-summary for nexus_bridge_session in standalone mode.
+  // Lightweight counts-based summary: no AI, no bundle bloat. The dashboard's
+  // /api/auto-summary route uses LM Studio for richer prose; standalone trades
+  // quality for a tiny bundle. Same response shape so bridge_session's parser works.
+  if (pathname === '/api/auto-summary' && (method === 'GET' || method === 'POST')) {
+    const project = (method === 'POST' ? body.project : params.get('project')) || 'Nexus';
+    const lastSessions = store.getSessions({ project, limit: 1 });
+    const lastSessionTime = lastSessions[0] ? new Date(lastSessions[0].created_at).getTime() : 0;
+    const windowStart = Math.max(lastSessionTime, Date.now() - 4 * 3600000);
+
+    const activity = store.getActivity(200).filter((a: any) => new Date(a.created_at).getTime() > windowStart);
+    const completedTasks = store.getAllTasks().filter((t: any) =>
+      t.status === 'done' && new Date(t.updated_at).getTime() > windowStart
+    );
+    const recentDecisions = (store.data.ledger || []).filter((d: any) =>
+      new Date(d.created_at).getTime() > windowStart
+    );
+
+    if (activity.length === 0 && completedTasks.length === 0 && recentDecisions.length === 0) {
+      return { error: 'No activity to summarize since last session.' };
+    }
+
+    const bits: string[] = [];
+    if (completedTasks.length > 0) bits.push(`${completedTasks.length} task${completedTasks.length === 1 ? '' : 's'} completed`);
+    if (recentDecisions.length > 0) bits.push(`${recentDecisions.length} decision${recentDecisions.length === 1 ? '' : 's'} recorded`);
+    if (activity.length > 0) bits.push(`${activity.length} activity event${activity.length === 1 ? '' : 's'}`);
+    const summary = `Standalone session log: ${bits.join(', ')}.`;
+
+    const result = {
+      raw: summary,
+      parsed: {
+        summary,
+        decisions: recentDecisions.slice(0, 5).map((d: any) => d.decision.slice(0, 120)),
+        blockers: [],
+        tags: ['standalone', 'counts-summary'],
+      },
+      context: {
+        completedTasks: completedTasks.length,
+        decisions: recentDecisions.length,
+        activityEvents: activity.length,
+      },
+      model: 'standalone-counts',
+    };
+
+    if (method === 'POST') {
+      const session = store.createSession({
+        project,
+        summary: result.parsed.summary,
+        decisions: result.parsed.decisions,
+        blockers: result.parsed.blockers,
+        tags: [...result.parsed.tags, 'auto-summary'],
+      });
+      store.addActivity('auto_summary', `Session auto-logged for ${project} (standalone, counts-based)`);
+      return session;
+    }
+    return result;
+  }
+
   // v4.3 #197 — propose-edges needs the async task map in the Express server.
   // Standalone MCPB mode gracefully degrades to an advisory error.
   if (pathname === '/api/overseer/propose-edges' && method === 'POST') {

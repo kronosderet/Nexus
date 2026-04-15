@@ -170,12 +170,22 @@ server.listen(PORT, () => {
   console.log('');
 
   store.addActivity('system', 'Nexus is online. Setting course.');
-  startFileWatcher(store, broadcast);
-  startGpuPoller(store, broadcast);
-  startOverseerPoller(store, broadcast);
+  fileWatcherRef = startFileWatcher(store, broadcast);
+  gpuPollerRef = startGpuPoller(store, broadcast);
+  overseerPollerRef = startOverseerPoller(store, broadcast);
 });
+
+// v4.3.5 C3 — capture watcher/interval refs so SIGINT can clean them up.
+// Without this, setInterval handles and chokidar FSWatcher were leaking on shutdown.
+let fileWatcherRef: any = null;
+let gpuPollerRef: NodeJS.Timeout | null = null;
+let overseerPollerRef: NodeJS.Timeout | null = null;
 
 process.on('SIGINT', () => {
   console.log('\n  Instruments powered down. Safe harbors, Captain.\n');
+  try { if (overseerPollerRef) clearInterval(overseerPollerRef); } catch {}
+  try { if (gpuPollerRef) clearInterval(gpuPollerRef); } catch {}
+  try { if (fileWatcherRef && typeof fileWatcherRef.close === 'function') fileWatcherRef.close(); } catch {}
+  try { server.close(); } catch {}
   process.exit(0);
 });
