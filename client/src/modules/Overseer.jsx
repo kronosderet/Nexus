@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '../hooks/useApi.js';
 import { Brain, RefreshCw, AlertTriangle, Shield, Send, Loader2, Play, CheckCircle2, XCircle, Clock } from 'lucide-react';
 
@@ -13,7 +13,8 @@ function RiskCard({ risk }) {
   const [result, setResult] = useState(null);
   const style = RISK_ICONS[risk.level] || RISK_ICONS.info;
 
-  async function executeFix(action, project, param, label) {
+  // v4.3.5 I4: useCallback so child buttons get a stable reference across re-renders.
+  const executeFix = useCallback(async (action, project, param, label) => {
     setRunning(label);
     setResult(null);
     try {
@@ -24,7 +25,7 @@ function RiskCard({ risk }) {
     } finally {
       setRunning(null);
     }
-  }
+  }, []);
 
   // Parse fix into remediation action
   function getActions() {

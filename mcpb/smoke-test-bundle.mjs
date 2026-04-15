@@ -169,9 +169,40 @@ async function main() {
   }
   console.log(`✓ nexus_predict_gaps works`);
 
-  // Skip nexus_ask_overseer (slow AI inference) and nexus_bridge_session
-  // (would commit a real session entry). Those are verified by existence
-  // in the tools list + manifest schema validation.
+  // v4.3.5 I3 — calendar runway with empty events expects "Runway clear" response.
+  // Pure-logic tool that uses /api/estimator state, works in standalone.
+  const runway = await send('tools/call', {
+    name: 'nexus_calendar_runway',
+    arguments: { events: [] },
+  });
+  if (runway.result.isError) {
+    console.error('✗ nexus_calendar_runway error:', runway.result.content[0].text);
+    process.exit(1);
+  }
+  const runwayText = runway.result.content[0].text;
+  if (!/Runway clear|Session fuel|No fuel data/.test(runwayText)) {
+    console.error('✗ nexus_calendar_runway unexpected response:', runwayText.slice(0, 200));
+    process.exit(1);
+  }
+  console.log(`✓ nexus_calendar_runway works (empty-events → ${runwayText.split('\n')[0]})`);
+
+  // v4.3.5 I3 — propose_edges requires async task infrastructure only present in the
+  // full server. Standalone MCPB should degrade gracefully with an advisory error.
+  // Smoke test: use a fake decision_id, expect either "Edge proposal unavailable" or 404.
+  const propose = await send('tools/call', {
+    name: 'nexus_propose_edges',
+    arguments: { decision_id: 999999 },
+  });
+  const proposeText = propose.result.content[0].text;
+  if (!/Edge proposal unavailable|requires the full Nexus server|not found|No local AI/.test(proposeText)) {
+    console.error('✗ nexus_propose_edges unexpected standalone response:', proposeText.slice(0, 200));
+    process.exit(1);
+  }
+  console.log(`✓ nexus_propose_edges standalone-error path works (${proposeText.split('\n')[0].slice(0, 80)})`);
+
+  // Skip nexus_ask_overseer (slow AI inference — needs LM Studio running) and
+  // nexus_bridge_session (commits a real session entry — side-effect on user data).
+  // Both verified by presence in tools/list + manifest schema validation.
   console.log(`  (skipped: nexus_ask_overseer, nexus_bridge_session — side-effects)`);
 
   console.log('\n=== BUNDLED SERVER WORKS AS STANDALONE NODE PROCESS ===');

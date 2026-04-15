@@ -112,6 +112,18 @@ Nexus becomes the reasoning layer ON TOP of CC's native scaffolding (memory, pla
 - **#198 HARMONIZE: Memory Bridge Phase B (advisory write path)** — `nexus_record_decision` gains `emit_cc_memory: true` param. When set, Nexus composes a ready-to-write memory file (YAML frontmatter + body + recommended filename) that Claude can persist via the Write tool. Closes the write half of the Memory Bridge. First-run import of existing memories remains queued as #200.
 - **#197 OWN: KG auto-edge generation (Overseer-powered)** — new `nexus_propose_edges` MCP tool + `POST /api/overseer/propose-edges` route. Given a decision id, Nexus pulls candidate decisions, builds a structured JSON prompt, and the Overseer proposes typed edges with confidence + reason. Async — returns taskId; user polls with `nexus_get_overseer_result` and commits chosen edges via `nexus_link_decisions`. Advisory flow respects the "Nexus suggests, Claude acts" pattern.
 
+### v4.3.5 Patch (audit-driven shakedown)
+Three-front audit (data / nexus code / dashboard) produced 14 tasks. Shipped:
+- **C1 CRITICAL: Task project-field backfill** — idempotent migration in store constructor infers project from decision_ids → keyword patterns → default "Nexus". 146 tasks backfilled on first load. `createTask` now persists project on creation so migration doesn't re-run.
+- **C2 CRITICAL: bridge_session standalone mode** — lightweight counts-based `/api/auto-summary` handler in localApi; avoids a 4x bundle bloat from importing the AI stack.
+- **C3 CRITICAL: Watcher cleanup on SIGINT** — captured refs from fileWatcher/gpuPoller/overseerPoller, clear/close in SIGINT handler. Fixes memory leak on restart.
+- **I1: Decision lifecycle backfill** — 108 decisions gained lifecycle (validated/proposed/active/deprecated) via centrality + age heuristics.
+- **I2: Version string sweep** — dashboard.ts, cli/nexus.js, cli/package.json all aligned to 4.3.5.
+- **I3: MCPB smoke-test coverage** — added assertions for nexus_calendar_runway (empty-events path) and nexus_propose_edges (standalone-error path).
+- **I4: React perf** — delegated in-map onClick handlers via data-attr pattern in Graph.jsx tabs + project toggles; useCallback on Overseer executeFix.
+- **I5: Graph.jsx hex → theme tokens** — extracted `client/src/lib/theme.js` with THEME / PROJECT_PALETTE / EDGE_STYLES / LIFECYCLE_COLORS; Graph.jsx imports from there.
+- **I6: WS_MAP notification** — added `notification: []` entry documenting ToastOverlay's direct handling as the intentional exception.
+
 ### Queued for v4.3
 - **#188 HARMONIZE: Memory Bridge** — read/write `~/.claude/projects/*/memory/` in brief + record_decision
 - **#192 AMPLIFY: Thought Stack ⇄ spawn_task** — bidirectional
