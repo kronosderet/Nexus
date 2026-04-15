@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { Fuel as FuelIcon, Clock, Timer, Zap, TrendingUp, BarChart3, History, Info } from 'lucide-react';
+import {
+  Fuel as FuelIcon, Clock, Timer, Zap,
+  TrendingUp, TrendingDown, Minus,
+  BarChart3, History, Info,
+  Sunrise, Sun, Sunset, Moon,
+  PieChart, Calendar, ChevronDown, ChevronRight,
+} from 'lucide-react';
 import { useNexusFuel } from '../context/useNexus.js';
 
 function color(pct) {
@@ -34,6 +40,41 @@ function usageIntensity(used) {
 
 const PLAN_PRICING = { free: 'Free', pro: '$20/mo', max5: '$100/mo', max20: '$200/mo', team: '$25/seat', team_premium: '$100/seat', enterprise: 'Custom', api: 'Pay-per-token' };
 
+// Mirror of PLAN_INFO from server/lib/fuelConfig.ts — kept on the frontend so the "Compare all plans"
+// view renders without a second fetch. Keep in sync with the server map.
+const PLAN_DETAILS = [
+  { name: 'free',         label: 'Free',          multiplier: 0.2, description: 'Limited usage, variable windows' },
+  { name: 'pro',          label: 'Pro',           multiplier: 1.0, description: '~44k tokens per 5h window' },
+  { name: 'max5',         label: 'Max 5x',        multiplier: 2.0, description: '~88k tokens per 5h window' },
+  { name: 'max20',        label: 'Max 20x',       multiplier: 5.0, description: '~220k tokens per 5h window' },
+  { name: 'team',         label: 'Team Standard', multiplier: 1.0, description: 'Same capacity as Pro' },
+  { name: 'team_premium', label: 'Team Premium',  multiplier: 2.0, description: 'Same capacity as Max 5x' },
+  { name: 'enterprise',   label: 'Enterprise',    multiplier: 5.0, description: 'Custom capacity' },
+  { name: 'api',          label: 'API',           multiplier: 0,   description: 'Pay-per-token, no windows' },
+];
+
+const TIME_SLOT_ICONS = { morning: Sunrise, afternoon: Sun, evening: Sunset, night: Moon };
+const TIME_SLOT_LABELS = {
+  morning: 'Morning (06–12)',
+  afternoon: 'Afternoon (12–18)',
+  evening: 'Evening (18–24)',
+  night: 'Night (00–06)',
+};
+
+function TrendBadge({ trend }) {
+  const cfg = {
+    improving: { Icon: TrendingUp,   cls: 'text-nexus-green',    label: 'Improving' },
+    stable:    { Icon: Minus,        cls: 'text-nexus-text-dim', label: 'Stable' },
+    degrading: { Icon: TrendingDown, cls: 'text-nexus-red',      label: 'Degrading' },
+  };
+  const { Icon, cls, label } = cfg[trend] || cfg.stable;
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] font-mono ${cls}`}>
+      <Icon size={11} /> {label}
+    </span>
+  );
+}
+
 function Stat({ label, value, sub, color: c }) {
   return (
     <div>
@@ -46,13 +87,18 @@ function Stat({ label, value, sub, color: c }) {
 
 export default function FuelModule() {
   // All fuel data from shared context — no local fetch, no ws.subscribe, no polling
-  const { estimator, workload, timing: timingSlice, history: historySlice } = useNexusFuel();
+  const { estimator, workload, timing: timingSlice, history: historySlice, fuelIntel } = useNexusFuel();
   const [showAllSessions, setShowAllSessions] = useState(false);
+  const [showAllPlans, setShowAllPlans] = useState(false);
 
   const fuel = estimator.data;
   const wl = workload.data;
   const timingData = timingSlice.data;
   const history = historySlice.data;
+  const intel = fuelIntel.data;
+  const patterns = intel?.patterns;
+  const taskCosts = intel?.taskCosts;
+  const weeklyPlan = intel?.weeklyPlan;
 
   if (!fuel?.tracked) {
     return (
@@ -103,6 +149,37 @@ export default function FuelModule() {
             <span className="text-nexus-text-faint">5h session windows</span>
             {weeklyReset && <span className="text-nexus-text-faint">Weekly resets {weeklyReset.resetsAt}</span>}
           </div>
+          {plan.description && (
+            <p className="text-[10px] font-mono text-nexus-text-faint mt-2">{plan.description}</p>
+          )}
+          <button
+            onClick={() => setShowAllPlans(p => !p)}
+            className="flex items-center gap-1 text-[10px] font-mono text-nexus-amber hover:text-nexus-text mt-3 transition-colors"
+          >
+            {showAllPlans ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+            {showAllPlans ? 'Hide plan comparison' : 'Compare all plans'}
+          </button>
+          {showAllPlans && (
+            <div className="mt-3 space-y-1">
+              {PLAN_DETAILS.map(p => {
+                const isCurrent = p.name === plan.name;
+                return (
+                  <div
+                    key={p.name}
+                    className={`flex items-center gap-3 text-[10px] font-mono ${isCurrent ? 'text-nexus-amber' : 'text-nexus-text-dim'}`}
+                  >
+                    <span className="w-24 font-medium">{p.label}</span>
+                    <span className="w-20 text-nexus-text-faint">{PLAN_PRICING[p.name]}</span>
+                    <span className="w-10 text-nexus-text-faint tabular-nums">{p.multiplier}x</span>
+                    <span className="flex-1 text-nexus-text-faint">{p.description}</span>
+                    {isCurrent && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-nexus-amber/20 text-nexus-amber">current</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -189,6 +266,130 @@ export default function FuelModule() {
               <Stat label="Weekly budget" value={`${capacity.weeklyTasksRemaining} tasks`} sub="across all sessions" />
             )}
           </div>
+        </div>
+      )}
+
+      {/* Session Patterns */}
+      {patterns && (
+        <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={14} className="text-nexus-amber" />
+            <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Session Patterns</span>
+            <span className="ml-auto"><TrendBadge trend={patterns.trend} /></span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+            <Stat label="Analyzed" value={`${patterns.totalSessions}`} sub="sessions" />
+            <Stat label="Avg burn rate" value={`${patterns.avgBurnRate}%/h`} />
+            <Stat label="Avg duration" value={`${patterns.avgSessionDuration}h`} />
+            <Stat label="Avg fuel/session" value={`${patterns.avgFuelPerSession}%`} />
+          </div>
+
+          <div className="space-y-2 mb-4">
+            <p className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider">Time of Day</p>
+            {(() => {
+              const slotKeys = ['morning', 'afternoon', 'evening', 'night'];
+              const activeSlots = slotKeys.filter(k => patterns.timeSlots?.[k]?.sessions > 0);
+              if (activeSlots.length === 0) {
+                return <p className="text-[10px] font-mono text-nexus-text-faint">No time-of-day data yet.</p>;
+              }
+              const maxBurn = Math.max(1, ...activeSlots.map(k => patterns.timeSlots[k].avgBurn ?? 0));
+              return activeSlots.map(key => {
+                const slot = patterns.timeSlots[key];
+                const Icon = TIME_SLOT_ICONS[key];
+                const pct = (slot.avgBurn / maxBurn) * 100;
+                return (
+                  <div key={key} className="flex items-center gap-3 text-xs font-mono">
+                    <Icon size={12} className="text-nexus-text-faint" />
+                    <span className="w-36 text-nexus-text-dim shrink-0">{TIME_SLOT_LABELS[key]}</span>
+                    <Bar percent={pct} className="flex-1" />
+                    <span className="w-12 text-right tabular-nums text-nexus-text-dim">{slot.avgBurn}%</span>
+                    <span className="w-14 text-right text-nexus-text-faint">{slot.sessions} sess</span>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+
+          {patterns.mostEfficient && patterns.leastEfficient && (
+            <div className="grid grid-cols-2 gap-4 pt-3 border-t border-nexus-border">
+              <div>
+                <p className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider mb-1">Most efficient</p>
+                <p className="text-sm font-medium text-nexus-green">{patterns.mostEfficient.burnRate}%/h</p>
+                <p className="text-[10px] font-mono text-nexus-text-faint">{patterns.mostEfficient.duration}h session</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider mb-1">Least efficient</p>
+                <p className="text-sm font-medium text-nexus-red">{patterns.leastEfficient.burnRate}%/h</p>
+                <p className="text-[10px] font-mono text-nexus-text-faint">{patterns.leastEfficient.duration}h session</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Task Cost by Category */}
+      {taskCosts && taskCosts.totalTasksAnalyzed > 0 && (() => {
+        const entries = Object.entries(taskCosts.patterns || {}).sort((a, b) => b[1].avgCost - a[1].avgCost);
+        if (entries.length === 0) return null;
+        const maxCost = Math.max(1, ...entries.map(([, v]) => v.avgCost));
+        return (
+          <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <PieChart size={14} className="text-nexus-amber" />
+              <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Task Cost by Category</span>
+              <span className="text-[9px] font-mono text-nexus-text-faint ml-auto">from {taskCosts.totalTasksAnalyzed} tasks</span>
+            </div>
+            <div className="space-y-2">
+              {entries.map(([cat, v]) => (
+                <div key={cat} className="flex items-center gap-3 text-xs font-mono">
+                  <span className="w-40 text-nexus-text-dim shrink-0">{cat}</span>
+                  <Bar percent={(v.avgCost / maxCost) * 100} className="flex-1" />
+                  <span className="w-12 text-right tabular-nums text-nexus-text-dim">{v.avgCost}%</span>
+                  <span className="w-14 text-right text-nexus-text-faint">{v.count}×</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Weekly Budget */}
+      {weeklyPlan && (
+        <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Calendar size={14} className="text-nexus-amber" />
+            <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Weekly Budget</span>
+            {weeklyPlan.trend && <span className="ml-auto"><TrendBadge trend={weeklyPlan.trend} /></span>}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+            <Stat
+              label="Sessions affordable"
+              value={`${weeklyPlan.sessionsAffordable ?? '—'}`}
+              sub="this week"
+              color={
+                weeklyPlan.sessionsAffordable > 5 ? 'text-nexus-green' :
+                weeklyPlan.sessionsAffordable > 2 ? 'text-nexus-amber' :
+                'text-nexus-red'
+              }
+            />
+            <Stat label="Weekly cost" value={`~${weeklyPlan.weeklyPerSession ?? '—'}%`} sub="per session" />
+            {weeklyPlan.backlog && (
+              <>
+                <Stat label="Backlog" value={`${weeklyPlan.backlog.total}`} sub={`${weeklyPlan.backlog.inProgress} in progress`} />
+                <Stat label="Est. sessions" value={`~${weeklyPlan.backlog.estimatedSessions}`} sub="to clear backlog" />
+              </>
+            )}
+          </div>
+          {weeklyPlan.recommendation && (
+            <p className={`text-xs font-mono ${
+              weeklyPlan.sessionsAffordable > 5 ? 'text-nexus-green' :
+              weeklyPlan.sessionsAffordable > 2 ? 'text-nexus-amber' :
+              'text-nexus-red'
+            }`}>{weeklyPlan.recommendation}</p>
+          )}
+          {weeklyPlan.optimalTiming && (
+            <p className="text-[10px] font-mono text-nexus-text-faint mt-2">{weeklyPlan.optimalTiming}</p>
+          )}
         </div>
       )}
 

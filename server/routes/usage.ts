@@ -58,7 +58,7 @@ export function buildTimingInfo(store: NexusStore) {
   return {
     now: now.toISOString(),
     timezone: config.timezone,
-    plan: { name: config.plan, label: planInfo.label, multiplier: planInfo.multiplier },
+    plan: { name: config.plan, label: planInfo.label, multiplier: planInfo.multiplier, description: planInfo.description },
     session: sessionInfo,
     weekly: {
       resetsAt: `${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][config.weeklyResetDay]} ${config.weeklyResetHour}:00 ${config.timezone}`,

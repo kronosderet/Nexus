@@ -197,6 +197,14 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
     return { error: 'Plan requires AI (LM Studio). Run the full Nexus server for AI features.' };
   }
 
+  // ── CC plan files (Plan Archaeology) ──────────────
+  if (pathname === '/api/cc-plans') {
+    const { scanPlans } = await import('../lib/planIndex.ts');
+    const raw = parseInt(params.get('limit') || '');
+    const limit = Number.isFinite(raw) && raw > 0 ? Math.min(raw, 200) : 30;
+    return scanPlans(limit);
+  }
+
   // ── Overseer risks ────────────────────────────────
   if (pathname === '/api/overseer/risks') {
     // Lightweight risk scan — no AI needed

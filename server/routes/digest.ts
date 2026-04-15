@@ -29,12 +29,14 @@ function buildDigest(store: NexusStore, range: string) {
     typeCounts[a.type] = (typeCounts[a.type] || 0) + 1;
   }
 
-  // Count by project (extract [ProjectName] from messages)
-  const IGNORED_PROJECTS = new Set(['.claude', 'claude', 'Projects', 'unknown', '']);
+  // Count by project (extract [ProjectName] from messages).
+  // Case-insensitive + trim — prevents '.claude' / 'Claude' / ' claude ' leaking into the digest (#207).
+  const IGNORED_PROJECTS = ['.claude', 'claude', 'projects', 'nexus/.claude', 'unknown', ''];
+  const isIgnored = (name: string) => IGNORED_PROJECTS.includes(name.trim().toLowerCase());
   const projectCounts: Record<string, number> = {};
   for (const a of activity) {
     const match = a.message.match(/\[([^\]]+)\]/);
-    if (match && !IGNORED_PROJECTS.has(match[1])) projectCounts[match[1]] = (projectCounts[match[1]] || 0) + 1;
+    if (match && !isIgnored(match[1])) projectCounts[match[1]] = (projectCounts[match[1]] || 0) + 1;
   }
 
   // Sort projects by activity

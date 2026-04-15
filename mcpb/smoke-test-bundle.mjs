@@ -15,7 +15,9 @@ const SERVER = join(__dirname, 'server', 'index.js');
 
 const child = spawn('node', [SERVER], {
   stdio: ['pipe', 'pipe', 'inherit'],
-  env: { ...process.env, NEXUS_BASE_URL: 'http://localhost:3001' },
+  // Force standalone mode to match manifest.json env. Without this the smoke test would
+  // hit the user's dev server (stale code) and mask bundle regressions.
+  env: { ...process.env, NEXUS_STANDALONE: '1', NEXUS_BASE_URL: 'http://localhost:3001' },
 });
 
 let buffer = '';

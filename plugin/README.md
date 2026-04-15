@@ -7,7 +7,7 @@ AI Cowork metabrain for Claude Code. Persistent session memory, Knowledge Graph,
 Nexus gives Claude Code a persistent brain across conversations:
 
 - **Session Memory** — every conversation is automatically logged (decisions, blockers, outcomes)
-- **Knowledge Graph** — 5 typed edge relationships between architectural decisions (led_to, depends_on, contradicts, replaced, related) with blast-radius analysis
+- **Knowledge Graph** — 7 typed edge relationships between architectural decisions (led_to, depends_on, contradicts, replaced, related, informs, experimental) with blast-radius analysis
 - **Thought Stack** — LIFO interrupt-recovery memory. Push before switching context, pop when you return.
 - **Decision Guard** — redundancy check before creating tasks or decisions
 - **Fuel Intelligence** — tracks Claude usage, burn rates, and session planning

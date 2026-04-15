@@ -7803,6 +7803,86 @@ var init_store = __esm({
   }
 });
 
+// server/lib/planIndex.ts
+var planIndex_exports = {};
+__export(planIndex_exports, {
+  scanPlans: () => scanPlans
+});
+import { homedir } from "os";
+import { join as join3 } from "path";
+import { existsSync as existsSync3, readdirSync, readFileSync as readFileSync3, statSync } from "fs";
+function scanPlans(limit = 30) {
+  if (!existsSync3(PLANS_DIR)) {
+    return { available: false, plans: [], totalFiles: 0, agentCount: 0, plansDir: PLANS_DIR };
+  }
+  const now = Date.now();
+  const entries = [];
+  let agentCount = 0;
+  let totalFiles = 0;
+  try {
+    const files = readdirSync(PLANS_DIR).filter((f) => f.endsWith(".md"));
+    totalFiles = files.length;
+    for (const file2 of files) {
+      if (AGENT_PLAN_PATTERN.test(file2)) {
+        agentCount++;
+        continue;
+      }
+      const fullPath = join3(PLANS_DIR, file2);
+      let stat;
+      try {
+        stat = statSync(fullPath);
+      } catch {
+        continue;
+      }
+      let content = "";
+      try {
+        content = readFileSync3(fullPath, "utf-8").slice(0, 4e3);
+      } catch {
+      }
+      const h1Match = content.match(/^#\s+(.+)$/m);
+      const firstLine = content.split("\n").find((l) => l.trim().length > 0);
+      const title = (h1Match?.[1] || firstLine || file2.replace(/\.md$/, "")).trim().replace(/^#+\s*/, "").slice(0, 140);
+      let project = null;
+      for (const hint of PROJECT_HINTS) {
+        if (hint.patterns.some((p) => p.test(content))) {
+          project = hint.project;
+          break;
+        }
+      }
+      const bodyStart = h1Match ? content.indexOf(h1Match[0]) + h1Match[0].length : 0;
+      const snippet = content.slice(bodyStart).replace(/^#+\s+.+$/gm, "").replace(/\s+/g, " ").trim().slice(0, 220);
+      const mtime = stat.mtime.toISOString();
+      const ageDays = Math.max(0, Math.round((now - stat.mtime.getTime()) / 864e5));
+      entries.push({ filename: file2, path: fullPath, title, mtime, ageDays, project, snippet });
+    }
+  } catch {
+  }
+  entries.sort((a, b) => new Date(b.mtime).getTime() - new Date(a.mtime).getTime());
+  return {
+    available: true,
+    plans: entries.slice(0, Math.max(1, limit)),
+    totalFiles,
+    agentCount,
+    plansDir: PLANS_DIR
+  };
+}
+var PLANS_DIR, AGENT_PLAN_PATTERN, PROJECT_HINTS;
+var init_planIndex = __esm({
+  "server/lib/planIndex.ts"() {
+    "use strict";
+    PLANS_DIR = process.env.NEXUS_CC_PLANS_DIR || join3(homedir(), ".claude", "plans");
+    AGENT_PLAN_PATTERN = /-agent-[a-f0-9]+\.md$/i;
+    PROJECT_HINTS = [
+      { project: "Nexus", patterns: [/[\\/]Projects[\\/]Nexus\b/i, /\bNexus\b/] },
+      { project: "Shadowrun", patterns: [/\bShadowrun\b/i] },
+      { project: "Firewall", patterns: [/Firewall[- ]?Godot\b/i, /\bFirewall\b/] },
+      { project: "Level", patterns: [/[Mm]:[\\/]Level\b/, /Level Magazine/i] },
+      { project: "family-coop", patterns: [/family[- ]coop\b/i] },
+      { project: "rts", patterns: [/Claude-MD[\\/]rts\b/i] }
+    ];
+  }
+});
+
 // server/mcp/localApi.ts
 var localApi_exports = {};
 __export(localApi_exports, {
@@ -7810,9 +7890,9 @@ __export(localApi_exports, {
   localApiFetch: () => localApiFetch,
   store: () => store
 });
-import { mkdirSync, existsSync as existsSync3 } from "fs";
-import { join as join3 } from "path";
-import { homedir } from "os";
+import { mkdirSync, existsSync as existsSync4 } from "fs";
+import { join as join4 } from "path";
+import { homedir as homedir2 } from "os";
 async function localApiFetch(path, init = {}) {
   const method = init.method || "GET";
   const body = init.body ? JSON.parse(init.body) : {};
@@ -7954,6 +8034,12 @@ async function localApiFetch(path, init = {}) {
   if (pathname === "/api/plan") {
     return { error: "Plan requires AI (LM Studio). Run the full Nexus server for AI features." };
   }
+  if (pathname === "/api/cc-plans") {
+    const { scanPlans: scanPlans2 } = await Promise.resolve().then(() => (init_planIndex(), planIndex_exports));
+    const raw = parseInt(params.get("limit") || "");
+    const limit = Number.isFinite(raw) && raw > 0 ? Math.min(raw, 200) : 30;
+    return scanPlans2(limit);
+  }
   if (pathname === "/api/overseer/risks") {
     const tasks = store.getAllTasks();
     const usage = store.getLatestUsage();
@@ -8014,9 +8100,9 @@ var init_localApi = __esm({
   async "server/mcp/localApi.ts"() {
     "use strict";
     init_aiEndpoints();
-    NEXUS_HOME = process.env.NEXUS_HOME || join3(homedir(), ".nexus");
-    if (!existsSync3(NEXUS_HOME)) mkdirSync(NEXUS_HOME, { recursive: true });
-    process.env.NEXUS_DB_PATH = process.env.NEXUS_DB_PATH || join3(NEXUS_HOME, "nexus.json");
+    NEXUS_HOME = process.env.NEXUS_HOME || join4(homedir2(), ".nexus");
+    if (!existsSync4(NEXUS_HOME)) mkdirSync(NEXUS_HOME, { recursive: true });
+    process.env.NEXUS_DB_PATH = process.env.NEXUS_DB_PATH || join4(NEXUS_HOME, "nexus.json");
     ({ NexusStore: NexusStore2 } = await Promise.resolve().then(() => (init_store(), store_exports)));
     store = new NexusStore2();
   }
@@ -22137,6 +22223,16 @@ function formatBrief(data, project) {
       lines.push(`  \u203A ${d.decision.slice(0, 100)}`);
     }
   }
+  if (data.recentPlans?.length) {
+    lines.push("");
+    const totalSuffix = data.totalPlans && data.totalPlans > data.recentPlans.length ? ` (${data.recentPlans.length} of ${data.totalPlans})` : ` (${data.recentPlans.length})`;
+    lines.push(`Recent CC plans${totalSuffix}:`);
+    for (const p of data.recentPlans.slice(0, 3)) {
+      const tag = p.project ? `[${p.project}] ` : "";
+      const age = p.ageDays === 0 ? "today" : p.ageDays === 1 ? "1d ago" : `${p.ageDays}d ago`;
+      lines.push(`  \u203A ${tag}${p.title.slice(0, 80)} (${age})`);
+    }
+  }
   if (data.risks?.length) {
     lines.push("");
     lines.push("Risks:");
@@ -22469,7 +22565,7 @@ var TOOLS = [
   },
   {
     name: "nexus_link_decisions",
-    description: "Create a typed edge between two existing decisions in The Ledger (the knowledge graph). Use this when you notice that one decision led to, depends on, contradicts, or replaces another. The graph feeds blast-radius analysis, centrality ranking, contradiction detection, and fragmented-project detection in the Holes view.",
+    description: "Create a typed edge between two existing decisions in The Ledger (the knowledge graph). Use this when you notice that one decision led to, depends on, informs, contradicts, or replaces another. The graph feeds blast-radius analysis, centrality ranking, contradiction detection, and fragmented-project detection in the Holes view.",
     inputSchema: {
       type: "object",
       properties: {
@@ -22483,8 +22579,8 @@ var TOOLS = [
         },
         rel: {
           type: "string",
-          enum: ["led_to", "depends_on", "contradicts", "replaced", "related"],
-          description: 'Edge type. "led_to" = causal, "depends_on" = prerequisite, "contradicts" = conflict, "replaced" = supersession, "related" = weak association.'
+          enum: ["led_to", "depends_on", "contradicts", "replaced", "related", "informs", "experimental"],
+          description: 'Edge type. "led_to" = causal, "depends_on" = prerequisite, "contradicts" = conflict, "replaced" = supersession, "related" = weak association, "informs" = provides context without being a requirement, "experimental" = tentative link, revisit later.'
         },
         note: {
           type: "string",
@@ -22616,12 +22712,13 @@ async function handleTool(name, args) {
     case "nexus_brief": {
       const project = args?.project || "Nexus";
       const withTimeout = (p, fallback) => Promise.race([p, new Promise((r) => setTimeout(() => r(fallback), 1e4))]);
-      const [tasks, sessions, ledger, fuel, risks] = await Promise.all([
+      const [tasks, sessions, ledger, fuel, risks, plansIndex] = await Promise.all([
         withTimeout(nexusFetch("/api/tasks"), []),
         withTimeout(nexusFetch("/api/sessions"), []),
         withTimeout(nexusFetch("/api/ledger"), []),
         withTimeout(nexusFetch("/api/estimator"), null),
-        withTimeout(nexusFetch("/api/overseer/risks"), { risks: [] })
+        withTimeout(nexusFetch("/api/overseer/risks"), { risks: [] }),
+        withTimeout(nexusFetch("/api/cc-plans?limit=10"), { available: false, plans: [], totalFiles: 0 })
       ]);
       const projectLower = project.toLowerCase();
       const allProjects = /* @__PURE__ */ new Set();
@@ -22644,6 +22741,10 @@ async function handleTool(name, args) {
       );
       const priorSessions = sessions.filter((s) => s.project === project || s.project?.toLowerCase() === projectLower).slice(0, 5);
       const keyDecisions = (Array.isArray(ledger) ? ledger : []).filter((d) => d.project === project || d.project?.toLowerCase() === projectLower).slice(0, 5);
+      const pi = plansIndex || {};
+      const allPlans = Array.isArray(pi.plans) ? pi.plans : [];
+      const matched = allPlans.filter((p) => p.project && p.project.toLowerCase() === projectLower);
+      const recentPlans = matched.length > 0 ? matched : allPlans.slice(0, 5);
       return formatBrief(
         {
           fuel: fuel?.estimated ? {
@@ -22654,6 +22755,8 @@ async function handleTool(name, args) {
           activeTasks,
           priorSessions,
           keyDecisions,
+          recentPlans,
+          totalPlans: pi.totalFiles ?? 0,
           risks: risks.risks || []
         },
         project
