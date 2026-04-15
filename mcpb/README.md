@@ -2,13 +2,13 @@
 
 One-click install of the Nexus metabrain into Claude Desktop.
 
-## 23 Native MCP Tools
+## 24 Native MCP Tools
 
 **Read:** nexus_brief, nexus_get_plan, nexus_check_guard, nexus_search, nexus_get_critique, nexus_predict_gaps, nexus_get_blast_radius, nexus_ask_overseer
 
 **Write:** nexus_create_task, nexus_complete_task, nexus_log_activity, nexus_log_session, nexus_log_usage, nexus_record_decision, nexus_update_decision, nexus_link_decisions, nexus_push_thought, nexus_pop_thought
 
-**Async AI:** nexus_ask_overseer_start, nexus_get_overseer_result
+**Async AI:** nexus_ask_overseer_start, nexus_get_overseer_result, nexus_propose_edges
 
 **Composite:** nexus_bridge_session, nexus_fleet_overview, nexus_calendar_runway
 

@@ -509,7 +509,7 @@ Local AI-powered mission control (v4.3). Tracks tasks, sessions, decisions,
 fuel usage, and git state across all projects. Features:
   • Knowledge Graph of 140+ decisions with 7 typed edge types + blast-radius analysis
   • Local AI Overseer (Gemma 4 via LM Studio) with self-improving Advice Journal
-  • 23 native MCP tools — every Nexus operation callable from Claude Desktop natively
+  • 24 native MCP tools — every Nexus operation callable from Claude Desktop natively
   • Compass module — Now/Next/Later/Done strategic dashboard replacing Scratchpad
   • Smart Fuel Intelligence with autonomous session planning
   • Predictive Task Generation from graph gaps (6 gap categories)

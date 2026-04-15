@@ -8201,6 +8201,13 @@ async function localApiFetch(path, init = {}) {
     if (!ai.available) return { error: "No local AI available. Install LM Studio for Overseer features." };
     return { error: "Overseer ask requires the full Nexus server. Use nexus_ask_overseer_start for async queries." };
   }
+  if (pathname === "/api/overseer/propose-edges" && method === "POST") {
+    const ai = await detectAI();
+    if (!ai.available) return { error: "No local AI available. Install LM Studio for Overseer-powered edge proposals." };
+    return {
+      error: "Overseer edge proposal requires the full Nexus server (async task tracking). Run `npm run dashboard` from C:/Projects/Nexus and retry \u2014 the dashboard hosts the /api/overseer/propose-edges endpoint used by this tool."
+    };
+  }
   if (pathname === "/api/search" || pathname === "/api/smart-search") {
     const q = params.get("q") || "";
     return store.search(q);
@@ -22284,7 +22291,7 @@ var StdioServerTransport = class {
 var STANDALONE = process.env.NEXUS_STANDALONE === "1";
 var NEXUS_BASE = process.env.NEXUS_BASE_URL || "http://localhost:3001";
 var SERVER_NAME = "nexus";
-var SERVER_VERSION = "4.3.1";
+var SERVER_VERSION = "4.3.2";
 var localApiFetch2 = null;
 if (STANDALONE) {
   try {
@@ -22892,6 +22899,28 @@ var TOOLS = [
       },
       required: ["events"]
     }
+  },
+  {
+    name: "nexus_propose_edges",
+    description: "Ask the local Overseer (LM Studio) to propose typed Knowledge Graph edges for a decision. Given a decision id, Nexus pulls candidate decisions (project-matched, newest first), builds a structured prompt, and the Overseer returns JSON edge proposals with {from_id, to_id, rel, confidence, reason}. Async \u2014 returns taskId; poll with nexus_get_overseer_result. After reviewing, commit the edges you like via nexus_link_decisions. Requires the Nexus dashboard running (async task infrastructure). Use after recording a significant decision to let the Overseer suggest non-obvious connections beyond keyword/embedding overlap.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        decision_id: {
+          type: "number",
+          description: "ID of the subject decision to propose edges for."
+        },
+        candidate_pool_size: {
+          type: "number",
+          description: "How many existing decisions to compare against. Default 10, max 30."
+        },
+        project_scope: {
+          type: "string",
+          description: "Optional: restrict candidates to this project. Defaults to the subject decision's project."
+        }
+      },
+      required: ["decision_id"]
+    }
   }
 ];
 async function handleTool(name, args) {
@@ -23408,6 +23437,29 @@ ${data.answer || "(no response)"}`;
           lines.push(`  ${proj}: ${days}d`);
         }
       }
+      return lines.join("\n");
+    }
+    case "nexus_propose_edges": {
+      if (args?.decision_id == null) throw new Error("decision_id is required");
+      const body = {
+        decision_id: Number(args.decision_id),
+        candidate_pool_size: args.candidate_pool_size,
+        project_scope: args.project_scope
+      };
+      const result = await nexusFetch("/api/overseer/propose-edges", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      if (result?.error) return `\u25C8 Edge proposal unavailable: ${result.error}`;
+      const lines = [
+        `\u25C8 Edge proposal started for decision #${result.subject?.id}: "${result.subject?.decision?.slice(0, 80) || ""}"`,
+        `  Project: ${result.subject?.project || "(none)"} \xB7 Candidates compared: ${result.candidates}`,
+        `  Task ID: ${result.taskId}`,
+        "",
+        `  Poll with: nexus_get_overseer_result(task_id: "${result.taskId}")`,
+        `  Expect JSON: { "proposals": [ { "from_id", "to_id", "rel", "confidence", "reason" } ] }`,
+        `  Commit chosen edges via nexus_link_decisions(from, to, rel, note).`
+      ];
       return lines.join("\n");
     }
     case "nexus_calendar_runway": {

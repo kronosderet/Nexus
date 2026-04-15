@@ -239,6 +239,17 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
     return { error: 'Overseer ask requires the full Nexus server. Use nexus_ask_overseer_start for async queries.' };
   }
 
+  // v4.3 #197 — propose-edges needs the async task map in the Express server.
+  // Standalone MCPB mode gracefully degrades to an advisory error.
+  if (pathname === '/api/overseer/propose-edges' && method === 'POST') {
+    const ai = await detectAI();
+    if (!ai.available) return { error: 'No local AI available. Install LM Studio for Overseer-powered edge proposals.' };
+    return {
+      error: 'Overseer edge proposal requires the full Nexus server (async task tracking). ' +
+             'Run `npm run dashboard` from C:/Projects/Nexus and retry — the dashboard hosts the /api/overseer/propose-edges endpoint used by this tool.',
+    };
+  }
+
   // ── Search ────────────────────────────────────────
   if (pathname === '/api/search' || pathname === '/api/smart-search') {
     const q = params.get('q') || '';
