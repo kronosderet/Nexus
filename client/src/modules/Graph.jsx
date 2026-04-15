@@ -1,13 +1,20 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { GitBranch, Target, AlertTriangle, BarChart3, Link2, RefreshCw, Search, ChevronRight, Network } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
 import { useNexusFleet } from '../context/useNexus.js';
+import { THEME, PROJECT_PALETTE, EDGE_STYLES, LIFECYCLE_COLORS } from '../lib/theme.js';
 
 export default function GraphModule() {
   const { graph: graphSlice } = useNexusFleet();
   const [view, setView] = useState('overview');
   const [blastId, setBlastId] = useState('');
   const [blastResult, setBlastResult] = useState(null);
+
+  // v4.3.5 I4: delegated tab handler — one stable useCallback instead of 6 inline closures per render.
+  const onSelectTab = useCallback((e) => {
+    const tab = e.currentTarget.dataset.tab;
+    if (tab) setView(tab);
+  }, []);
 
   const graph = graphSlice.data?.graph || null;
   const centrality = graphSlice.data?.centrality || null;
@@ -59,7 +66,8 @@ export default function GraphModule() {
           return (
             <button
               key={tab.key}
-              onClick={() => setView(tab.key)}
+              data-tab={tab.key}
+              onClick={onSelectTab}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono transition-colors ${
                 view === tab.key
                   ? 'bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20'
@@ -357,18 +365,7 @@ function StatCard({ label, value, sub, color = 'text-nexus-text' }) {
   );
 }
 
-// ── Visual / Force-Directed View ─────────────────────────
-const PROJECT_PALETTE = [
-  { name: 'amber',  stroke: '#f59e0b', fill: '#f59e0b' },
-  { name: 'green',  stroke: '#22c55e', fill: '#22c55e' },
-  { name: 'blue',   stroke: '#3b82f6', fill: '#3b82f6' },
-  { name: 'purple', stroke: '#a855f7', fill: '#a855f7' },
-  { name: 'red',    stroke: '#ef4444', fill: '#ef4444' },
-  { name: 'cyan',   stroke: '#06b6d4', fill: '#06b6d4' },
-  { name: 'pink',   stroke: '#ec4899', fill: '#ec4899' },
-  { name: 'lime',   stroke: '#84cc16', fill: '#84cc16' },
-];
-
+// v4.3.5 I5: palette + edge styles now live in lib/theme.js (mirror of index.css tokens).
 function hashProjectColor(project) {
   if (!project) return PROJECT_PALETTE[0];
   let h = 0;
@@ -378,19 +375,6 @@ function hashProjectColor(project) {
   return PROJECT_PALETTE[Math.abs(h) % PROJECT_PALETTE.length];
 }
 
-// Edge type visual styles
-const EDGE_STYLES = {
-  led_to:      { stroke: '#f59e0b', dash: 'none',    label: 'Led to' },
-  depends_on:  { stroke: '#3b82f6', dash: '6,3',     label: 'Depends on' },
-  contradicts: { stroke: '#ef4444', dash: '2,3',     label: 'Contradicts' },
-  replaced:    { stroke: '#6b7280', dash: '8,4',     label: 'Replaced' },
-  related:     { stroke: '#64748b', dash: '2,2',     label: 'Related' },
-  // v4.3: informs = context without dependency (softer than depends_on). Purple + medium dash.
-  informs:     { stroke: '#a855f7', dash: '4,2',     label: 'Informs' },
-  // v4.3: experimental = tentative, revisit. Teal + sparse pencil-like dots.
-  experimental:{ stroke: '#14b8a6', dash: '1,3',     label: 'Experimental' },
-};
-
 function VisualView({ graph }) {
   const HEIGHT = 400;
   const [hoveredId, setHoveredId] = useState(null);
@@ -398,6 +382,17 @@ function VisualView({ graph }) {
   const [hiddenProjects, setHiddenProjects] = useState(new Set());
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(600);
+
+  // v4.3.5 I4: delegated project-toggle handler — one stable callback for N buttons.
+  const onToggleProject = useCallback((e) => {
+    const p = e.currentTarget.dataset.project;
+    if (!p) return;
+    setHiddenProjects(prev => {
+      const s = new Set(prev);
+      s.has(p) ? s.delete(p) : s.add(p);
+      return s;
+    });
+  }, []);
 
   // Responsive width
   useEffect(() => {
@@ -563,7 +558,7 @@ function VisualView({ graph }) {
               const c = hashProjectColor(p);
               const hidden = hiddenProjects.has(p);
               return (
-                <button key={p} onClick={() => setHiddenProjects(prev => { const s = new Set(prev); s.has(p) ? s.delete(p) : s.add(p); return s; })}
+                <button key={p} data-project={p} onClick={onToggleProject}
                   className={`text-[10px] font-mono px-2 py-0.5 rounded-full border transition-all ${hidden ? 'opacity-30 border-nexus-border text-nexus-text-faint' : 'border-current'}`}
                   style={{ color: hidden ? undefined : c.fill, borderColor: hidden ? undefined : c.fill + '40' }}>
                   {p}
@@ -581,7 +576,7 @@ function VisualView({ graph }) {
             width="100%"
             height={HEIGHT}
             className="block"
-            style={{ background: '#0a0e1a', borderRadius: 8 }}
+            style={{ background: THEME.bg, borderRadius: 8 }}
             onClick={() => setSelectedId(null)}
           >
             {/* Edges with type-based styling */}
@@ -618,7 +613,7 @@ function VisualView({ graph }) {
               const isHi = hoveredId === n.id;
               const isSel = selectedId === n.id;
               const lc = n.lifecycle;
-              const lcColor = lc === 'validated' ? '#22c55e' : lc === 'proposed' ? '#60a5fa' : lc === 'deprecated' ? '#6b7280' : '#f59e0b';
+              const lcColor = LIFECYCLE_COLORS[lc] || LIFECYCLE_COLORS.active;
               const lcLetter = lc === 'validated' ? 'V' : lc === 'proposed' ? 'P' : lc === 'deprecated' ? 'D' : 'A';
               return (
                 <g key={n.id}>
@@ -628,7 +623,7 @@ function VisualView({ graph }) {
                     r={isHi || isSel ? r + 2 : r}
                     fill={color.fill}
                     fillOpacity={isHi || isSel ? 1 : 0.75}
-                    stroke={isSel ? '#fff' : isHi ? '#f59e0b' : color.stroke}
+                    stroke={isSel ? THEME.white : isHi ? THEME.amber : color.stroke}
                     strokeOpacity={isHi || isSel ? 1 : 0.6}
                     strokeWidth={isSel ? 2.5 : isHi ? 2 : 1}
                     style={{ cursor: 'pointer', transition: 'r 0.1s' }}
@@ -654,14 +649,14 @@ function VisualView({ graph }) {
                   width={210}
                   height={22}
                   rx={4}
-                  fill="#0a0e1a"
-                  stroke="#f59e0b"
+                  fill={THEME.bg}
+                  stroke={THEME.amber}
                   strokeOpacity={0.6}
                 />
                 <text
                   x={Math.min(WIDTH - 220, Math.max(4, positions[hovered.id].x + 10)) + 8}
                   y={Math.max(4, positions[hovered.id].y - 22) + 14}
-                  fill="#e2e8f0"
+                  fill={THEME.text}
                   fontSize={10}
                   fontFamily="ui-monospace, monospace"
                 >

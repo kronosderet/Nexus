@@ -7038,6 +7038,27 @@ var init_store = __esm({
           }
           console.error(`\u25C8 Migration v4.3.5 C1: backfilled \`project\` on ${tasksNeedingProject.length} tasks.`);
         }
+        const decisionsNeedingLifecycle = this.data.ledger.filter((d) => !d.lifecycle);
+        if (decisionsNeedingLifecycle.length > 0) {
+          const degreeByDecision = /* @__PURE__ */ new Map();
+          for (const e of this.data.graph_edges) {
+            degreeByDecision.set(e.from, (degreeByDecision.get(e.from) || 0) + 1);
+            degreeByDecision.set(e.to, (degreeByDecision.get(e.to) || 0) + 1);
+          }
+          const now = Date.now();
+          const nowIso = new Date(now).toISOString();
+          for (const d of decisionsNeedingLifecycle) {
+            const degree = degreeByDecision.get(d.id) || 0;
+            const ageDays = (now - new Date(d.created_at).getTime()) / 864e5;
+            if (d.deprecated) d.lifecycle = "deprecated";
+            else if (degree >= 3) d.lifecycle = "validated";
+            else if (ageDays < 14) d.lifecycle = "proposed";
+            else d.lifecycle = "active";
+            if (!d.last_reviewed_at) d.last_reviewed_at = nowIso;
+            changed++;
+          }
+          console.error(`\u25C8 Migration v4.3.5 I1: backfilled \`lifecycle\` on ${decisionsNeedingLifecycle.length} decisions.`);
+        }
         if (changed > 0) this._flush();
       }
       /** Re-read data from disk (for external changes, e.g. MCP writes while dashboard is running). */
@@ -7204,7 +7225,7 @@ var init_store = __esm({
       getAllTasks() {
         return [...this.data.tasks].sort((a, b) => a.sort_order - b.sort_order);
       }
-      createTask({ title, description = "", status = "backlog", priority = 0, decision_ids }) {
+      createTask({ title, description = "", status = "backlog", priority = 0, decision_ids, project }) {
         const maxOrder = this.data.tasks.reduce((max, t) => t.status === status && t.sort_order > max ? t.sort_order : max, 0);
         const task = {
           id: this._id("tasks"),
@@ -7214,6 +7235,8 @@ var init_store = __esm({
           priority,
           sort_order: maxOrder + 1,
           linked_files: "[]",
+          // v4.3.5 C1: persist project on creation so the backfill migration doesn't have to re-run.
+          project: project || "Nexus",
           ...decision_ids?.length ? { decision_ids } : {},
           created_at: this._now(),
           updated_at: this._now()
@@ -8081,7 +8104,7 @@ async function localApiFetch(path, init = {}) {
   }
   if (pathname === "/api/tasks" && method === "POST") {
     if (!body.title?.trim()) throw new Error("400: Task title required.");
-    const task = store.createTask({ title: body.title.trim(), description: body.description, status: body.status, priority: body.priority, decision_ids: body.decision_ids });
+    const task = store.createTask({ title: body.title.trim(), description: body.description, status: body.status, priority: body.priority, decision_ids: body.decision_ids, project: body.project });
     store.addActivity("task_created", `Plotted -- "${body.title}"`);
     return task;
   }
@@ -22381,7 +22404,7 @@ var StdioServerTransport = class {
 var STANDALONE = process.env.NEXUS_STANDALONE === "1";
 var NEXUS_BASE = process.env.NEXUS_BASE_URL || "http://localhost:3001";
 var SERVER_NAME = "nexus";
-var SERVER_VERSION = "4.3.2";
+var SERVER_VERSION = "4.3.5";
 var localApiFetch2 = null;
 if (STANDALONE) {
   try {
@@ -22732,6 +22755,10 @@ var TOOLS = [
         description: {
           type: "string",
           description: "Optional longer description or context for the task."
+        },
+        project: {
+          type: "string",
+          description: 'Optional project name. If omitted, defaults to "Nexus". Use the canonical project name (e.g. "Shadowrun", "noosphere", "Firewall-Godot").'
         },
         status: {
           type: "string",
@@ -23248,6 +23275,7 @@ ${memoryFile}
       if (args.description) body.description = args.description;
       if (args.priority != null) body.priority = Number(args.priority);
       if (args.decision_ids) body.decision_ids = args.decision_ids;
+      if (args.project) body.project = args.project;
       const result = await nexusFetch("/api/tasks", {
         method: "POST",
         body: JSON.stringify(body)

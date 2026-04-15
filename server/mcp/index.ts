@@ -63,7 +63,7 @@ import {
 const STANDALONE = process.env.NEXUS_STANDALONE === '1';
 const NEXUS_BASE = process.env.NEXUS_BASE_URL || 'http://localhost:3001';
 const SERVER_NAME = 'nexus';
-const SERVER_VERSION = '4.3.2';
+const SERVER_VERSION = '4.3.5';
 
 // In standalone mode, import the local API adapter (direct store access, no Express needed)
 let localApiFetch: ((path: string, init?: any) => Promise<any>) | null = null;
@@ -494,6 +494,10 @@ const TOOLS: Tool[] = [
         description: {
           type: 'string',
           description: 'Optional longer description or context for the task.',
+        },
+        project: {
+          type: 'string',
+          description: 'Optional project name. If omitted, defaults to "Nexus". Use the canonical project name (e.g. "Shadowrun", "noosphere", "Firewall-Godot").',
         },
         status: {
           type: 'string',
@@ -1107,6 +1111,7 @@ async function handleTool(name: string, args: any): Promise<string> {
       if (args.description) body.description = args.description;
       if (args.priority != null) body.priority = Number(args.priority);
       if (args.decision_ids) body.decision_ids = args.decision_ids;
+      if (args.project) body.project = args.project;
       const result = await nexusFetch('/api/tasks', {
         method: 'POST',
         body: JSON.stringify(body),

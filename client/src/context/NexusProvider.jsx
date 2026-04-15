@@ -66,6 +66,10 @@ const WS_MAP = {
   usage_update:     ['estimator', 'workload', 'timing', 'fuelIntel'],
   gpu_snapshot:     ['pulse'],
   decision_update:  ['graph'],
+  // v4.3.5 I6 — notification events are handled directly by ToastOverlay.jsx via
+  // ws.subscribe(); mapping them to [] here documents that no slice invalidation is
+  // intentional and preserves the "every event type appears in WS_MAP" contract.
+  notification:     [],
   reload:           ['tasks', 'activity', 'sessions', 'thoughts', 'estimator', 'workload', 'timing', 'history', 'fuelIntel', 'pulse', 'fleet', 'graph'],
 };
 

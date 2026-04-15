@@ -135,6 +135,30 @@ export class NexusStore {
       console.error(`◈ Migration v4.3.5 C1: backfilled \`project\` on ${tasksNeedingProject.length} tasks.`);
     }
 
+    // v4.3.5 I1: Backfill `lifecycle` on ledger decisions (108/154 lacked it pre-patch).
+    // Heuristic: high-centrality (degree ≥3) → validated, recent (<14d) → proposed, else → active.
+    const decisionsNeedingLifecycle = this.data.ledger.filter(d => !d.lifecycle);
+    if (decisionsNeedingLifecycle.length > 0) {
+      const degreeByDecision = new Map<number, number>();
+      for (const e of this.data.graph_edges) {
+        degreeByDecision.set(e.from, (degreeByDecision.get(e.from) || 0) + 1);
+        degreeByDecision.set(e.to,   (degreeByDecision.get(e.to)   || 0) + 1);
+      }
+      const now = Date.now();
+      const nowIso = new Date(now).toISOString();
+      for (const d of decisionsNeedingLifecycle) {
+        const degree = degreeByDecision.get(d.id) || 0;
+        const ageDays = (now - new Date(d.created_at).getTime()) / 86400000;
+        if (d.deprecated) d.lifecycle = 'deprecated';
+        else if (degree >= 3) d.lifecycle = 'validated';
+        else if (ageDays < 14) d.lifecycle = 'proposed';
+        else d.lifecycle = 'active';
+        if (!d.last_reviewed_at) d.last_reviewed_at = nowIso;
+        changed++;
+      }
+      console.error(`◈ Migration v4.3.5 I1: backfilled \`lifecycle\` on ${decisionsNeedingLifecycle.length} decisions.`);
+    }
+
     if (changed > 0) this._flush();
   }
 
@@ -267,13 +291,15 @@ export class NexusStore {
     return [...this.data.tasks].sort((a, b) => a.sort_order - b.sort_order);
   }
 
-  createTask({ title, description = '', status = 'backlog', priority = 0, decision_ids }: {
-    title: string; description?: string; status?: Task['status']; priority?: number; decision_ids?: number[];
+  createTask({ title, description = '', status = 'backlog', priority = 0, decision_ids, project }: {
+    title: string; description?: string; status?: Task['status']; priority?: number; decision_ids?: number[]; project?: string;
   }): Task {
     const maxOrder = this.data.tasks.reduce((max, t) => t.status === status && t.sort_order > max ? t.sort_order : max, 0);
     const task: Task = {
       id: this._id('tasks'), title, description, status, priority,
       sort_order: maxOrder + 1, linked_files: '[]',
+      // v4.3.5 C1: persist project on creation so the backfill migration doesn't have to re-run.
+      project: project || 'Nexus',
       ...(decision_ids?.length ? { decision_ids } : {}),
       created_at: this._now(), updated_at: this._now(),
     };

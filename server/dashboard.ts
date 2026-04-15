@@ -138,7 +138,7 @@ async function start() {
   });
 
   // Status endpoint
-  app.get('/api/status', (_req, res) => res.json({ status: 'online', version: '4.2.0', mode: 'dashboard', message: 'All instruments nominal, Captain.' }));
+  app.get('/api/status', (_req, res) => res.json({ status: 'online', version: '4.3.5', mode: 'dashboard', message: 'All instruments nominal, Captain.' }));
 
   // SPA fallback (Express 5 uses {*path} not *)
   app.use((_req, res) => {

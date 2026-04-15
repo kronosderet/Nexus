@@ -101,7 +101,7 @@ app.get('/api/status', (req, res) => {
   res.json({
     status: 'online',
     message: 'All instruments nominal.',
-    version: '4.3.2',
+    version: '4.3.5',
     uptime: process.uptime(),
   });
 });

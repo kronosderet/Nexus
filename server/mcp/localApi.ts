@@ -46,7 +46,7 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
   }
   if (pathname === '/api/tasks' && method === 'POST') {
     if (!body.title?.trim()) throw new Error('400: Task title required.');
-    const task = store.createTask({ title: body.title.trim(), description: body.description, status: body.status, priority: body.priority, decision_ids: body.decision_ids });
+    const task = store.createTask({ title: body.title.trim(), description: body.description, status: body.status, priority: body.priority, decision_ids: body.decision_ids, project: body.project });
     store.addActivity('task_created', `Plotted -- "${body.title}"`);
     return task;
   }
