@@ -86,12 +86,20 @@ export class NexusStore {
     this._runMigrations();
   }
 
-  /** Idempotent schema migrations — inspect data and backfill missing fields. */
+  /** Idempotent schema migrations — inspect data and backfill missing fields.
+   *  v4.3.6 M1: each migration records its ID in `_appliedMigrations` after completion so
+   *  subsequent cold-starts skip the scan. Tests can force a re-run by clearing that map. */
   private _runMigrations(): void {
     let changed = 0;
+    if (!this.data._appliedMigrations) {
+      this.data._appliedMigrations = {};
+      changed++;
+    }
+    const applied = this.data._appliedMigrations;
+    const markApplied = (id: string) => { applied[id] = new Date().toISOString(); };
 
     // v4.3.5 C1: Backfill `project` on tasks (v4.2 added the field but never migrated old tasks).
-    const tasksNeedingProject = this.data.tasks.filter(t => !t.project);
+    const tasksNeedingProject = applied['v4.3.5-C1'] ? [] : this.data.tasks.filter(t => !t.project);
     if (tasksNeedingProject.length > 0) {
       // Build project name lookup from existing decisions (canonical casing).
       const decisionProjectById = new Map<number, string>();
@@ -136,11 +144,15 @@ export class NexusStore {
         changed++;
       }
       console.error(`◈ Migration v4.3.5 C1: backfilled \`project\` on ${tasksNeedingProject.length} tasks.`);
+      markApplied('v4.3.5-C1');
+    } else if (!applied['v4.3.5-C1']) {
+      // No tasks needed backfill — still mark applied so we don't rescan on every load.
+      markApplied('v4.3.5-C1');
     }
 
     // v4.3.5 I1: Backfill `lifecycle` on ledger decisions (108/154 lacked it pre-patch).
     // Heuristic: high-centrality (degree ≥3) → validated, recent (<14d) → proposed, else → active.
-    const decisionsNeedingLifecycle = this.data.ledger.filter(d => !d.lifecycle);
+    const decisionsNeedingLifecycle = applied['v4.3.5-I1'] ? [] : this.data.ledger.filter(d => !d.lifecycle);
     if (decisionsNeedingLifecycle.length > 0) {
       const degreeByDecision = new Map<number, number>();
       for (const e of this.data.graph_edges) {
@@ -160,6 +172,9 @@ export class NexusStore {
         changed++;
       }
       console.error(`◈ Migration v4.3.5 I1: backfilled \`lifecycle\` on ${decisionsNeedingLifecycle.length} decisions.`);
+      markApplied('v4.3.5-I1');
+    } else if (!applied['v4.3.5-I1']) {
+      markApplied('v4.3.5-I1');
     }
 
     if (changed > 0) this._flush();

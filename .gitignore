@@ -12,3 +12,8 @@ nexus.json.bak
 nexus.json.bak.*
 nexus.json.tmp
 nexus-actions.json
+
+# v4.3.6 H3 — generated artifacts. Rebuild via `npm run mcpb:pack` before release.
+mcpb/nexus.mcpb
+mcpb/server/index.js
+plugin/server/index.js

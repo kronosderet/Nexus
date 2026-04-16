@@ -38,7 +38,7 @@ interface HealthResults {
 async function runHealthChecks(store: NexusStore): Promise<HealthResults> {
   const results: HealthResults = {
     timestamp: new Date().toISOString(),
-    version: '4.3.5',
+    version: '4.3.6',
     status: 'operational',
     checks: {},
   };

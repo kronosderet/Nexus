@@ -1701,7 +1701,7 @@ Ritual:  nexus_bridge_session (end-of-work: auto-summary + handoff)
     };
 
     console.log(`
-  ${amber('◈')} ${amber('NEXUS MCP SERVER')} -- v4.3.5
+  ${amber('◈')} ${amber('NEXUS MCP SERVER')} -- v4.3.6
 
   ${dim('Exposes the Nexus metabrain as 24 native MCP tools so every Claude')}
   ${dim('instance can call mcp__nexus__brief, mcp__nexus__check_guard, etc.')}
