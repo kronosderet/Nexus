@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
+import type { Thought } from '../types.ts';
 
 /**
  * Thought Stack — interrupt-recovery working memory.
@@ -8,14 +9,17 @@ import type { NexusStore } from '../db/store.ts';
  * It's a LIFO stack: push when interrupted mid-thought,
  * pop when returning to recover what you were doing.
  */
-export function createThoughtRoutes(store: NexusStore, broadcast: (data: any) => void) {
+export function createThoughtRoutes(store: NexusStore, broadcast: (data: unknown) => void) {
   const router = Router();
 
   // GET /api/thoughts — list active thoughts (or all with ?all=true)
   router.get('/', (req: Request, res: Response) => {
     const all = req.query.all === 'true' || req.query.all === '1';
     const project = typeof req.query.project === 'string' ? req.query.project : undefined;
-    const status = typeof req.query.status === 'string' ? req.query.status as any : undefined;
+    // Validate status against the Thought.status union to avoid `as any` cast.
+    const rawStatus = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const validStatuses = new Set(['active', 'resolved', 'abandoned']);
+    const status = rawStatus && validStatuses.has(rawStatus) ? (rawStatus as Thought['status']) : undefined;
 
     if (all) {
       res.json(store.getAllThoughts({ project, status, limit: 50 }));

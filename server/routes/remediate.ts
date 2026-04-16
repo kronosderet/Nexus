@@ -4,7 +4,7 @@ import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
 import { PROJECTS_DIR } from '../lib/config.ts';
 
-type BroadcastFn = (data: any) => void;
+type BroadcastFn = (data: unknown) => void;
 
 // Whitelisted safe commands that Nexus can auto-execute
 const SAFE_COMMANDS: Record<string, (project: string, param?: string) => { cmd: string; cwd: string }> = {

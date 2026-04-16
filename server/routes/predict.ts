@@ -20,7 +20,7 @@ import { PROJECTS_DIR } from '../lib/config.ts';
  * 6. Uncommitted drift — repos with many uncommitted changes
  */
 
-export function createPredictRoutes(store: NexusStore, broadcast: (data: any) => void) {
+export function createPredictRoutes(store: NexusStore, broadcast: (data: unknown) => void) {
   const router = Router();
 
   // Dry run — show what would be generated, don't create anything
@@ -78,7 +78,7 @@ interface GapSuggestion {
   decisionId?: number;
 }
 
-async function detectGaps(store: NexusStore): Promise<{ suggestions: GapSuggestion[]; stats: any }> {
+async function detectGaps(store: NexusStore): Promise<{ suggestions: GapSuggestion[]; stats: Record<string, number> }> {
   const suggestions: GapSuggestion[] = [];
   const ledger = store.getAllDecisions();
   const edges = store.getAllEdges();

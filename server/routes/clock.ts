@@ -27,7 +27,8 @@ export function createClockRoutes(store: NexusStore, _getUsageTiming?: () => any
     const hoursLeftToday = Math.max(0, 24 - hour);
 
     // Fuel burn projection from history within current session
-    let projection: any = null;
+    interface FuelProjection { burnPerHour: number; emptyInHours: number; emptyAt: string }
+    let projection: FuelProjection | null = null;
     const sessionHistory = history.filter(h => h.session_percent != null);
     if (sessionHistory.length >= 2) {
       const newest = sessionHistory[0];
@@ -46,7 +47,8 @@ export function createClockRoutes(store: NexusStore, _getUsageTiming?: () => any
     }
 
     // Calendar
-    const calendar: any[] = [];
+    interface CalendarDay { date: string; dayOfWeek: number; isToday: boolean; isWeekend: boolean; isWeeklyReset: boolean; note: string | null }
+    const calendar: CalendarDay[] = [];
     for (let d = 0; d < 7; d++) {
       const date = new Date(local);
       date.setDate(date.getDate() + d);

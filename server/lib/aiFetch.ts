@@ -15,7 +15,7 @@ import { request } from 'undici';
  */
 export async function aiFetch(
   url: string,
-  body: any,
+  body: unknown,
   signal?: AbortSignal
 ): Promise<any> {
   const { statusCode, body: responseBody } = await request(url, {

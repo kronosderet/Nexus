@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { execSync } from 'child_process';
 import type { NexusStore } from '../db/store.ts';
 
-type BroadcastFn = (data: any) => void;
+type BroadcastFn = (data: unknown) => void;
 
 export function createNotifyRoutes(store: NexusStore, broadcast: BroadcastFn): Router {
   const router = Router();

@@ -166,7 +166,9 @@ export interface NexusData {
 export interface ScheduledScan {
   type: 'risk' | 'digest';
   timestamp: string;
-  result: any;
+  // Shape varies by scan type — risks are a summary of counts + items;
+  // digests are a narrative summary + stats. Opaque at the type level.
+  result: unknown;
 }
 
 // ── API response types ─────────────────────────────────
