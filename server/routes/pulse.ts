@@ -4,7 +4,17 @@ import { readdirSync, statSync, existsSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
 import type { NexusStore } from '../db/store.ts';
+import type { ActivityEntry, Task, Session, Decision } from '../types.ts';
 import { PROJECTS_DIR } from '../lib/config.ts';
+
+// v4.3.5 P1 — per-project git info shape.
+interface ProjectGitInfo {
+  isRepo: boolean;
+  branch?: string;
+  lastCommitDate?: string;
+  lastCommitMsg?: string;
+  uncommittedChanges?: number;
+}
 
 export function createPulseRoutes(store: NexusStore) {
   const router = Router();
@@ -46,22 +56,22 @@ export function createPulseRoutes(store: NexusStore) {
     const enriched = projects.map(p => {
       const name = p.name.toLowerCase();
       // Count activity per project (by [ProjectName] tag)
-      const projActivity = activity.filter((a: any) => a.message.toLowerCase().includes(`[${name}]`));
-      const activity7d = projActivity.filter((a: any) => now - new Date(a.created_at).getTime() < 7 * DAY).length;
-      const activityToday = projActivity.filter((a: any) => now - new Date(a.created_at).getTime() < DAY).length;
+      const projActivity = activity.filter((a: ActivityEntry) => a.message.toLowerCase().includes(`[${name}]`));
+      const activity7d = projActivity.filter((a: ActivityEntry) => now - new Date(a.created_at).getTime() < 7 * DAY).length;
+      const activityToday = projActivity.filter((a: ActivityEntry) => now - new Date(a.created_at).getTime() < DAY).length;
       const lastActivity = projActivity[0]?.created_at || null;
 
       // Tasks referencing this project
-      const projTasks = tasks.filter((t: any) => t.title.toLowerCase().includes(name));
-      const openTasks = projTasks.filter((t: any) => t.status !== 'done').length;
-      const doneTasks = projTasks.filter((t: any) => t.status === 'done').length;
+      const projTasks = tasks.filter((t: Task) => t.title.toLowerCase().includes(name));
+      const openTasks = projTasks.filter((t: Task) => t.status !== 'done').length;
+      const doneTasks = projTasks.filter((t: Task) => t.status === 'done').length;
 
       // Sessions
-      const projSessions = sessions.filter((s: any) => s.project.toLowerCase() === name);
+      const projSessions = sessions.filter((s: Session) => s.project.toLowerCase() === name);
       const lastSession = projSessions[0]?.created_at || null;
 
       // Git info per project
-      let git: any = { isRepo: false };
+      let git: ProjectGitInfo = { isRepo: false };
       if (p.hasGit) {
         try {
           const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: p.path, encoding: 'utf-8' }).trim();
@@ -89,7 +99,7 @@ export function createPulseRoutes(store: NexusStore) {
         activity: { today: activityToday, week: activity7d, last: lastActivity },
         tasks: { open: openTasks, done: doneTasks },
         sessions: { count: projSessions.length, last: lastSession },
-        decisions: decisions.filter((d: any) => d.project.toLowerCase() === name).length,
+        decisions: decisions.filter((d: Decision) => d.project.toLowerCase() === name).length,
         heat,
       };
     });

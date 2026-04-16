@@ -5,7 +5,35 @@ import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
 import { PROJECTS_DIR } from '../lib/config.ts';
 
-type BroadcastFn = (data: any) => void;
+type BroadcastFn = (data: unknown) => void;
+
+// v4.3.5 P1 — git repo + commit shapes.
+interface GitHubInfo { owner: string; repo: string; url: string }
+interface GitCommit {
+  project: string;
+  hash: string;
+  short: string;
+  message: string;
+  author: string;
+  date: string;
+}
+interface RepoInfo {
+  name: string;
+  path: string;
+  branch: string;
+  remote: string;
+  github: GitHubInfo | null;
+  uncommitted: number;
+  ahead: number;
+  behind: number;
+  lastCommit: { hash: string; short: string; message: string; author: string; date: string };
+}
+interface SyncResult {
+  project: string;
+  newCommits?: number;
+  status: 'ok' | 'error';
+  error?: string;
+}
 
 export function createGitHubRoutes(store: NexusStore, broadcast: BroadcastFn) {
   const router = Router();
@@ -61,16 +89,16 @@ export function createGitHubRoutes(store: NexusStore, broadcast: BroadcastFn) {
       broadcast({ type: 'activity', payload: entry });
 
       res.json({ success: true, files, project });
-    } catch (err: any) {
-      res.json({ success: false, project, error: err.message?.slice(0, 200) });
+    } catch (err) {
+      res.json({ success: false, project, error: (err as Error).message?.slice(0, 200) });
     }
   });
 
   return router;
 }
 
-function scanGitRepos() {
-  const repos: any[] = [];
+function scanGitRepos(): RepoInfo[] {
+  const repos: RepoInfo[] = [];
   try {
     for (const name of readdirSync(PROJECTS_DIR)) {
       const fullPath = join(PROJECTS_DIR, name);
@@ -86,7 +114,7 @@ function scanGitRepos() {
         const [hash, short, message, author, date] = lastCommit.split('|');
 
         // Parse GitHub info from remote URL
-        let github: any = null;
+        let github: GitHubInfo | null = null;
         const ghMatch = remote.match(/github\.com[:/]([^/]+)\/([^/.]+)/);
         if (ghMatch) github = { owner: ghMatch[1], repo: ghMatch[2], url: `https://github.com/${ghMatch[1]}/${ghMatch[2]}` };
 
@@ -112,7 +140,7 @@ function scanGitRepos() {
     }
   } catch {}
 
-  return repos.sort((a: any, b: any) => {
+  return repos.sort((a, b) => {
     const da = a.lastCommit?.date ? new Date(a.lastCommit.date) : new Date(0);
     const db = b.lastCommit?.date ? new Date(b.lastCommit.date) : new Date(0);
     return db.getTime() - da.getTime();
@@ -132,9 +160,9 @@ function getProjectCommits(cwd: string, projectName: string, limit = 20) {
   });
 }
 
-function getAllCommits(days: number) {
+function getAllCommits(days: number): GitCommit[] {
   const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
-  const allCommits: any[] = [];
+  const allCommits: GitCommit[] = [];
 
   try {
     for (const name of readdirSync(PROJECTS_DIR)) {
@@ -157,8 +185,8 @@ function getAllCommits(days: number) {
   return allCommits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
-function syncAllRepos(store: NexusStore, broadcast: BroadcastFn) {
-  const results: any[] = [];
+function syncAllRepos(store: NexusStore, broadcast: BroadcastFn): SyncResult[] {
+  const results: SyncResult[] = [];
 
   try {
     for (const name of readdirSync(PROJECTS_DIR)) {
@@ -185,8 +213,8 @@ function syncAllRepos(store: NexusStore, broadcast: BroadcastFn) {
         }
 
         results.push({ project: name, newCommits, status: 'ok' });
-      } catch (err: any) {
-        results.push({ project: name, status: 'error', error: err.message });
+      } catch (err) {
+        results.push({ project: name, status: 'error', error: (err as Error).message });
       }
     }
   } catch {}
