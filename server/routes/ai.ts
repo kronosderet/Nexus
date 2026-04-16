@@ -1,20 +1,45 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
+import type { ActivityEntry, Session, Task } from '../types.ts';
+
+// v4.3.5 P1 — typed AI endpoint + response shapes (minimal, matches what we consume)
+type AIEndpointType = 'anthropic' | 'openai' | 'ollama';
+interface AIEndpointConfig { name: string; base: string; type: AIEndpointType }
+
+interface ChatMessage { role: 'system' | 'user' | 'assistant'; content: string }
+
+interface AIModel { id: string; name: string; size?: number }
+interface DetectResultAvailable {
+  available: true;
+  provider: string;
+  base: string;
+  type: AIEndpointType;
+  models: AIModel[];
+}
+interface DetectResultUnavailable { available: false }
+type DetectResult = DetectResultAvailable | DetectResultUnavailable;
+
+// Response shapes from the three supported AI backends. Only fields we actually read.
+interface OpenAIModelsResponse { data?: Array<{ id: string }> }
+interface OllamaModelsResponse { models?: Array<{ name: string; size?: number }> }
+interface AnthropicMessagesResponse { content?: Array<{ type?: string; text?: string }> }
+interface OpenAIChatResponse { choices?: Array<{ message?: { content?: string; reasoning_content?: string } }> }
+interface OllamaChatResponse { message?: { content?: string } }
 
 // LM Studio / Ollama auto-detection
 // Anthropic endpoint first -- cleaner response for thinking models (no empty content issue)
-const AI_ENDPOINTS = [
+const AI_ENDPOINTS: AIEndpointConfig[] = [
   { name: 'LM Studio (Anthropic)', base: 'http://localhost:1234/v1', type: 'anthropic' },
   { name: 'LM Studio', base: 'http://localhost:1234/v1', type: 'openai' },
   { name: 'Ollama', base: 'http://localhost:11434', type: 'ollama' },
 ];
 
-async function detectAI() {
+async function detectAI(): Promise<DetectResult> {
   for (const ep of AI_ENDPOINTS) {
     try {
       if (ep.type === 'anthropic') {
         // Probe Anthropic endpoint with a tiny request
-        const res = await fetch(`${ep.base}/messages`, {
+        await fetch(`${ep.base}/messages`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-api-key': 'none' },
           body: JSON.stringify({ model: 'test', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
@@ -23,10 +48,10 @@ async function detectAI() {
         // LM Studio returns 200 even with wrong model -- or a model list via /models
         const modelsRes = await fetch(`${ep.base}/models`, { signal: AbortSignal.timeout(2000) });
         if (!modelsRes.ok) continue;
-        const modelsData: any = await modelsRes.json();
-        const models = (modelsData.data || [])
-          .filter((m: any) => !m.id.includes('embed'))
-          .map((m: any) => ({ id: m.id, name: m.id }));
+        const modelsData: OpenAIModelsResponse = await modelsRes.json();
+        const models: AIModel[] = (modelsData.data || [])
+          .filter((m) => !m.id.includes('embed'))
+          .map((m) => ({ id: m.id, name: m.id }));
         if (models.length === 0) continue;
         return { available: true, provider: ep.name, base: ep.base, type: 'anthropic', models };
       }
@@ -34,30 +59,32 @@ async function detectAI() {
       const modelsUrl = ep.type === 'ollama' ? `${ep.base}/api/tags` : `${ep.base}/models`;
       const res = await fetch(modelsUrl, { signal: AbortSignal.timeout(2000) });
       if (!res.ok) continue;
-      const data: any = await res.json();
 
-      let models: any[] = [];
+      let models: AIModel[] = [];
       if (ep.type === 'ollama') {
-        models = (data.models || []).map((m: any) => ({ id: m.name, name: m.name, size: m.size }));
+        const data: OllamaModelsResponse = await res.json();
+        models = (data.models || []).map((m) => ({ id: m.name, name: m.name, size: m.size }));
       } else {
-        models = (data.data || []).filter((m: any) => !m.id.includes('embed')).map((m: any) => ({ id: m.id, name: m.id }));
+        const data: OpenAIModelsResponse = await res.json();
+        models = (data.data || []).filter((m) => !m.id.includes('embed')).map((m) => ({ id: m.id, name: m.id }));
       }
       if (models.length === 0) continue;
 
       return { available: true, provider: ep.name, base: ep.base, type: ep.type, models };
     } catch {}
   }
-  return { available: false } as any;
+  return { available: false };
 }
 
-async function chat(base: string, type: string, model: string, messages: any[], maxTokens = 512) {
+async function chat(base: string, type: AIEndpointType, model: string, messages: ChatMessage[], maxTokens = 512): Promise<string> {
   // ── Anthropic Messages API (preferred -- clean output, no thinking model issues) ──
   if (type === 'anthropic') {
     // Anthropic format: system is separate, messages are user/assistant only
-    const systemMsg = messages.find((m: any) => m.role === 'system');
-    const chatMsgs = messages.filter((m: any) => m.role !== 'system');
+    const systemMsg = messages.find((m) => m.role === 'system');
+    const chatMsgs = messages.filter((m) => m.role !== 'system');
 
-    const body: any = {
+    // Anthropic body shape — `system` is optional string, messages are user/assistant only.
+    const body: { model: string; max_tokens: number; messages: ChatMessage[]; system?: string } = {
       model,
       max_tokens: maxTokens,
       messages: chatMsgs,
@@ -71,10 +98,10 @@ async function chat(base: string, type: string, model: string, messages: any[], 
       signal: AbortSignal.timeout(120000),
     });
     if (!res.ok) throw new Error(`AI returned ${res.status}`);
-    const data: any = await res.json();
+    const data: AnthropicMessagesResponse = await res.json();
     // Anthropic format: content is array of {type, text} blocks
-    const textBlocks = (data.content || []).filter((b: any) => b.type === 'text');
-    return textBlocks.map((b: any) => b.text).join('\n').trim();
+    const textBlocks = (data.content || []).filter((b) => b.type === 'text');
+    return textBlocks.map((b) => b.text || '').join('\n').trim();
   }
 
   // ── OpenAI / Ollama ──
@@ -92,11 +119,12 @@ async function chat(base: string, type: string, model: string, messages: any[], 
   });
 
   if (!res.ok) throw new Error(`AI returned ${res.status}`);
-  const data: any = await res.json();
 
   if (type === 'ollama') {
+    const data: OllamaChatResponse = await res.json();
     return data.message?.content || '';
   }
+  const data: OpenAIChatResponse = await res.json();
   const choice = data.choices?.[0]?.message;
   const content = choice?.content || '';
   const reasoning = choice?.reasoning_content || '';
@@ -138,7 +166,7 @@ export function createAIRoutes(store: NexusStore) {
       return res.json({ available: true, error: 'No models loaded.' });
     }
 
-    const messages: any[] = [];
+    const messages: ChatMessage[] = [];
     if (system) messages.push({ role: 'system', content: system });
     if (context) messages.push({ role: 'user', content: `Context:\n${context}` });
     messages.push({ role: 'user', content: prompt });
@@ -146,8 +174,8 @@ export function createAIRoutes(store: NexusStore) {
     try {
       const response = await chat(ai.base, ai.type, selectedModel, messages);
       res.json({ response, model: selectedModel, provider: ai.provider });
-    } catch (err: any) {
-      res.json({ error: err.message });
+    } catch (err) {
+      res.json({ error: (err as Error).message });
     }
   });
 
@@ -165,9 +193,9 @@ export function createAIRoutes(store: NexusStore) {
     const tasks = store.getAllTasks();
 
     // Keep context short for small models
-    const recentActivity = activity.slice(0, 15).map((a: any) => `- ${a.message}`);
-    const recentSessions = sessions.slice(0, 3).map((s: any) => `- [${s.project}] ${s.summary.slice(0, 80)}`);
-    const openTaskList = tasks.filter((t: any) => t.status !== 'done').map((t: any) => t.title).join(', ') || 'none';
+    const recentActivity = activity.slice(0, 15).map((a: ActivityEntry) => `- ${a.message}`);
+    const recentSessions = sessions.slice(0, 3).map((s: Session) => `- [${s.project}] ${s.summary.slice(0, 80)}`);
+    const openTaskList = tasks.filter((t: Task) => t.status !== 'done').map((t: Task) => t.title).join(', ') || 'none';
 
     const context = [
       `Activity (last ${range}): ${activity.length} events total.`,
@@ -189,8 +217,8 @@ export function createAIRoutes(store: NexusStore) {
         600
       );
       res.json({ summary: response, model: ai.models[0]?.id, provider: ai.provider });
-    } catch (err: any) {
-      res.json({ error: err.message });
+    } catch (err) {
+      res.json({ error: (err as Error).message });
     }
   });
 
@@ -212,8 +240,8 @@ export function createAIRoutes(store: NexusStore) {
         500
       );
       res.json({ response, model: ai.models[0]?.id });
-    } catch (err: any) {
-      res.json({ error: err.message });
+    } catch (err) {
+      res.json({ error: (err as Error).message });
     }
   });
 

@@ -9,13 +9,28 @@ import { aiFetch } from '../lib/aiFetch.ts';
 import { PROJECTS_DIR } from '../lib/config.ts';
 import { scanPlans } from '../lib/planIndex.ts';
 import { scanCCMemories } from '../lib/memoryIndex.ts';
+import type { Decision, GraphEdge, Task, RiskItem } from '../types.ts';
+import type { PlanEntry } from '../lib/planIndex.ts';
+import type { MemoryEntry } from '../lib/memoryIndex.ts';
 
-type BroadcastFn = (data: any) => void;
+// v4.3.5 P1 — typed repo info + centrality entry + AI config
+interface RepoInfo {
+  name: string;
+  branch: string;
+  uncommitted: number;
+  lastCommit: string;
+  daysSinceCommit: number;
+}
+interface CentralityEntry { decision: string; project: string; count: number }
+interface AIConfig { base: string; model: string; provider?: string; type?: string }
+interface AnthropicContentBlock { type?: string; text?: string }
+
+type BroadcastFn = (data: unknown) => void;
 
 // ── AI connection — shared detection from lib/aiEndpoints.ts ─────
 import { detectAI } from '../lib/aiEndpoints.ts';
 
-async function ask(ai: any, system: string, prompt: string, maxTokens = 1500) {
+async function ask(ai: AIConfig, system: string, prompt: string, maxTokens = 1500): Promise<string> {
   // Semaphore: only one AI inference at a time (prevents slot contention on 8GB VRAM)
   const releaseLock = await acquireAiLock();
   // GPU-aware signal: waits as long as GPU is computing, aborts when idle
@@ -31,7 +46,8 @@ async function ask(ai: any, system: string, prompt: string, maxTokens = 1500) {
         messages: [{ role: 'user', content: prompt }],
       };
       const data = await aiFetch(`${ai.base}/messages`, payload, signal);
-      return (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
+      const blocks: AnthropicContentBlock[] = data.content || [];
+      return blocks.filter((b) => b.type === 'text').map((b) => b.text || '').join('\n').trim();
     }
 
     // ── OpenAI / Ollama ──
@@ -75,13 +91,13 @@ function gatherContext(store: NexusStore) {
     if (centralityMap[e.from]) centralityMap[e.from].count++;
     if (centralityMap[e.to]) centralityMap[e.to].count++;
   }
-  const topCentral = Object.entries(centralityMap)
-    .sort((a, b) => (b[1] as any).count - (a[1] as any).count)
+  const topCentral = (Object.entries(centralityMap) as Array<[string, CentralityEntry]>)
+    .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 5)
     .map(([id, v]) => ({ id: Number(id), ...v }));
 
   // Git info per repo
-  const repos: any[] = [];
+  const repos: RepoInfo[] = [];
   try {
     for (const name of readdirSync(PROJECTS_DIR)) {
       const p = join(PROJECTS_DIR, name);
@@ -98,7 +114,7 @@ function gatherContext(store: NexusStore) {
   } catch {}
 
   // Blind spots: projects with repos but no Ledger decisions
-  const projectsWithDecisions = new Set((store.getAllDecisions()).map((d: any) => d.project.toLowerCase()));
+  const projectsWithDecisions = new Set((store.getAllDecisions()).map((d: Decision) => d.project.toLowerCase()));
   const blindSpots = repos.filter(r => !projectsWithDecisions.has(r.name.toLowerCase())).map(r => r.name);
 
   // Advice journal: past recommendations + their outcomes (the learning loop)
@@ -110,8 +126,8 @@ function gatherContext(store: NexusStore) {
   // Overseer can cross-reference Nexus decisions with what CC has stored about
   // the user's workflow. Bounded small (5 plans, 10 memories) to keep the
   // context prompt under control; larger surveys belong to the /nexus-audit flow.
-  let ccPlans: any[] = [];
-  let ccMemories: any[] = [];
+  let ccPlans: PlanEntry[] = [];
+  let ccMemories: MemoryEntry[] = [];
   try {
     const p = scanPlans(5);
     if (p.available) ccPlans = p.plans;
@@ -132,12 +148,15 @@ function gatherContext(store: NexusStore) {
   };
 }
 
-function buildContextPrompt(ctx: any) {
+// Derive the ctx shape from gatherContext — keeps the interface in sync automatically.
+type GatherContext = ReturnType<typeof gatherContext>;
+
+function buildContextPrompt(ctx: GatherContext) {
   const lines: string[] = [];
 
   // Tasks
-  const open = ctx.tasks.filter((t: any) => t.status !== 'done');
-  const done = ctx.tasks.filter((t: any) => t.status === 'done');
+  const open = ctx.tasks.filter((t: Task) => t.status !== 'done');
+  const done = ctx.tasks.filter((t: Task) => t.status === 'done');
   lines.push(`TASKS: ${open.length} open, ${done.length} completed`);
   if (open.length > 0) {
     lines.push('Open tasks:');
@@ -282,14 +301,14 @@ export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) 
         model: ai.model,
         provider: ai.provider,
         context: {
-          openTasks: ctx.tasks.filter((t: any) => t.status !== 'done').length,
+          openTasks: ctx.tasks.filter((t: Task) => t.status !== 'done').length,
           repos: ctx.repos.length,
           sessions: ctx.sessions.length,
           usage: ctx.usage,
         },
         timestamp: new Date().toISOString(),
       });
-    } catch (err: any) {
+    } catch (err) {
       res.json({ error: err.message });
     }
   });
@@ -316,7 +335,7 @@ export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) 
       });
 
       res.json({ answer, adviceId: advice?.id ?? null, model: ai.model });
-    } catch (err: any) {
+    } catch (err) {
       res.json({ error: err.message });
     }
   });
@@ -527,19 +546,19 @@ Group by severity. Be terse. Maximum 30 findings.`;
     const id = Number(decision_id);
     if (!Number.isFinite(id)) return res.status(400).json({ error: 'decision_id required.' });
 
-    const subject = store.getAllDecisions().find((d: any) => d.id === id);
+    const subject = store.getAllDecisions().find((d: Decision) => d.id === id);
     if (!subject) return res.status(404).json({ error: `Decision #${id} not found.` });
 
     const ai = await detectAI();
     if (!ai.available) return res.json({ error: 'No local AI available. Install LM Studio and load a model.' });
 
     // Candidate selection: project-matched first, then recent.
-    const all = store.getAllDecisions().filter((d: any) => d.id !== id && !d.deprecated);
+    const all = store.getAllDecisions().filter((d: Decision) => d.id !== id && !d.deprecated);
     const scoped = project_scope
-      ? all.filter((d: any) => (d.project || '').toLowerCase() === String(project_scope).toLowerCase())
-      : all.filter((d: any) => (d.project || '').toLowerCase() === (subject.project || '').toLowerCase());
+      ? all.filter((d: Decision) => (d.project || '').toLowerCase() === String(project_scope).toLowerCase())
+      : all.filter((d: Decision) => (d.project || '').toLowerCase() === (subject.project || '').toLowerCase());
     const pool = (scoped.length >= 3 ? scoped : all)
-      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .sort((a: Decision, b: Decision) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, Math.max(3, Math.min(30, Number(candidate_pool_size) || 10)));
 
     if (pool.length === 0) return res.json({ error: 'No candidate decisions available to propose edges against.' });
@@ -575,7 +594,7 @@ Rules:
   #${subject.id} [${subject.project}] ${subject.decision}${subject.context ? `\n  context: ${subject.context.slice(0, 300)}` : ''}
 
 CANDIDATE decisions (${pool.length}):
-${pool.map((d: any) => `  #${d.id} [${d.project}] ${d.decision.slice(0, 180)}`).join('\n')}
+${pool.map((d: Decision) => `  #${d.id} [${d.project}] ${d.decision.slice(0, 180)}`).join('\n')}
 
 Propose edges from the SUBJECT to one or more CANDIDATES. Remember: JSON only, max 5 proposals.`;
 
@@ -610,7 +629,7 @@ Propose edges from the SUBJECT to one or more CANDIDATES. Remember: JSON only, m
   // Quick risk scan (lightweight, no AI needed)
   router.get('/risks', (req: Request, res: Response) => {
     const ctx = gatherContext(store);
-    const risks: any[] = [];
+    const risks: RiskItem[] = [];
 
     // Stale repos (no commit in 14+ days)
     for (const r of ctx.repos) {
