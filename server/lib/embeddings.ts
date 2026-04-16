@@ -60,7 +60,7 @@ export async function getEmbedding(text: string): Promise<number[] | null> {
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;
-    const data: any = await res.json();
+    const data: { data?: Array<{ embedding?: number[] }> } = await res.json();
     const vec = data?.data?.[0]?.embedding;
     if (vec) {
       cache[key] = { vec, ts: Date.now() };

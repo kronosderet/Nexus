@@ -43,7 +43,7 @@ export function createFuelIntelRoutes(store: NexusStore) {
 
 // ── Session boundary detection ──────────────────────────
 // Uses the known 5h fixed window grid — no heuristic fuel-jump detection
-function detectSessions(usage: UsageEntry[], store?: any): SessionWindow[] {
+function detectSessions(usage: UsageEntry[], store?: NexusStore): SessionWindow[] {
   if (usage.length < 2) return [];
 
   // Use real window boundaries from FuelConfig
@@ -271,7 +271,7 @@ function buildWeeklyPlan(store: NexusStore) {
   const sessionsAffordable = weeklyPerSession > 0 ? Math.floor(weeklyRemaining / weeklyPerSession) : 10;
 
   // Optimal session timing based on patterns
-  const bestSlot = Object.entries(patterns.timeSlots as Record<string, any>)
+  const bestSlot = Object.entries(patterns.timeSlots as Record<string, { sessions: number; avgBurn: number; totalBurned: number }>)
     .filter(([, v]) => v.sessions > 0)
     .sort((a, b) => a[1].avgBurn - b[1].avgBurn)[0];
 

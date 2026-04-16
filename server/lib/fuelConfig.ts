@@ -124,8 +124,10 @@ export function getSessionWindow(timestamp: string | Date, config: FuelConfig): 
  * Group usage entries by their 5h session windows.
  * Returns arrays of entries per window, sorted chronologically within each.
  */
-export function groupBySessionWindow(usage: any[], config: FuelConfig): Array<{ windowStart: string; entries: any[] }> {
-  const groups: Record<string, any[]> = {};
+import type { UsageEntry } from '../types.ts';
+
+export function groupBySessionWindow(usage: UsageEntry[], config: FuelConfig): Array<{ windowStart: string; entries: UsageEntry[] }> {
+  const groups: Record<string, UsageEntry[]> = {};
   for (const u of usage) {
     const window = getSessionWindow(u.created_at, config);
     if (!groups[window]) groups[window] = [];
@@ -134,7 +136,7 @@ export function groupBySessionWindow(usage: any[], config: FuelConfig): Array<{ 
   return Object.entries(groups)
     .map(([windowStart, entries]) => ({
       windowStart,
-      entries: entries.sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+      entries: entries.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
     }))
     .sort((a, b) => new Date(b.windowStart).getTime() - new Date(a.windowStart).getTime()); // newest first
 }

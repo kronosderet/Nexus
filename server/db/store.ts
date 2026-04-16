@@ -346,7 +346,7 @@ export class NexusStore {
       .slice(0, limit);
   }
 
-  addActivity(type: string, message: string, meta: Record<string, any> = {}): ActivityEntry {
+  addActivity(type: string, message: string, meta: Record<string, unknown> = {}): ActivityEntry {
     const entry: ActivityEntry = {
       id: this._id('activity'), type, message,
       meta: JSON.stringify(meta), created_at: this._now(),

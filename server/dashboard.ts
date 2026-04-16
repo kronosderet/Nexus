@@ -91,7 +91,9 @@ async function start() {
   wss.on('connection', (ws) => { clients.add(ws); ws.on('close', () => clients.delete(ws)); });
   const broadcast = (data: unknown) => {
     const msg = JSON.stringify(data);
-    for (const ws of clients) { try { (ws as any).send(msg); } catch {} }
+    for (const ws of clients) {
+      try { (ws as { send: (s: string) => void }).send(msg); } catch {}
+    }
   };
 
   // Mount all API routes

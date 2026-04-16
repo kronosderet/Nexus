@@ -25,7 +25,7 @@ export function createFocusRoutes(store: NexusStore): Router {
     const activity = store.getActivity(200).filter(a => a.message.toLowerCase().includes(`[${p}]`));
 
     // Git
-    let git: any = null;
+    let git: { branch?: string; log?: string; uncommitted?: number } | null = null;
     try {
       const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath, encoding: 'utf-8' }).trim();
       const log = execSync('git log --oneline -10 --format="%h|%s|%ar" 2>nul', { cwd: projectPath, encoding: 'utf-8' }).trim();

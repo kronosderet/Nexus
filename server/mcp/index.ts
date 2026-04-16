@@ -66,14 +66,14 @@ const SERVER_NAME = 'nexus';
 const SERVER_VERSION = '4.3.5';
 
 // In standalone mode, import the local API adapter (direct store access, no Express needed)
-let localApiFetch: ((path: string, init?: any) => Promise<any>) | null = null;
+let localApiFetch: ((path: string, init?: { method?: string; body?: string }) => Promise<unknown>) | null = null;
 if (STANDALONE) {
   try {
     const mod = await import('./localApi.ts');
     localApiFetch = mod.localApiFetch;
     console.error('◈ Standalone mode — using in-process NexusStore at', process.env.NEXUS_DB_PATH || '~/.nexus/nexus.json');
-  } catch (err: any) {
-    console.error('◈ Failed to load standalone adapter:', err.message);
+  } catch (err) {
+    console.error('◈ Failed to load standalone adapter:', (err as Error).message);
   }
 }
 
@@ -92,10 +92,12 @@ const SLOW_TOOLS = new Set<string>([
 const HEARTBEAT_INTERVAL_MS = 8000; // ping every 8s — well under typical 60s timeouts
 
 // ── API helper (standalone or HTTP proxy) ───────────────
+// Return type is `unknown` — handlers cast to the specific shape they need.
+// The dispatcher doesn't know what endpoint was called.
 async function nexusFetch(
   path: string,
   init: RequestInit = {}
-): Promise<any> {
+): Promise<unknown> {
   // Standalone mode: route directly to in-process store
   if (localApiFetch) {
     return localApiFetch(path, {
@@ -112,7 +114,7 @@ async function nexusFetch(
   });
   try {
     res = await doFetch();
-  } catch (err: any) {
+  } catch (err) {
     // Single retry after 500ms (covers server restart window)
     try {
       await new Promise(r => setTimeout(r, 500));
@@ -121,7 +123,7 @@ async function nexusFetch(
       throw new Error(
         `Nexus server unreachable at ${NEXUS_BASE}. ` +
           `Start with: nexus-dev.bat, or set NEXUS_STANDALONE=1 for direct mode. ` +
-          `(${err.message})`
+          `(${(err as Error).message})`
       );
     }
   }
@@ -133,7 +135,22 @@ async function nexusFetch(
 }
 
 // ── Response formatters ──────────────────────────────────
-function formatBrief(data: any, project: string): string {
+// Brief data comes from a composition of 6 different endpoint responses — treating
+// it as `unknown` would force defensive checks on every access. We keep the
+// shape loose (Record<string, unknown>) and let individual accessors narrow as needed.
+type BriefData = Record<string, unknown> & {
+  fuel?: { session?: number | null; weekly?: number | null; runwayMinutes?: number | null };
+  activeTasks?: Array<{ id: number; status: string; title: string }>;
+  priorSessions?: Array<{ created_at: string; summary: string }>;
+  keyDecisions?: Array<{ decision: string }>;
+  recentPlans?: Array<{ project?: string | null; title: string; ageDays: number }>;
+  totalPlans?: number;
+  ccMemories?: Array<{ type: string; description?: string; name?: string; filename?: string }>;
+  totalMemories?: number;
+  risks?: Array<{ message?: string }>;
+};
+
+function formatBrief(data: BriefData, project: string): string {
   const lines: string[] = [];
   lines.push(`◈ NEXUS BRIEF — ${project}`);
   lines.push('');
@@ -217,7 +234,7 @@ function formatBrief(data: any, project: string): string {
   return lines.join('\n');
 }
 
-function formatPlan(data: any): string {
+function formatPlan(data: Record<string, unknown>): string {
   const lines: string[] = [];
   lines.push('◈ NEXUS SESSION PLAN');
   lines.push('');
@@ -235,7 +252,7 @@ function formatPlan(data: any): string {
   return lines.join('\n');
 }
 
-function formatGuard(data: any, title: string): string {
+function formatGuard(data: Record<string, unknown>, title: string): string {
   const similarTasks = data?.similarTasks || [];
   const relatedDecisions = data?.relatedDecisions || [];
   const pastSessions = data?.pastSessions || [];
@@ -840,6 +857,11 @@ const TOOLS: Tool[] = [
 ];
 
 // ── Tool handlers ────────────────────────────────────────
+// v4.3.5 P1 note: `args: any` is intentional. MCP tool arguments come from the
+// client as arbitrary JSON — the protocol has no schema validation at this layer.
+// Each handler validates its own required fields. Typing this as Record<string, unknown>
+// would force excessive narrowing in every case branch without adding safety.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleTool(name: string, args: any): Promise<string> {
   switch (name) {
     case 'nexus_brief': {
@@ -862,8 +884,10 @@ async function handleTool(name: string, args: any): Promise<string> {
       const projectLower = project.toLowerCase();
       // Build dynamic project list from actual data (no hardcoded list)
       const allProjects = new Set<string>();
-      for (const s of sessions as any[]) allProjects.add((s.project || '').toLowerCase());
-      for (const d of (Array.isArray(ledger) ? ledger : []) as any[]) allProjects.add((d.project || '').toLowerCase());
+      // Sessions/ledger are opaque dispatcher returns (unknown); narrow via minimal shape.
+      type HasProject = { project?: string };
+      for (const s of sessions as HasProject[]) allProjects.add((s.project || '').toLowerCase());
+      for (const d of (Array.isArray(ledger) ? ledger : []) as HasProject[]) allProjects.add((d.project || '').toLowerCase());
       allProjects.delete('');
       allProjects.delete('general');
 
@@ -879,26 +903,35 @@ async function handleTool(name: string, args: any): Promise<string> {
         return true; // no other projects known — include everything
       };
 
-      const activeTasks = (tasks as any[]).filter(
+      // Minimal shapes for these dispatcher-return values — only the fields we read.
+      type TaskLite = { status: string; title: string };
+      type SessionLite = { project: string; created_at: string; summary: string };
+      type DecisionLite = { decision: string; project: string };
+
+      const activeTasks = (tasks as TaskLite[]).filter(
         (t) => t.status !== 'done' && inProject(t.title)
       );
-      const priorSessions = (sessions as any[])
+      const priorSessions = (sessions as SessionLite[])
         .filter((s) => s.project === project || s.project?.toLowerCase() === projectLower)
         .slice(0, 5);
-      const keyDecisions = (Array.isArray(ledger) ? ledger : [])
-        .filter((d: any) => d.project === project || d.project?.toLowerCase() === projectLower)
+      const keyDecisions = (Array.isArray(ledger) ? ledger : [] as DecisionLite[])
+        .filter((d: DecisionLite) => d.project === project || d.project?.toLowerCase() === projectLower)
         .slice(0, 5);
 
       // Filter CC plans by project (if inferred) — show project-matched ones first,
       // fall back to most-recent across projects if none match.
-      const pi: any = plansIndex || {};
-      const allPlans: any[] = Array.isArray(pi.plans) ? pi.plans : [];
+      // plansIndex comes from /api/cc-plans — we treat as loose shape with the fields we read.
+      type PlanEntryLite = { project?: string | null; title: string; ageDays: number; filename: string };
+      const pi = (plansIndex || {}) as { plans?: PlanEntryLite[]; totalFiles?: number };
+      const allPlans: PlanEntryLite[] = Array.isArray(pi.plans) ? pi.plans : [];
       const matchedPlans = allPlans.filter((p) => p.project && p.project.toLowerCase() === projectLower);
       const recentPlans = matchedPlans.length > 0 ? matchedPlans : allPlans.slice(0, 5);
 
       // Same pattern for CC memories — show project-matched first, newest fallback.
-      const mi: any = memoriesIndex || {};
-      const allMemories: any[] = Array.isArray(mi.memories) ? mi.memories : [];
+      // memoriesIndex comes from /api/cc-memory — same loose-shape pattern.
+      type MemoryEntryLite = { project?: string | null; type: string; description?: string; name?: string; filename?: string };
+      const mi = (memoriesIndex || {}) as { memories?: MemoryEntryLite[]; totalFiles?: number };
+      const allMemories: MemoryEntryLite[] = Array.isArray(mi.memories) ? mi.memories : [];
       const matchedMemories = allMemories.filter((m) => m.project && m.project.toLowerCase() === projectLower);
       const ccMemories = matchedMemories.length > 0 ? matchedMemories : allMemories.slice(0, 5);
 
@@ -918,7 +951,7 @@ async function handleTool(name: string, args: any): Promise<string> {
           totalPlans: pi.totalFiles ?? 0,
           ccMemories,
           totalMemories: mi.totalFiles ?? 0,
-          risks: (risks as any).risks || [],
+          risks: (risks as { risks?: Array<{ message?: string }> }).risks || [],
         },
         project
       );
@@ -997,7 +1030,7 @@ async function handleTool(name: string, args: any): Promise<string> {
 
     case 'nexus_update_decision': {
       if (args?.id == null) throw new Error('id is required');
-      const body: any = {};
+      const body: Record<string, unknown> = {};
       if (args.decision) body.decision = args.decision;
       if (args.rationale) body.context = args.rationale;
       if (args.project) body.project = args.project;
@@ -1044,8 +1077,8 @@ async function handleTool(name: string, args: any): Promise<string> {
         return `◈ Popped thought #${result.id}:\n\n  ${result.text}${
           result.context ? `\n\n  context: ${result.context}` : ''
         }${result.project ? `\n  project: ${result.project}` : ''}`;
-      } catch (err: any) {
-        if (err.message?.includes('404')) {
+      } catch (err) {
+        if ((err as Error).message?.includes('404')) {
           return '◈ Stack is empty. Nothing to pop.';
         }
         throw err;
@@ -1058,7 +1091,7 @@ async function handleTool(name: string, args: any): Promise<string> {
           'Provide session_percent and/or weekly_percent (percentages REMAINING, not used).'
         );
       }
-      const body: any = {};
+      const body: Record<string, unknown> = {};
       if (args.session_percent != null) body.session_percent = Number(args.session_percent);
       if (args.weekly_percent != null) body.weekly_percent = Number(args.weekly_percent);
       if (args.sonnet_weekly_percent != null) body.sonnet_weekly_percent = Number(args.sonnet_weekly_percent);
@@ -1104,7 +1137,7 @@ async function handleTool(name: string, args: any): Promise<string> {
 
     case 'nexus_create_task': {
       if (!args?.title) throw new Error('title is required');
-      const body: any = {
+      const body: Record<string, unknown> = {
         title: args.title,
         status: args.status || 'backlog',
       };
@@ -1327,8 +1360,15 @@ async function handleTool(name: string, args: any): Promise<string> {
       const results: string[] = ['◈ Bridging session'];
       results.push('');
 
-      // Step 1: Generate (and optionally commit) a session summary
-      let summary: any;
+      // Step 1: Generate (and optionally commit) a session summary.
+      // auto-summary returns either a committed Session (has .id) or a preview
+      // with { parsed: { summary, decisions, tags } } — both fields probed below.
+      interface AutoSummaryResponse {
+        id?: number;
+        error?: string;
+        parsed?: { summary: string; decisions?: string[]; tags?: string[] };
+      }
+      let summary: AutoSummaryResponse | undefined;
       if (commitSummary) {
         summary = await nexusFetch('/api/auto-summary', {
           method: 'POST',
@@ -1416,10 +1456,16 @@ async function handleTool(name: string, args: any): Promise<string> {
         candidate_pool_size: args.candidate_pool_size,
         project_scope: args.project_scope,
       };
-      const result: any = await nexusFetch('/api/overseer/propose-edges', {
+      interface ProposeEdgesResponse {
+        error?: string;
+        taskId?: string;
+        candidates?: number;
+        subject?: { id: number; decision: string; project: string };
+      }
+      const result: ProposeEdgesResponse = await nexusFetch('/api/overseer/propose-edges', {
         method: 'POST',
         body: JSON.stringify(body),
-      });
+      }) as ProposeEdgesResponse;
       if (result?.error) return `◈ Edge proposal unavailable: ${result.error}`;
       const lines = [
         `◈ Edge proposal started for decision #${result.subject?.id}: "${result.subject?.decision?.slice(0, 80) || ''}"`,
@@ -1434,11 +1480,17 @@ async function handleTool(name: string, args: any): Promise<string> {
     }
 
     case 'nexus_calendar_runway': {
-      const rawEvents: any[] = Array.isArray(args?.events) ? args.events : [];
+      interface EventLike { start?: string; title?: string; summary?: string }
+      const rawEvents: EventLike[] = Array.isArray(args?.events) ? args.events : [];
       const buffer = Number.isFinite(args?.buffer_minutes) ? Math.max(0, args.buffer_minutes) : 15;
 
       // Pull current fuel + runway. Nexus owns this data in both HTTP and standalone modes.
-      const fuel: any = await nexusFetch('/api/estimator');
+      interface EstimatorResponse {
+        tracked: boolean;
+        estimated?: { session?: number };
+        session?: { minutesRemaining?: number | null };
+      }
+      const fuel = await nexusFetch('/api/estimator') as EstimatorResponse;
       if (!fuel?.tracked) {
         return '◈ No fuel data yet — report usage with nexus_log_usage, then try again.';
       }
@@ -1564,12 +1616,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     return {
       content: [{ type: 'text', text }],
     };
-  } catch (err: any) {
+  } catch (err) {
     return {
       content: [
         {
           type: 'text',
-          text: `Error: ${err.message}`,
+          text: `Error: ${(err as Error).message}`,
         },
       ],
       isError: true,

@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
 
-type BroadcastFn = (data: any) => void;
+type BroadcastFn = (data: unknown) => void;
 
 export function createSessionRoutes(store: NexusStore, broadcast: BroadcastFn) {
   const router = Router();

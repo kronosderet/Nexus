@@ -435,7 +435,8 @@ function buildWorkloadPlan(store: NexusStore, estimate: ReturnType<typeof buildE
   const constraint = estimate.session.constrainingFactor;
 
   // What fits in the remaining runway?
-  const fits: Record<string, any> = {};
+  interface TaskFit { count: number; label: string; fuelEach: number }
+  const fits: Record<string, TaskFit> = {};
   for (const [type, preset] of Object.entries(TASK_SIZES)) {
     const rate = estimate.rates.sessionPerMinute || (preset.fuelCost / preset.minutes);
     const fuelNeeded = rate * preset.minutes;
