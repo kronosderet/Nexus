@@ -1,7 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
+import type { Decision, GraphEdge } from '../types.ts';
 
-type BroadcastFn = (data: any) => void;
+type BroadcastFn = (data: unknown) => void;
 
 export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
   const router = Router();
@@ -37,7 +38,7 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
     const existing = store.getDecisionById(id);
     if (!existing) return res.status(404).json({ error: 'Decision not found.' });
     if (deprecated !== undefined) { existing.deprecated = !!deprecated; store._flush(); }
-    const updates: any = {};
+    const updates: Partial<Decision> = {};
     if (text !== undefined) updates.decision = text;
     if (context !== undefined) updates.context = context;
     if (alternatives !== undefined) updates.alternatives = alternatives;
@@ -54,7 +55,7 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
   // Auto-extract decisions from all sessions
   router.post('/extract', (req: Request, res: Response) => {
     const sessions = store.getSessions({ limit: 100 });
-    const existing = new Set((store.getAllDecisions()).map((l: any) => l.decision.toLowerCase().slice(0, 60)));
+    const existing = new Set((store.getAllDecisions()).map((l: Decision) => l.decision.toLowerCase().slice(0, 60)));
     let added = 0;
 
     for (const s of sessions) {
@@ -89,7 +90,7 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
     }
 
     let linked = 0;
-    const existingEdges = new Set(store.getAllEdges().map((e: any) => `${e.from}-${e.to}`));
+    const existingEdges = new Set(store.getAllEdges().map((e: GraphEdge) => `${e.from}-${e.to}`));
 
     for (const [project, decs] of Object.entries(byProject)) {
       // Link sequential decisions in same project (temporal chain)
@@ -175,11 +176,11 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
     if (!decision) return res.status(404).json({ error: 'Decision not found.' });
 
     const edges = store.getEdgesFor(id);
-    const connected = edges.map((e: any) => {
+    const connected = edges.map((e: GraphEdge) => {
       const otherId = e.from === id ? e.to : e.from;
-      const other = store.getDecisionById( otherId);
+      const other = store.getDecisionById(otherId);
       return { edge: e, decision: other };
-    }).filter((c: any) => c.decision);
+    }).filter((c): c is { edge: GraphEdge; decision: Decision } => Boolean(c.decision));
 
     res.json({ decision, connected });
   });

@@ -6808,8 +6808,7 @@ async function detectAI() {
       const url2 = ep.type === "ollama" ? `${ep.base}/api/tags` : `${ep.base}/models`;
       const res = await fetch(url2, { signal: AbortSignal.timeout(2e3) });
       if (!res.ok) continue;
-      const data = await res.json();
-      const models = ep.type === "ollama" ? (data.models || []).map((m) => m.name) : (data.data || []).filter((m) => !m.id.includes("embed")).map((m) => m.id);
+      const models = ep.type === "ollama" ? ((await res.json()).models || []).map((m) => m.name) : ((await res.json()).data || []).filter((m) => !m.id.includes("embed")).map((m) => m.id);
       if (models.length === 0) continue;
       return { available: true, provider: ep.name, base: ep.base, type: ep.type, model: models[0] };
     } catch {

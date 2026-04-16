@@ -7,7 +7,18 @@ import os from 'os';
 import type { NexusStore } from '../db/store.ts';
 import { PROJECTS_DIR } from '../lib/config.ts';
 
-type BroadcastFn = (data: any) => void;
+type BroadcastFn = (data: unknown) => void;
+
+// v4.3.5 P1 — action definition + result shapes.
+interface ActionDef {
+  id: string;
+  label: string;
+  icon?: string;
+  description?: string;
+  command: string;
+}
+interface ActionParams { taskId?: number }
+interface GpuInfo { name: string; utilization: string; temperature: string; vram: string }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = join(__dirname, '..', '..', 'nexus-actions.json');
@@ -55,7 +66,7 @@ export function createActionRoutes(store: NexusStore, broadcast: BroadcastFn) {
   // Execute an action
   router.post('/:id/run', (req: Request, res: Response) => {
     const actions = loadActions();
-    const action = actions.find((a: any) => a.id === String(req.params.id));
+    const action = actions.find((a: ActionDef) => a.id === String(req.params.id));
     if (!action) return res.status(404).json({ error: 'Unknown action.' });
 
     const result = executeAction(action.command, store, req.body);
@@ -88,7 +99,7 @@ export function createActionRoutes(store: NexusStore, broadcast: BroadcastFn) {
   return router;
 }
 
-function executeAction(command: string, store: NexusStore, params?: any): any {
+function executeAction(command: string, store: NexusStore, params?: ActionParams): unknown {
   switch (command) {
     case 'git-summary': return gitSummary();
     case 'system-check': return systemCheck();
@@ -128,7 +139,7 @@ function parkTask(store: NexusStore, taskId?: number) {
 
 function gitSummary() {
   const projectsDir = PROJECTS_DIR;
-  const results: any[] = [];
+  const results: Array<{ project: string; commits: string[] }> = [];
 
   for (const name of readdirSync(projectsDir)) {
     const fullPath = join(projectsDir, name);
@@ -152,7 +163,7 @@ function systemCheck() {
   const totalMem = os.totalmem();
   const freeMem = os.freemem();
 
-  let gpu: any = null;
+  let gpu: GpuInfo | null = null;
   try {
     const csv = execSync(
       'nvidia-smi --query-gpu=name,utilization.gpu,temperature.gpu,memory.used,memory.total --format=csv,noheader,nounits',

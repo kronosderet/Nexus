@@ -26,10 +26,11 @@ export async function detectAI(): Promise<AIConnection> {
       const url = ep.type === 'ollama' ? `${ep.base}/api/tags` : `${ep.base}/models`;
       const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
       if (!res.ok) continue;
-      const data: any = await res.json();
+      interface OpenAIModelsResponse { data?: Array<{ id: string }> }
+      interface OllamaModelsResponse { models?: Array<{ name: string }> }
       const models = ep.type === 'ollama'
-        ? (data.models || []).map((m: any) => m.name)
-        : (data.data || []).filter((m: any) => !m.id.includes('embed')).map((m: any) => m.id);
+        ? ((await res.json() as OllamaModelsResponse).models || []).map((m) => m.name)
+        : ((await res.json() as OpenAIModelsResponse).data || []).filter((m) => !m.id.includes('embed')).map((m) => m.id);
       if (models.length === 0) continue;
       return { available: true, provider: ep.name, base: ep.base, type: ep.type, model: models[0] };
     } catch {}
