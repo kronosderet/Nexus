@@ -1,8 +1,27 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
+import type { SessionTiming, UsageEntry, FuelConfig } from '../types.ts';
 import { getFuelConfig, setFuelConfig as saveFuelConfig, nowInTZ as configNowInTZ, getNextWeeklyReset as configGetNextWeeklyReset, PLAN_INFO } from '../lib/fuelConfig.ts';
 
-type BroadcastFn = (data: any) => void;
+// v4.3.5 P1 — typed local shapes for this route.
+type BroadcastFn = (data: unknown) => void;
+
+interface SessionInfo {
+  type: 'fixed';
+  windowHours: number;
+  startedAt: string | null;
+  countdown: string;
+  countdownMs: number;
+  resetsAt?: string;
+  elapsed?: string;
+  elapsedMs?: number;
+  expired?: boolean;
+}
+
+interface BurnRate {
+  sessionPerHour: number;
+  estimatedEmpty: string | null;
+}
 
 // Valid plan values for input sanitization (#161)
 const VALID_PLANS = new Set(['free', 'pro', 'max5', 'max20', 'team', 'team_premium', 'enterprise', 'api']);
@@ -25,12 +44,12 @@ export function buildTimingInfo(store: NexusStore) {
   const nextWeekly = configGetNextWeeklyReset(config);
   const weeklyMs = nextWeekly.getTime() - now.getTime();
 
-  const timing = store.getSessionTiming() || {} as any;
+  const timing: Partial<SessionTiming> = store.getSessionTiming() || {};
   const sessionResetTime = timing.resetTime ? new Date(timing.resetTime) : null;
   const sessionStartTime = timing.startTime ? new Date(timing.startTime) : null;
   const planInfo = PLAN_INFO[config.plan] || PLAN_INFO.pro;
 
-  let sessionInfo: any;
+  let sessionInfo: SessionInfo;
   if (sessionResetTime) {
     const sessionMs = sessionResetTime.getTime() - now.getTime();
     const elapsed = sessionStartTime ? now.getTime() - sessionStartTime.getTime() : 0;
@@ -74,7 +93,7 @@ export function createUsageRoutes(store: NexusStore, broadcast: BroadcastFn) {
   function startSession(resetMinutesFromNow: number | null = null) {
     const config = getFuelConfig(store);
     const now = configNowInTZ(config);
-    const existing = store.getSessionTiming() || {} as any;
+    const existing: Partial<SessionTiming> = store.getSessionTiming() || {};
     const timing = {
       startTime: now.toISOString(),
       resetTime: resetMinutesFromNow != null
@@ -101,12 +120,12 @@ export function createUsageRoutes(store: NexusStore, broadcast: BroadcastFn) {
 
     // Calculate burn rate from recent history
     const history = store.getUsage(10);
-    let burnRate: any = null;
+    let burnRate: BurnRate | null = null;
     // Only use data points from current session window
-    const curTiming = (store.getSessionTiming() || {} as any);
+    const curTiming: Partial<SessionTiming> = store.getSessionTiming() || {};
     const curStart = curTiming.startTime ? new Date(curTiming.startTime) : null;
     const sessionHistory = curStart
-      ? history.filter((h: any) => new Date(h.created_at) >= curStart)
+      ? history.filter((h: UsageEntry) => new Date(h.created_at) >= curStart)
       : history;
 
     // Need 3+ data points spanning >5 minutes for meaningful burn rate
@@ -141,14 +160,14 @@ export function createUsageRoutes(store: NexusStore, broadcast: BroadcastFn) {
 
     // Save plan/timezone config if provided — validate before saving (#161)
     if (plan || timezone) {
-      const updates: any = {};
+      const updates: Partial<FuelConfig> = {};
       if (plan && VALID_PLANS.has(plan)) updates.plan = plan;
       if (timezone && typeof timezone === 'string' && timezone.includes('/')) updates.timezone = timezone;
       if (Object.keys(updates).length > 0) saveFuelConfig(store, updates);
     }
 
     // Auto-start session tracking on first log, or if reset_in_minutes is provided
-    const existingTiming = (store.getSessionTiming() || {} as any);
+    const existingTiming: Partial<SessionTiming> = store.getSessionTiming() || {};
     if (!existingTiming.startTime || reset_in_minutes != null) {
       startSession(reset_in_minutes);
     }
