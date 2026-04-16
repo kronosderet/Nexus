@@ -4,6 +4,16 @@ import { createGpuAwareSignal } from '../lib/gpuSignal.ts';
 import { acquireAiLock } from '../lib/aiSemaphore.ts';
 import { aiFetch } from '../lib/aiFetch.ts';
 
+// v4.3.5 P1 — local AI types.
+interface AIConfig { base: string; model: string }
+interface OpenAIModelsResponse { data?: Array<{ id: string }> }
+interface ParsedSummary {
+  summary: string;
+  decisions?: string[];
+  blockers?: string[];
+  tags?: string[];
+}
+
 /**
  * Auto-Summary: The Overseer writes session logs for you.
  *
@@ -21,10 +31,10 @@ async function detectAI(): Promise<{ available: boolean; base?: string; model?: 
     try {
       const res = await fetch(`${ep.base}/models`, { signal: AbortSignal.timeout(2000) });
       if (!res.ok) continue;
-      const data: any = await res.json();
+      const data: OpenAIModelsResponse = await res.json();
       const models = (data.data || [])
-        .filter((m: any) => !m.id.includes('embed'))
-        .map((m: any) => m.id);
+        .filter((m) => !m.id.includes('embed'))
+        .map((m) => m.id);
       if (models.length === 0) continue;
       return { available: true, base: ep.base, model: models[0] };
     } catch {}
@@ -32,17 +42,17 @@ async function detectAI(): Promise<{ available: boolean; base?: string; model?: 
   return { available: false };
 }
 
-async function askAI(ai: any, system: string, prompt: string, maxTokens = 1000): Promise<string> {
+async function askAI(ai: AIConfig, system: string, prompt: string, maxTokens = 1000): Promise<string> {
   const releaseLock = await acquireAiLock();
   const { signal, cleanup } = createGpuAwareSignal();
   try {
-    const data = await aiFetch(`${ai.base}/messages`, {
+    const data: { content?: Array<{ type?: string; text?: string }> } = await aiFetch(`${ai.base}/messages`, {
       model: ai.model,
       max_tokens: maxTokens,
       system,
       messages: [{ role: 'user', content: prompt }],
     }, signal);
-    return (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
+    return (data.content || []).filter((b) => b.type === 'text').map((b) => b.text || '').join('\n').trim();
   } finally {
     cleanup();
     releaseLock();
@@ -68,7 +78,7 @@ Rules:
 - Output ONLY valid JSON, no markdown code fences, no preamble
 - Be factual and specific — reference actual task/version names`;
 
-export function createAutoSummaryRoutes(store: NexusStore, broadcast: (data: any) => void) {
+export function createAutoSummaryRoutes(store: NexusStore, broadcast: (data: unknown) => void) {
   const router = Router();
 
   // Preview: generate a summary but don't save
@@ -171,7 +181,7 @@ async function generateSummary(store: NexusStore, project: string) {
     const fenceMatch = jsonText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
     if (fenceMatch) jsonText = fenceMatch[1];
 
-    let parsed: any = null;
+    let parsed: ParsedSummary | null = null;
     try {
       parsed = JSON.parse(jsonText);
     } catch {
@@ -192,7 +202,7 @@ async function generateSummary(store: NexusStore, project: string) {
       },
       model: ai.model,
     };
-  } catch (err: any) {
-    return { error: `AI failed: ${err.message}` };
+  } catch (err) {
+    return { error: `AI failed: ${(err as Error).message}` };
   }
 }

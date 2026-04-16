@@ -1,6 +1,12 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
-import type { Task } from '../types.ts';
+import type { Task, RiskItem } from '../types.ts';
+
+// v4.3.5 P1 — shared AI response shapes (mirrored from ai.ts).
+interface AIConfig { base: string; model: string; type: string }
+interface OpenAIModelsResponse { data?: Array<{ id: string }> }
+interface AnthropicMessagesResponse { content?: Array<{ type?: string; text?: string }> }
+interface OpenAIChatResponse { choices?: Array<{ message?: { content?: string; reasoning_content?: string } }> }
 
 /**
  * Autonomous Session Planner — v3.0's killer feature.
@@ -22,10 +28,10 @@ async function detectAI(): Promise<{ available: boolean; base?: string; type?: s
     try {
       const res = await fetch(`${ep.base}/models`, { signal: AbortSignal.timeout(2000) });
       if (!res.ok) continue;
-      const data: any = await res.json();
+      const data: OpenAIModelsResponse = await res.json();
       const models = (data.data || [])
-        .filter((m: any) => !m.id.includes('embed'))
-        .map((m: any) => m.id);
+        .filter((m) => !m.id.includes('embed'))
+        .map((m) => m.id);
       if (models.length === 0) continue;
       return { available: true, base: ep.base, type: ep.type, model: models[0] };
     } catch {}
@@ -33,7 +39,7 @@ async function detectAI(): Promise<{ available: boolean; base?: string; type?: s
   return { available: false };
 }
 
-async function askAI(ai: any, system: string, prompt: string, maxTokens = 1500): Promise<string> {
+async function askAI(ai: AIConfig, system: string, prompt: string, maxTokens = 1500): Promise<string> {
   if (ai.type === 'anthropic') {
     const res = await fetch(`${ai.base}/messages`, {
       method: 'POST',
@@ -47,8 +53,8 @@ async function askAI(ai: any, system: string, prompt: string, maxTokens = 1500):
       signal: AbortSignal.timeout(120000),
     });
     if (!res.ok) throw new Error(`AI ${res.status}`);
-    const data: any = await res.json();
-    return (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
+    const data: AnthropicMessagesResponse = await res.json();
+    return (data.content || []).filter((b) => b.type === 'text').map((b) => b.text || '').join('\n').trim();
   }
 
   const res = await fetch(`${ai.base}/chat/completions`, {
@@ -63,7 +69,7 @@ async function askAI(ai: any, system: string, prompt: string, maxTokens = 1500):
     signal: AbortSignal.timeout(120000),
   });
   if (!res.ok) throw new Error(`AI ${res.status}`);
-  const data: any = await res.json();
+  const data: OpenAIChatResponse = await res.json();
   const choice = data.choices?.[0]?.message;
   if (choice?.content?.trim()) return choice.content.trim();
   if (choice?.reasoning_content) {
@@ -183,7 +189,7 @@ async function buildSessionPlan(store: NexusStore, projectFilter?: string) {
 
   // ── 4. Risk scan ────────────────────────────────────
   const risks = store._lastRiskScan?.risks || [];
-  const criticalRisks = risks.filter((r: any) => r.level === 'critical');
+  const criticalRisks = risks.filter((r: RiskItem) => r.level === 'critical');
 
   // ── 5. Graph intelligence: most-connected pending areas ─
   const ledger = store.data.ledger || [];
@@ -228,11 +234,11 @@ async function buildSessionPlan(store: NexusStore, projectFilter?: string) {
   let aiPlan = '';
   let aiError: string | null = null;
 
-  if (ai.available) {
+  if (ai.available && ai.base && ai.model && ai.type) {
     try {
-      aiPlan = await askAI(ai, PLANNER_SYSTEM, contextLines.join('\n'));
-    } catch (err: any) {
-      aiError = err.message;
+      aiPlan = await askAI({ base: ai.base, model: ai.model, type: ai.type }, PLANNER_SYSTEM, contextLines.join('\n'));
+    } catch (err) {
+      aiError = (err as Error).message;
     }
   }
 

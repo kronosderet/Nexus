@@ -4,30 +4,51 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import type { NexusStore } from '../db/store.ts';
 
-type BroadcastFn = (data: any) => void;
+type BroadcastFn = (data: unknown) => void;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HOOKS_PATH = join(__dirname, '..', '..', 'nexus-webhooks.json');
 
-const DEFAULT_CONFIG: any = {
+// v4.3.5 P1 — typed webhook config.
+interface WebhookEntry {
+  id: string;
+  name: string;
+  url: string;
+  events: string[];
+  format?: 'discord' | 'slack' | 'teams' | 'json';
+}
+interface WebhookConfig {
+  outbound: WebhookEntry[];
+}
+
+const DEFAULT_CONFIG: WebhookConfig = {
   outbound: [],
   // Example:
   // { id: 'discord-nexus', url: 'https://discord.com/api/webhooks/...', events: ['task_done', 'session'], format: 'discord' }
 };
 
-function loadConfig() {
+function loadConfig(): WebhookConfig {
   if (existsSync(HOOKS_PATH)) return JSON.parse(readFileSync(HOOKS_PATH, 'utf-8'));
   writeFileSync(HOOKS_PATH, JSON.stringify(DEFAULT_CONFIG, null, 2));
   return DEFAULT_CONFIG;
 }
 
-function saveConfig(config: any) {
+function saveConfig(config: WebhookConfig) {
   writeFileSync(HOOKS_PATH, JSON.stringify(config, null, 2));
 }
 
-// Format payload for different targets
-function formatPayload(event: string, data: any, format: string) {
-  const message = `[Nexus] ${event}: ${typeof data === 'string' ? data : data.message || data.title || JSON.stringify(data).slice(0, 200)}`;
+// Format payload for different targets. `data` is opaque at this boundary (could be a string,
+// an Activity row, a Task, etc.) — the formatters defensively probe common fields.
+function formatPayload(event: string, data: unknown, format: string) {
+  const fallback = (d: unknown): string => {
+    if (typeof d === 'string') return d;
+    if (d && typeof d === 'object') {
+      const obj = d as Record<string, unknown>;
+      return (obj.message as string) || (obj.title as string) || JSON.stringify(d).slice(0, 200);
+    }
+    return String(d);
+  };
+  const message = `[Nexus] ${event}: ${fallback(data)}`;
 
   switch (format) {
     case 'discord':
@@ -42,7 +63,7 @@ function formatPayload(event: string, data: any, format: string) {
 }
 
 // Fire outbound webhooks for a given event
-export async function fireWebhooks(event: string, data: any) {
+export async function fireWebhooks(event: string, data: unknown) {
   const config = loadConfig();
   for (const hook of config.outbound) {
     if (hook.events.includes(event) || hook.events.includes('*')) {
@@ -83,7 +104,7 @@ export function createWebhookRoutes(store: NexusStore, broadcast: BroadcastFn) {
   // Delete outbound webhook
   router.delete('/:id', (req: Request, res: Response) => {
     const config = loadConfig();
-    config.outbound = config.outbound.filter((h: any) => h.id !== String(req.params.id));
+    config.outbound = config.outbound.filter((h: WebhookEntry) => h.id !== String(req.params.id));
     saveConfig(config);
     res.json({ success: true });
   });
@@ -91,7 +112,7 @@ export function createWebhookRoutes(store: NexusStore, broadcast: BroadcastFn) {
   // Test a webhook
   router.post('/:id/test', async (req: Request, res: Response) => {
     const config = loadConfig();
-    const hook = config.outbound.find((h: any) => h.id === String(req.params.id));
+    const hook = config.outbound.find((h: WebhookEntry) => h.id === String(req.params.id));
     if (!hook) return res.status(404).json({ error: 'Nothing on the charts.' });
 
     const payload = formatPayload('test', 'Nexus webhook test -- all instruments nominal.', hook.format);
@@ -102,8 +123,8 @@ export function createWebhookRoutes(store: NexusStore, broadcast: BroadcastFn) {
         body: JSON.stringify(payload),
       });
       res.json({ success: true, payload });
-    } catch (err: any) {
-      res.json({ success: false, error: err.message });
+    } catch (err) {
+      res.json({ success: false, error: (err as Error).message });
     }
   });
 
@@ -131,7 +152,19 @@ export function createWebhookRoutes(store: NexusStore, broadcast: BroadcastFn) {
   return router;
 }
 
-function parseGitHubEvent(event: string, payload: any): string {
+interface GitHubPayload {
+  repository?: { name?: string };
+  commits?: Array<unknown>;
+  ref?: string;
+  pull_request?: { title?: string; number?: number; merged?: boolean };
+  issue?: { title?: string; number?: number };
+  release?: { tag_name?: string; name?: string };
+  sender?: { login?: string };
+  action?: string;
+  [key: string]: unknown;
+}
+
+function parseGitHubEvent(event: string, payload: GitHubPayload): string {
   switch (event) {
     case 'push': {
       const repo = payload.repository?.name || 'unknown';
