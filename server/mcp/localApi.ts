@@ -11,6 +11,9 @@
 import { mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import type {
+  Task, ActivityEntry, Decision, FuelConfig, RiskItem,
+} from '../types.ts';
 
 // ── Data directory ──────────────────────────────────────
 const NEXUS_HOME = process.env.NEXUS_HOME || join(homedir(), '.nexus');
@@ -29,10 +32,19 @@ const broadcast = () => {};
 // ── AI detection — shared from lib/aiEndpoints.ts ──────
 import { detectAI } from '../lib/aiEndpoints.ts';
 
+// v4.3.5 P1 — typed fetch-style init. Body is serialized JSON string (per fetch convention).
+interface LocalApiInit {
+  method?: string;
+  body?: string;
+}
+
+// Lazy import typing for memory entries so we don't pull memoryIndex at module load.
+interface MemoryEntryLike { type: string; [k: string]: unknown }
+
 // ── Route dispatcher ────────────────────────────────────
 // Mimics Express API routes — same paths, same request/response shapes.
-
-export async function localApiFetch(path: string, init: any = {}): Promise<any> {
+// Return type is `unknown` — callers in mcp/index.ts cast to the shape they expect.
+export async function localApiFetch(path: string, init: LocalApiInit = {}): Promise<unknown> {
   const method = init.method || 'GET';
   const body = init.body ? JSON.parse(init.body) : {};
 
@@ -100,7 +112,7 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
   }
   if (pathname.match(/^\/api\/ledger\/\d+$/) && method === 'PATCH') {
     const id = parseInt(pathname.split('/').pop()!);
-    const updates: any = {};
+    const updates: Partial<Decision> = {};
     if (body.decision !== undefined) updates.decision = body.decision;
     if (body.context !== undefined) updates.context = body.context;
     if (body.project !== undefined) updates.project = body.project;
@@ -152,7 +164,7 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
   if (pathname === '/api/usage' && method === 'POST') {
     // Save plan/timezone config if provided
     if (body.plan || body.timezone) {
-      const updates: any = {};
+      const updates: Partial<FuelConfig> = {};
       if (body.plan) updates.plan = body.plan;
       if (body.timezone) updates.timezone = body.timezone;
       const current = store.getFuelConfig() || { plan: 'pro', timezone: 'Europe/Prague', sessionWindowHours: 5, weeklyResetDay: 4, weeklyResetHour: 21 };
@@ -213,7 +225,7 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
     const typeFilter = params.get('type');
     const index = scanCCMemories(limit * 2);
     return typeFilter
-      ? { ...index, memories: index.memories.filter((m: any) => m.type === typeFilter).slice(0, limit) }
+      ? { ...index, memories: index.memories.filter((m: MemoryEntryLike) => m.type === typeFilter).slice(0, limit) }
       : { ...index, memories: index.memories.slice(0, limit) };
   }
 
@@ -222,7 +234,7 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
     // Lightweight risk scan — no AI needed
     const tasks = store.getAllTasks();
     const usage = store.getLatestUsage();
-    const risks: any[] = [];
+    const risks: RiskItem[] = [];
     if (usage?.weekly_percent != null && usage.weekly_percent <= 10) {
       risks.push({ level: 'warning', message: `Weekly Claude usage at ${usage.weekly_percent}% — ration carefully` });
     }
@@ -249,11 +261,11 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
     const lastSessionTime = lastSessions[0] ? new Date(lastSessions[0].created_at).getTime() : 0;
     const windowStart = Math.max(lastSessionTime, Date.now() - 4 * 3600000);
 
-    const activity = store.getActivity(200).filter((a: any) => new Date(a.created_at).getTime() > windowStart);
-    const completedTasks = store.getAllTasks().filter((t: any) =>
+    const activity = store.getActivity(200).filter((a: ActivityEntry) => new Date(a.created_at).getTime() > windowStart);
+    const completedTasks = store.getAllTasks().filter((t: Task) =>
       t.status === 'done' && new Date(t.updated_at).getTime() > windowStart
     );
-    const recentDecisions = (store.data.ledger || []).filter((d: any) =>
+    const recentDecisions = (store.data.ledger || []).filter((d: Decision) =>
       new Date(d.created_at).getTime() > windowStart
     );
 
@@ -271,7 +283,7 @@ export async function localApiFetch(path: string, init: any = {}): Promise<any> 
       raw: summary,
       parsed: {
         summary,
-        decisions: recentDecisions.slice(0, 5).map((d: any) => d.decision.slice(0, 120)),
+        decisions: recentDecisions.slice(0, 5).map((d: Decision) => d.decision.slice(0, 120)),
         blockers: [],
         tags: ['standalone', 'counts-summary'],
       },
