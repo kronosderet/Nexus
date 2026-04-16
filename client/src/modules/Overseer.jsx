@@ -61,18 +61,28 @@ function RiskCard({ risk }) {
 
       {/* Action buttons */}
       {actions.length > 0 && (
-        <div className="flex gap-1 mt-1.5 ml-5">
-          {actions.map((a, i) => (
-            <button
-              key={i}
-              onClick={() => a.action && executeFix(a.action, a.project, a.param, a.label)}
-              disabled={running !== null}
-              className="flex items-center gap-1 text-[10px] font-mono text-nexus-amber hover:text-nexus-text border border-nexus-amber/20 rounded px-1.5 py-0.5 hover:bg-nexus-amber/10 transition-colors disabled:opacity-50"
-            >
-              {running === a.label ? <Loader2 size={8} className="animate-spin" /> : <Play size={8} />}
-              {a.label}
-            </button>
-          ))}
+        <div className="flex gap-1 mt-1.5 ml-5" role="group" aria-label={`Remediation actions for ${risk.category || 'risk'}`}>
+          {actions.map((a, i) => {
+            // v4.3.5 P5: rich aria-label so screen readers get full context,
+            // not just the visible short action label.
+            const projectPart = a.project ? ` on project ${a.project}` : '';
+            const paramPart = a.param ? ` (${a.param})` : '';
+            const ariaLabel = `${a.label}${projectPart}${paramPart} — remediate: ${risk.message || risk.category || ''}`;
+            const isRunning = running === a.label;
+            return (
+              <button
+                key={i}
+                onClick={() => a.action && executeFix(a.action, a.project, a.param, a.label)}
+                disabled={running !== null}
+                aria-label={ariaLabel}
+                aria-busy={isRunning}
+                className="flex items-center gap-1 text-[10px] font-mono text-nexus-amber hover:text-nexus-text border border-nexus-amber/20 rounded px-1.5 py-0.5 hover:bg-nexus-amber/10 transition-colors disabled:opacity-50"
+              >
+                {isRunning ? <Loader2 size={8} className="animate-spin" aria-hidden="true" /> : <Play size={8} aria-hidden="true" />}
+                {a.label}
+              </button>
+            );
+          })}
         </div>
       )}
 

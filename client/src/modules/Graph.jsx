@@ -4,6 +4,16 @@ import { api } from '../hooks/useApi.js';
 import { useNexusFleet } from '../context/useNexus.js';
 import { THEME, PROJECT_PALETTE, EDGE_STYLES, LIFECYCLE_COLORS } from '../lib/theme.js';
 
+// v4.3.5 P4: shared tabs constant so the inline render + keyboard handler agree on order.
+const GRAPH_TABS = [
+  { key: 'overview',       label: 'Overview',     icon: BarChart3 },
+  { key: 'blast',          label: 'Blast Radius', icon: Target },
+  { key: 'centrality',     label: 'Centrality',   icon: Link2 },
+  { key: 'contradictions', label: 'Conflicts',    icon: AlertTriangle },
+  { key: 'holes',          label: 'Holes',        icon: Search },
+  { key: 'visual',         label: 'Visual',       icon: Network },
+];
+
 export default function GraphModule() {
   const { graph: graphSlice } = useNexusFleet();
   const [view, setView] = useState('overview');
@@ -15,6 +25,26 @@ export default function GraphModule() {
     const tab = e.currentTarget.dataset.tab;
     if (tab) setView(tab);
   }, []);
+
+  // v4.3.5 P4: keyboard nav for the tablist — ArrowLeft/Right cycles, Home/End jump to edges.
+  // Follows the ARIA Authoring Practices "tabs with automatic activation" pattern.
+  const onTabKeyDown = useCallback((e) => {
+    const keys = GRAPH_TABS.map(t => t.key);
+    const currentIdx = keys.indexOf(view);
+    if (currentIdx < 0) return;
+    let nextIdx = -1;
+    if (e.key === 'ArrowRight') nextIdx = (currentIdx + 1) % keys.length;
+    else if (e.key === 'ArrowLeft') nextIdx = (currentIdx - 1 + keys.length) % keys.length;
+    else if (e.key === 'Home') nextIdx = 0;
+    else if (e.key === 'End') nextIdx = keys.length - 1;
+    if (nextIdx === -1) return;
+    e.preventDefault();
+    const nextKey = keys[nextIdx];
+    setView(nextKey);
+    // Focus the newly-active tab so keyboard users see selection follow focus.
+    const btn = document.getElementById(`graph-tab-${nextKey}`);
+    if (btn && typeof btn.focus === 'function') btn.focus();
+  }, [view]);
 
   const graph = graphSlice.data?.graph || null;
   const centrality = graphSlice.data?.centrality || null;
@@ -52,29 +82,27 @@ export default function GraphModule() {
         </p>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex flex-wrap gap-1 mb-4 border-b border-nexus-border pb-2">
-        {[
-          { key: 'overview', label: 'Overview', icon: BarChart3 },
-          { key: 'blast', label: 'Blast Radius', icon: Target },
-          { key: 'centrality', label: 'Centrality', icon: Link2 },
-          { key: 'contradictions', label: 'Conflicts', icon: AlertTriangle },
-          { key: 'holes', label: 'Holes', icon: Search },
-          { key: 'visual', label: 'Visual', icon: Network },
-        ].map(tab => {
+      {/* Tab bar — v4.3.5 P4: ARIA tablist + keyboard nav (Arrow/Home/End) */}
+      <div className="flex flex-wrap gap-1 mb-4 border-b border-nexus-border pb-2" role="tablist" aria-label="Knowledge graph views" onKeyDown={onTabKeyDown}>
+        {GRAPH_TABS.map(tab => {
           const Icon = tab.icon;
+          const selected = view === tab.key;
           return (
             <button
               key={tab.key}
+              role="tab"
+              id={`graph-tab-${tab.key}`}
+              aria-selected={selected}
+              tabIndex={selected ? 0 : -1}
               data-tab={tab.key}
               onClick={onSelectTab}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono transition-colors ${
-                view === tab.key
+                selected
                   ? 'bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20'
                   : 'text-nexus-text-faint hover:text-nexus-text border border-transparent'
               }`}
             >
-              <Icon size={12} />{tab.label}
+              <Icon size={12} aria-hidden="true" />{tab.label}
             </button>
           );
         })}

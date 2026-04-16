@@ -43,12 +43,6 @@ export async function acquireAiLock(): Promise<() => void> {
   });
 }
 
-/** Check if an AI inference is currently running (for status reporting). */
-export function isAiBusy(): boolean {
-  return locked;
-}
-
-/** How many requests are waiting in the queue. */
-export function aiQueueLength(): number {
-  return queue.length;
-}
+// v4.3.5 P2: Removed `isAiBusy()` and `aiQueueLength()` — exported but had zero
+// consumers across the codebase. If status reporting needs them later, add back
+// with the consumer alongside to prove the API is used.
