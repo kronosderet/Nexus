@@ -89,10 +89,11 @@ wss.on('connection', (ws) => {
   ws.on('close', () => clients.delete(ws));
 });
 
-function broadcast(data: any) {
+function broadcast(data: unknown) {
   const msg = JSON.stringify(data);
   for (const ws of clients) {
-    if ((ws as any).readyState === 1) (ws as any).send(msg);
+    const sock = ws as { readyState?: number; send?: (s: string) => void };
+    if (sock.readyState === 1 && sock.send) sock.send(msg);
   }
 }
 
@@ -177,7 +178,8 @@ server.listen(PORT, () => {
 
 // v4.3.5 C3 — capture watcher/interval refs so SIGINT can clean them up.
 // Without this, setInterval handles and chokidar FSWatcher were leaking on shutdown.
-let fileWatcherRef: any = null;
+// chokidar's FSWatcher type isn't needed globally; we just need .close() to be callable.
+let fileWatcherRef: { close?: () => void } | null = null;
 let gpuPollerRef: NodeJS.Timeout | null = null;
 let overseerPollerRef: NodeJS.Timeout | null = null;
 

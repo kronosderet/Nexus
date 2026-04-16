@@ -89,7 +89,7 @@ async function start() {
 
   const clients = new Set();
   wss.on('connection', (ws) => { clients.add(ws); ws.on('close', () => clients.delete(ws)); });
-  const broadcast = (data: any) => {
+  const broadcast = (data: unknown) => {
     const msg = JSON.stringify(data);
     for (const ws of clients) { try { (ws as any).send(msg); } catch {} }
   };
@@ -175,9 +175,9 @@ async function start() {
     try {
       const res = await fetch(`http://localhost:${PORT}/api/overseer/risks`);
       if (!res.ok) return;
-      const data = await res.json();
-      const critical = (data.risks || []).filter((r: any) => r.level === 'critical').length;
-      const warnings = (data.risks || []).filter((r: any) => r.level === 'warning').length;
+      const data: { risks?: Array<{ level: string }> } = await res.json();
+      const critical = (data.risks || []).filter((r) => r.level === 'critical').length;
+      const warnings = (data.risks || []).filter((r) => r.level === 'warning').length;
       store.addScheduledScan({
         type: 'risk',
         timestamp: new Date().toISOString(),

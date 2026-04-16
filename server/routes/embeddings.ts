@@ -48,21 +48,29 @@ async function getEmbedding(text: string): Promise<number[] | null> {
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;
-    const data: any = await res.json();
+    const data: { data?: Array<{ embedding?: number[] }> } = await res.json();
     const vec = data.data?.[0]?.embedding;
     if (vec) {
       cache[key] = { vec, ts: Date.now() };
       saveCache();
     }
-    return vec;
+    return vec ?? null;
   } catch {
     return null;
   }
 }
 
 // ── Build searchable corpus from store ─────────────────
-function buildCorpus(store: NexusStore) {
-  const items: any[] = [];
+interface EmbedCorpusItem {
+  type: 'session' | 'task' | 'activity' | 'scratchpad';
+  id: number;
+  text: string;
+  display: string;
+  date: string;
+}
+
+function buildCorpus(store: NexusStore): EmbedCorpusItem[] {
+  const items: EmbedCorpusItem[] = [];
 
   // Sessions (highest value -- decisions, summaries)
   for (const s of store.getSessions({ limit: 100 })) {
@@ -102,7 +110,7 @@ export function createEmbeddingRoutes(store: NexusStore) {
     const corpus = buildCorpus(store);
 
     // Embed all corpus items (uses cache for previously seen items)
-    const scored: any[] = [];
+    const scored: Array<EmbedCorpusItem & { score: number }> = [];
     for (const item of corpus) {
       const itemVec = await getEmbedding(item.text);
       if (!itemVec) continue;

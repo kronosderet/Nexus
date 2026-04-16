@@ -40,14 +40,16 @@ export function createRemediateRoutes(store: NexusStore, broadcast: BroadcastFn)
       const entry = store.addActivity('remediation', `Auto-fix executed: ${action}${project ? ` on ${project}` : ''}`);
       broadcast({ type: 'activity', payload: entry });
       res.json({ success: true, action, project, output });
-    } catch (err: any) {
-      res.json({ success: false, action, project, error: err.message });
+    } catch (err) {
+      res.json({ success: false, action, project, error: (err as Error).message });
     }
   });
 
   // Scan risks and return with executable fix actions
   router.get('/scan', (req: Request, res: Response) => {
-    const risks: any[] = [];
+    interface FixAction { action: string; project?: string; param?: string; label: string }
+    interface RemediationRisk { level: 'critical' | 'warning'; message: string; actions: FixAction[] }
+    const risks: RemediationRisk[] = [];
 
     try {
       const { readdirSync, statSync } = require('fs');

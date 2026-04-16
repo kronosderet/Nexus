@@ -21,12 +21,26 @@ export function createInitRoutes(store: NexusStore): Router {
   return router;
 }
 
-async function runHealthChecks(store: NexusStore) {
-  const results: any = {
+// v4.3.5 P1 — health check result shapes.
+interface CheckResult {
+  ok: boolean;
+  error?: string;
+  [key: string]: unknown;
+}
+interface HealthResults {
+  timestamp: string;
+  version: string;
+  status: 'operational' | 'degraded';
+  message?: string;
+  checks: Record<string, CheckResult>;
+}
+
+async function runHealthChecks(store: NexusStore): Promise<HealthResults> {
+  const results: HealthResults = {
     timestamp: new Date().toISOString(),
-    version: '2.0.0',
+    version: '4.3.5',
     status: 'operational',
-    checks: {} as Record<string, any>,
+    checks: {},
   };
 
   // 1. System
@@ -45,8 +59,8 @@ async function runHealthChecks(store: NexusStore) {
     const decisions = store.data.ledger?.length || 0;
     const graphEdges = store.data.graph_edges?.length || 0;
     results.checks.database = { ok: true, tasks: tasks.length, sessions: allSessions.length, decisions, graphEdges };
-  } catch (err: any) {
-    results.checks.database = { ok: false, error: err.message };
+  } catch (err) {
+    results.checks.database = { ok: false, error: (err as Error).message };
   }
 
   // 3. GPU
@@ -72,8 +86,8 @@ async function runHealthChecks(store: NexusStore) {
       try {
         const res = await fetch(ep.url, { signal: AbortSignal.timeout(2000) });
         if (res.ok) {
-          const data = await res.json();
-          const models = data.data?.map((m: any) => m.id) || data.models?.map((m: any) => m.name) || [];
+          const data: { data?: Array<{ id: string }>; models?: Array<{ name: string }> } = await res.json();
+          const models = data.data?.map((m) => m.id) || data.models?.map((m) => m.name) || [];
           const chatModels = models.filter((m: string) => !m.includes('embed'));
           results.checks.ai = { ok: true, provider: ep.name, models: chatModels };
           found = true;
@@ -120,7 +134,7 @@ async function runHealthChecks(store: NexusStore) {
     : { ok: true, tracked: false };
 
   // Overall status
-  const allOk = Object.values(results.checks).every((c: any) => c.ok);
+  const allOk = Object.values(results.checks).every((c) => c.ok);
   results.status = allOk ? 'operational' : 'degraded';
   results.message = allOk ? 'All instruments nominal, Captain.' : 'Some systems need attention.';
 
