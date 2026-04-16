@@ -21,7 +21,11 @@ export function cosineSim(a: number[], b: number[]): number {
 // ── Embedding cache ────────────────────────────────────
 let cache: Record<string, { vec: number[]; ts: number }> = {};
 if (existsSync(EMBED_CACHE_PATH)) {
-  try { cache = JSON.parse(readFileSync(EMBED_CACHE_PATH, 'utf-8')); } catch {}
+  try { cache = JSON.parse(readFileSync(EMBED_CACHE_PATH, 'utf-8')); }
+  catch (err) {
+    // v4.3.6 H5 — corrupt cache should not silently degrade into "no cache, re-fetch everything".
+    console.warn('[embeddings] cache file corrupt, starting fresh:', (err as Error).message);
+  }
 }
 
 let savePending: NodeJS.Timeout | null = null;
@@ -35,7 +39,10 @@ function saveCache() {
       const sorted = keys.sort((a, b) => (cache[a].ts || 0) - (cache[b].ts || 0));
       for (const k of sorted.slice(0, keys.length - 400)) delete cache[k];
     }
-    try { writeFileSync(EMBED_CACHE_PATH, JSON.stringify(cache)); } catch {}
+    try { writeFileSync(EMBED_CACHE_PATH, JSON.stringify(cache)); }
+    catch (err) {
+      console.warn('[embeddings] failed to persist cache:', (err as Error).message);
+    }
   }, 2000);
 }
 
@@ -43,7 +50,11 @@ function saveCache() {
 process.on('exit', () => {
   if (savePending) {
     clearTimeout(savePending);
-    try { writeFileSync(EMBED_CACHE_PATH, JSON.stringify(cache)); } catch {}
+    try { writeFileSync(EMBED_CACHE_PATH, JSON.stringify(cache)); }
+    catch (err) {
+      // Best-effort flush on exit; log but don't crash.
+      console.warn('[embeddings] final flush failed:', (err as Error).message);
+    }
   }
 });
 
@@ -67,7 +78,10 @@ export async function getEmbedding(text: string): Promise<number[] | null> {
       saveCache();
     }
     return vec || null;
-  } catch {
+  } catch (err) {
+    // v4.3.6 H5 — LM Studio down, timeout, or network hiccup. Previously swallowed; now
+    // surface at debug so users can distinguish "no LM Studio" from "bad key / corrupt cache".
+    if (process.env.NEXUS_DEBUG) console.warn('[embeddings] getEmbedding failed:', (err as Error).message);
     return null;
   }
 }

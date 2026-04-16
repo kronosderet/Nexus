@@ -1,9 +1,18 @@
 import { Router, type Request, type Response } from 'express';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import { readdirSync, statSync } from 'fs';
-import { join } from 'path';
+import { join, basename } from 'path';
 import type { NexusStore } from '../db/store.ts';
 import { PROJECTS_DIR } from '../lib/config.ts';
+
+// v4.3.6 C1 — guard against path traversal when a project name comes from the wire.
+// Must be a simple basename (no separators, no parent refs, non-empty).
+function safeProject(name: unknown): string | null {
+  if (typeof name !== 'string' || name.length === 0) return null;
+  if (name !== basename(name)) return null;
+  if (name === '..' || name === '.' || name.includes('\0')) return null;
+  return name;
+}
 
 type BroadcastFn = (data: unknown) => void;
 
@@ -54,11 +63,14 @@ export function createGitHubRoutes(store: NexusStore, broadcast: BroadcastFn) {
   // Fetch recent commits for a specific project
   router.get('/commits/:project', (req: Request, res: Response) => {
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
-    const projectPath = join(PROJECTS_DIR, String(req.params.project));
+    const project = safeProject(req.params.project);
+    if (!project) return res.status(400).json({ error: 'Invalid project name.' });
+    const projectPath = join(PROJECTS_DIR, project);
     try {
-      const commits = getProjectCommits(projectPath, String(req.params.project), limit);
+      const commits = getProjectCommits(projectPath, project, limit);
       res.json(commits);
-    } catch {
+    } catch (err) {
+      console.error('[github] getProjectCommits failed:', (err as Error).message);
       res.status(404).json({ error: 'Nothing on the charts.' });
     }
   });
@@ -71,25 +83,32 @@ export function createGitHubRoutes(store: NexusStore, broadcast: BroadcastFn) {
 
   // Commit all changes in a project
   router.post('/commit', (req: Request, res: Response) => {
-    const { project, message = 'Nexus auto-commit' } = req.body;
-    if (!project) return res.status(400).json({ error: 'Project name required.' });
+    const { project: rawProject, message: rawMessage = 'Nexus auto-commit' } = req.body ?? {};
+    const project = safeProject(rawProject);
+    if (!project) return res.status(400).json({ error: 'Project name required (must be a simple basename).' });
+    // v4.3.6 C1 — message is user-controlled; coerce to string and reject control chars so it can't
+    // smuggle ANSI/terminal escapes through the activity log, and clip to a reasonable length.
+    const message = String(rawMessage ?? '').replace(/[\x00-\x08\x0B-\x1F\x7F]/g, '').slice(0, 500) || 'Nexus auto-commit';
 
     const cwd = join(PROJECTS_DIR, project);
     try {
       // Stage all
-      execSync('git add -A', { cwd, encoding: 'utf-8' });
+      execFileSync('git', ['add', '-A'], { cwd, encoding: 'utf-8' });
       // Check if anything staged
-      const status = execSync('git status --porcelain', { cwd, encoding: 'utf-8' }).trim();
+      const status = execFileSync('git', ['status', '--porcelain'], { cwd, encoding: 'utf-8' }).trim();
       if (!status) return res.json({ success: true, files: 0, message: 'Nothing to commit' });
 
       const files = status.split('\n').length;
-      execSync(`git commit -m "${message.replace(/"/g, '\\"')}"`, { cwd, encoding: 'utf-8' });
+      // v4.3.6 C1 — execFileSync with argv prevents shell interpolation. Previous execSync with
+      // quote-only escaping allowed $() and backtick injection via the message body.
+      execFileSync('git', ['commit', '-m', message], { cwd, encoding: 'utf-8' });
 
       const entry = store.addActivity('git_commit', `Fleet commit -- [${project}] ${files} files: ${message.slice(0, 60)}`);
       broadcast({ type: 'activity', payload: entry });
 
       res.json({ success: true, files, project });
     } catch (err) {
+      console.error(`[github] commit failed for ${project}:`, (err as Error).message);
       res.json({ success: false, project, error: (err as Error).message?.slice(0, 200) });
     }
   });
@@ -123,7 +142,11 @@ function scanGitRepos(): RepoInfo[] {
         try {
           const ab = execSync('git rev-list --left-right --count HEAD...@{u} 2>nul', { cwd: fullPath, encoding: 'utf-8' }).trim();
           [ahead, behind] = ab.split('\t').map(Number);
-        } catch {}
+        } catch (err) {
+          // v4.3.6 H5 — common case: no upstream configured. Log at debug-ish level so operators
+          // can see it without the route lying by returning ahead=0/behind=0 for a real failure.
+          if (process.env.NEXUS_DEBUG) console.warn(`[github] ahead/behind unavailable for ${name}:`, (err as Error).message);
+        }
 
         repos.push({
           name,
@@ -136,9 +159,13 @@ function scanGitRepos(): RepoInfo[] {
           behind,
           lastCommit: { hash, short, message, author, date },
         });
-      } catch {}
+      } catch (err) {
+        if (process.env.NEXUS_DEBUG) console.warn(`[github] scanGitRepos skipped ${name}:`, (err as Error).message);
+      }
     }
-  } catch {}
+  } catch (err) {
+    console.error('[github] scanGitRepos failed to read PROJECTS_DIR:', (err as Error).message);
+  }
 
   return repos.sort((a, b) => {
     const da = a.lastCommit?.date ? new Date(a.lastCommit.date) : new Date(0);
@@ -178,9 +205,13 @@ function getAllCommits(days: number): GitCommit[] {
           const [hash, short, message, author, date] = line.split('|');
           allCommits.push({ project: name, hash, short, message, author, date });
         }
-      } catch {}
+      } catch (err) {
+        if (process.env.NEXUS_DEBUG) console.warn(`[github] getAllCommits skipped ${name}:`, (err as Error).message);
+      }
     }
-  } catch {}
+  } catch (err) {
+    console.error('[github] getAllCommits failed to read PROJECTS_DIR:', (err as Error).message);
+  }
 
   return allCommits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
@@ -205,7 +236,10 @@ function syncAllRepos(store: NexusStore, broadcast: BroadcastFn): SyncResult[] {
         try {
           const ab = execSync('git rev-list --count HEAD..@{u} 2>nul', { cwd: fullPath, encoding: 'utf-8' }).trim();
           newCommits = parseInt(ab) || 0;
-        } catch {}
+        } catch (err) {
+          // No upstream tracking branch — common, stay quiet unless debugging.
+          if (process.env.NEXUS_DEBUG) console.warn(`[github] rev-list HEAD..@{u} failed for ${name}:`, (err as Error).message);
+        }
 
         if (newCommits > 0) {
           const entry = store.addActivity('git_fetch', `Signal received -- [${name}] ${newCommits} new commit${newCommits !== 1 ? 's' : ''} on remote`);
@@ -214,10 +248,13 @@ function syncAllRepos(store: NexusStore, broadcast: BroadcastFn): SyncResult[] {
 
         results.push({ project: name, newCommits, status: 'ok' });
       } catch (err) {
+        console.error(`[github] syncAllRepos failed for ${name}:`, (err as Error).message);
         results.push({ project: name, status: 'error', error: (err as Error).message });
       }
     }
-  } catch {}
+  } catch (err) {
+    console.error('[github] syncAllRepos failed to read PROJECTS_DIR:', (err as Error).message);
+  }
 
   return results;
 }

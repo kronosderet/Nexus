@@ -161,6 +161,9 @@ export interface NexusData {
   _sessionTiming?: SessionTiming;
   _fuelConfig?: FuelConfig;
   _scheduledScans?: ScheduledScan[];
+  // v4.3.6 M1 — tracks which idempotent one-shot migrations have run so cold-start
+  // doesn't re-scan all tasks/decisions every time. Keys are migration IDs like "v4.3.5-C1".
+  _appliedMigrations?: Record<string, string>; // migration_id → ISO timestamp applied
 }
 
 export interface ScheduledScan {

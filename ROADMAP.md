@@ -124,6 +124,21 @@ Three-front audit (data / nexus code / dashboard) produced 14 tasks. Shipped:
 - **I5: Graph.jsx hex → theme tokens** — extracted `client/src/lib/theme.js` with THEME / PROJECT_PALETTE / EDGE_STYLES / LIFECYCLE_COLORS; Graph.jsx imports from there.
 - **I6: WS_MAP notification** — added `notification: []` entry documenting ToastOverlay's direct handling as the intentional exception.
 
+### v4.3.6 Patch (external-audit shakedown)
+Full-repo audit (2026-04-16) produced 10 ranked findings. Decision #5. Shipped:
+- **C1 CRITICAL: Command injection in github.ts:86** — `/commit` endpoint passed user-controlled `message` through `execSync` with quote-only escaping; `$()` + backticks passed through for RCE. Replaced with `execFileSync('git', ['commit', '-m', msg])` argv form. Added `safeProject()` basename guard on `/commits/:project` and `/commit` to block path traversal. Clipped message to 500 chars + stripped control chars.
+- **H1: Test-count reconciled** — actual count 169 (5 test files: routes, store, graph, ccScaffolding, estimator). README.md + CONCEPT.md updated from "153 Vitest" → "169 Vitest".
+- **H2: Tool-count reconciled** — README.md:108 architecture table and CONCEPT.md both updated "22 tools" → "24 tools". MCPB manifest was missing 2 tool entries; added `nexus_calendar_runway` and `nexus_propose_edges` descriptors. Plugin README "22 non-AI" clarified to "20 non-AI" (4 AI-dependent tools listed).
+- **H3: .gitignore generated artifacts** — `mcpb/nexus.mcpb`, `mcpb/server/index.js`, `plugin/server/index.js` (23k-line esbuild output) added to .gitignore so fresh builds don't churn the repo. Still-tracked copies need `git rm --cached` in release commit.
+- **H5: Silent catches logged** — `github.ts` (ahead/behind, scanGitRepos, syncAllRepos, getAllCommits), `embeddings.ts` (cache corrupt / fetch failure / write failure) now log via `console.error` or `console.warn`. Gated noise (ahead/behind absent = no upstream) behind `NEXUS_DEBUG`. Hook catches left intentional.
+- **M1: Persistent `_appliedMigrations` ledger** — `NexusData._appliedMigrations: Record<string,string>` tracks which one-shot migrations ran. C1 (task.project backfill) and I1 (decision lifecycle) now skip the scan entirely on subsequent cold-starts; mark-applied after every run so empty first-loads don't re-scan forever.
+- **Release: version sweep** — 4.3.5 → 4.3.6 across root/cli/manifest package.json, cli/nexus.js splash, server/mcp/index.ts SERVER_VERSION, server/index.ts /api/status, server/dashboard.ts /api/status, server/routes/init.ts /nexus-health.
+
+### Queued for v4.3.7+ (from v4.3.6 audit — deferred scope)
+- **H4: Integration tests for github.ts / overseer.ts / webhooks.ts** — 0 coverage on the injection site (now patched) + AI + outbound fetch.
+- **M2: Zod runtime validation at route boundaries** — activity.meta stringify/parse drift + untyped request bodies.
+- **M3: Split oversized files** — cli/nexus.js (1969), server/mcp/index.ts (1647), server/db/store.ts (1074), server/routes/overseer.ts (674).
+
 ### Queued for v4.3
 - **#188 HARMONIZE: Memory Bridge** — read/write `~/.claude/projects/*/memory/` in brief + record_decision
 - **#192 AMPLIFY: Thought Stack ⇄ spawn_task** — bidirectional

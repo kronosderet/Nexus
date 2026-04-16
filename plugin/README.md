@@ -46,7 +46,7 @@ All data stored at `~/.nexus/nexus.json` with automatic backup rotation (3 gener
 
 ## Local AI (optional)
 
-For AI-powered features (Overseer, session plan, code audit), install [LM Studio](https://lmstudio.ai) and load a model. Tested with Gemma 4 31B and 26B A4B (Q4_K_M). Auto-detects at `localhost:1234`. Without it, all 22 non-AI tools still work normally.
+For AI-powered features (Overseer, session plan, code audit), install [LM Studio](https://lmstudio.ai) and load a model. Tested with Gemma 4 31B and 26B A4B (Q4_K_M). Auto-detects at `localhost:1234`. Without it, the 20 non-AI tools still work normally (4 AI-dependent tools: `nexus_ask_overseer`, `nexus_ask_overseer_start`, `nexus_get_overseer_result`, `nexus_propose_edges`).
 
 ## Privacy
 
