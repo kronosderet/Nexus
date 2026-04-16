@@ -1,6 +1,14 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
+import type { UsageEntry, ActivityEntry, SessionTiming } from '../types.ts';
 import { getFuelConfig, groupBySessionWindow } from '../lib/fuelConfig.ts';
+
+// v4.3.5 P1 — workload recommendation shape used by buildWorkloadPlan.
+interface WorkloadRecommendation {
+  action: 'wrap_up' | 'small_tasks' | 'medium_tasks' | 'full_capacity';
+  message: string;
+  suggested: string[];
+}
 
 /**
  * Smart Fuel Estimator
@@ -78,7 +86,7 @@ function buildEstimate(store: NexusStore) {
   let estimatedWeekly = reportedWeekly;
 
   // Session timing
-  const timing = store.getSessionTiming() || {} as any;
+  const timing: Partial<SessionTiming> = store.getSessionTiming() || {};
   const resetTime = timing.resetTime ? new Date(timing.resetTime) : null;
   const minutesUntilReset = resetTime ? Math.max(0, (resetTime.getTime() - now) / 60000) : null;
 
@@ -202,7 +210,7 @@ function buildEstimate(store: NexusStore) {
   };
 }
 
-function calculateBurnRates(history: any[]) {
+function calculateBurnRates(history: UsageEntry[]) {
   // Sort by timestamp descending (newest first) — don't assume array order
   const sorted = [...history].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -265,7 +273,7 @@ function weightedAvg(values: number[]) {
  */
 function calculateEventCosts(store: NexusStore) {
   const usage = store.getUsage(100).sort(
-    (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    (a: UsageEntry, b: UsageEntry) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
   const activity = store.getActivity(500);
 
@@ -292,7 +300,7 @@ function calculateEventCosts(store: NexusStore) {
     if (sessionBurned <= 0) continue;
 
     // Count activity events in this window
-    const events = activity.filter((a: any) => {
+    const events = activity.filter((a: ActivityEntry) => {
       const at = new Date(a.created_at).getTime();
       return at >= t1 && at <= t2;
     }).length;
@@ -349,8 +357,8 @@ function buildHistoricalStats(store: NexusStore) {
       const durationH = durationMs / 3600000;
 
       // Find highest and lowest session_percent in this window
-      const maxFuel = Math.max(...entries.map((e: any) => e.session_percent ?? 0));
-      const minFuel = Math.min(...entries.map((e: any) => e.session_percent ?? 100));
+      const maxFuel = Math.max(...entries.map((e: UsageEntry) => e.session_percent ?? 0));
+      const minFuel = Math.min(...entries.map((e: UsageEntry) => e.session_percent ?? 100));
       const burned = Math.max(0, maxFuel - minFuel);
 
       // Weekly burn: first weekly reading vs last in this window
@@ -394,7 +402,7 @@ const TASK_SIZES: Record<string, { minutes: number; label: string; fuelCost: num
   huge: { minutes: 120, label: 'Full system build, major rewrite', fuelCost: 45 },
 };
 
-function predictTaskCost(store: NexusStore, taskType: string, estimate: any) {
+function predictTaskCost(store: NexusStore, taskType: string, estimate: ReturnType<typeof buildEstimate>) {
   const preset = TASK_SIZES[taskType] || TASK_SIZES.medium;
   const rate = estimate.rates?.sessionPerMinute || 0;
 
@@ -417,7 +425,7 @@ function predictTaskCost(store: NexusStore, taskType: string, estimate: any) {
   };
 }
 
-function buildWorkloadPlan(store: NexusStore, estimate: any) {
+function buildWorkloadPlan(store: NexusStore, estimate: ReturnType<typeof buildEstimate>) {
   if (!estimate.tracked || !estimate.session?.minutesRemaining) {
     return { available: false, reason: 'Insufficient data for workload planning.' };
   }
@@ -440,7 +448,7 @@ function buildWorkloadPlan(store: NexusStore, estimate: any) {
   }
 
   // Smart recommendation
-  let recommendation: any;
+  let recommendation: WorkloadRecommendation;
   if (fuel <= 10) {
     recommendation = {
       action: 'wrap_up',
