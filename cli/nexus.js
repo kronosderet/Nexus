@@ -16,12 +16,20 @@
  */
 
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// v4.3.7 F1c — read version from root package.json instead of hardcoding.
+// Falls back if package.json is missing (e.g. when the CLI is bundled standalone).
+let NEXUS_VERSION = 'unknown';
+try {
+  const pkgPath = join(__dirname, '..', 'package.json');
+  if (existsSync(pkgPath)) NEXUS_VERSION = JSON.parse(readFileSync(pkgPath, 'utf-8')).version || 'unknown';
+} catch {}
 
 const BASE = process.env.NEXUS_URL || 'http://localhost:3001';
 
@@ -509,7 +517,7 @@ Local AI-powered mission control (v4.3). Tracks tasks, sessions, decisions,
 fuel usage, and git state across all projects. Features:
   • Knowledge Graph of 140+ decisions with 7 typed edge types + blast-radius analysis
   • Local AI Overseer (Gemma 4 via LM Studio) with self-improving Advice Journal
-  • 24 native MCP tools — every Nexus operation callable from Claude Desktop natively
+  • 25 native MCP tools — every Nexus operation callable from Claude Desktop natively
   • Compass module — Now/Next/Later/Done strategic dashboard replacing Scratchpad
   • Smart Fuel Intelligence with autonomous session planning
   • Predictive Task Generation from graph gaps (6 gap categories)
@@ -1701,9 +1709,9 @@ Ritual:  nexus_bridge_session (end-of-work: auto-summary + handoff)
     };
 
     console.log(`
-  ${amber('◈')} ${amber('NEXUS MCP SERVER')} -- v4.3.6
+  ${amber('◈')} ${amber('NEXUS MCP SERVER')} -- v${NEXUS_VERSION}
 
-  ${dim('Exposes the Nexus metabrain as 24 native MCP tools so every Claude')}
+  ${dim('Exposes the Nexus metabrain as 25 native MCP tools so every Claude')}
   ${dim('instance can call mcp__nexus__brief, mcp__nexus__check_guard, etc.')}
   ${dim('without shelling out to the CLI or fetching the HTTP API.')}
 
@@ -1875,7 +1883,7 @@ ${JSON.stringify(config, null, 2).split('\n').map(l => '    ' + l).join('\n')}
 
   ${amber('Commands:')}
     nexus hooks                     Claude Code lifecycle hooks (install/uninstall)
-    nexus mcp                       Print MCP server config (24 tools, v4.3.5)
+    nexus mcp                       Print MCP server config (25 tools, v${NEXUS_VERSION})
     nexus mcp --run                 Run the MCP stdio server (for debugging)
     nexus plan                      Autonomous session plan (AI-generated)
     nexus summarize [project]       Overseer writes session log (preview)

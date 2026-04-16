@@ -60,10 +60,13 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 // ── Configuration ────────────────────────────────────────
+import { SERVER_VERSION } from '../lib/version.ts';
 const STANDALONE = process.env.NEXUS_STANDALONE === '1';
 const NEXUS_BASE = process.env.NEXUS_BASE_URL || 'http://localhost:3001';
 const SERVER_NAME = 'nexus';
-const SERVER_VERSION = '4.3.6';
+// v4.3.7 F1c — SERVER_VERSION now lives in server/lib/version.ts (sourced from package.json).
+// Drift against mcpb/manifest.json guarded by tests/versionDrift.test.ts.
+const SERVER_STARTED_AT = Date.now();
 
 // In standalone mode, import the local API adapter (direct store access, no Express needed)
 let localApiFetch: ((path: string, init?: { method?: string; body?: string }) => Promise<unknown>) | null = null;
@@ -152,7 +155,10 @@ type BriefData = Record<string, unknown> & {
 
 function formatBrief(data: BriefData, project: string): string {
   const lines: string[] = [];
-  lines.push(`◈ NEXUS BRIEF — ${project}`);
+  // v4.3.7 F1b — version + mode in the header answers "which Nexus am I talking to?"
+  // without needing a separate tool call. STANDALONE is resolved at module load time.
+  const mode = STANDALONE ? 'standalone' : 'dashboard';
+  lines.push(`◈ NEXUS BRIEF — ${project} (v${SERVER_VERSION} · ${mode})`);
   lines.push('');
 
   if (data.fuel) {
@@ -854,6 +860,16 @@ const TOOLS: Tool[] = [
       required: ['decision_id'],
     },
   },
+  {
+    // v4.3.7 F1a — definitive "what version am I talking to?" answer.
+    // Zero side-effects; reads in-memory state + one fast probe to the overseer endpoint.
+    name: 'nexus_version',
+    description:
+      'Return the running Nexus server version, mode, applied migrations, tool count, uptime, and overseer availability. ' +
+      'Call this when you need to verify which Nexus build is serving the session (after an MCPB update, a Claude Desktop restart, ' +
+      'or when debugging a tool that should exist but doesn\'t). Cheap and side-effect-free.',
+    inputSchema: { type: 'object', properties: {} },
+  },
 ];
 
 // ── Tool handlers ────────────────────────────────────────
@@ -1550,6 +1566,43 @@ async function handleTool(name: string, args: any): Promise<string> {
         lines.push('', `  Then (within runway): ${upcoming.slice(1, 4).map(e => `"${e.title}" +${e.minutesAway}m`).join(', ')}`);
       }
 
+      return lines.join('\n');
+    }
+
+    case 'nexus_version': {
+      // v4.3.7 F1a — definitive "which Nexus is serving this session?" answer.
+      // Reads: in-memory constants (SERVER_VERSION, STANDALONE, TOOLS, SERVER_STARTED_AT),
+      // the on-disk store for applied_migrations, and probes the local AI endpoint.
+      const { readFileSync, existsSync } = await import('fs');
+      const { join } = await import('path');
+      const { homedir } = await import('os');
+      const { detectAI } = await import('../lib/aiEndpoints.ts');
+
+      const storePath = process.env.NEXUS_DB_PATH || join(homedir(), '.nexus', 'nexus.json');
+      let appliedMigrations: string[] = [];
+      try {
+        if (existsSync(storePath)) {
+          const raw = JSON.parse(readFileSync(storePath, 'utf-8')) as { _appliedMigrations?: Record<string, string> };
+          appliedMigrations = Object.keys(raw._appliedMigrations || {}).sort();
+        }
+      } catch (err) {
+        console.error('[nexus_version] failed to read applied_migrations:', (err as Error).message);
+      }
+
+      const ai = await detectAI();
+      const uptimeSeconds = Math.floor((Date.now() - SERVER_STARTED_AT) / 1000);
+
+      const lines = [
+        `◈ NEXUS VERSION`,
+        ``,
+        `  version:            ${SERVER_VERSION}`,
+        `  mode:               ${STANDALONE ? 'standalone' : `dashboard (${NEXUS_BASE})`}`,
+        `  store_path:         ${storePath}`,
+        `  tool_count:         ${TOOLS.length}`,
+        `  uptime_seconds:     ${uptimeSeconds}`,
+        `  applied_migrations: ${appliedMigrations.length > 0 ? appliedMigrations.join(', ') : '(none)'}`,
+        `  overseer:           ${ai.available ? `${ai.provider} · ${ai.model}` : 'unavailable'}`,
+      ];
       return lines.join('\n');
     }
 

@@ -200,6 +200,21 @@ async function main() {
   }
   console.log(`✓ nexus_propose_edges standalone-error path works (${proposeText.split('\n')[0].slice(0, 80)})`);
 
+  // v4.3.7 F1a — nexus_version must report the package-declared version and list applied migrations.
+  // Standalone bundle should never say "unknown" because the version is inlined by esbuild.
+  const ver = await send('tools/call', { name: 'nexus_version', arguments: {} });
+  const verText = ver.result.content[0].text;
+  const pkgVersion = JSON.parse((await import('fs')).readFileSync(join(__dirname, '..', 'package.json'), 'utf-8')).version;
+  if (!verText.includes(`version:            ${pkgVersion}`)) {
+    console.error(`✗ nexus_version did not report v${pkgVersion} — output was:\n${verText}`);
+    process.exit(1);
+  }
+  if (!verText.includes('tool_count:') || !verText.includes('mode:')) {
+    console.error('✗ nexus_version missing expected fields (tool_count / mode). Output:\n', verText);
+    process.exit(1);
+  }
+  console.log(`✓ nexus_version works (reports v${pkgVersion})`);
+
   // Skip nexus_ask_overseer (slow AI inference — needs LM Studio running) and
   // nexus_bridge_session (commits a real session entry — side-effect on user data).
   // Both verified by presence in tools/list + manifest schema validation.

@@ -2,10 +2,10 @@
   "manifest_version": "0.3",
   "name": "nexus",
   "display_name": "Nexus — The Cartographer",
-  "version": "4.3.6",
+  "version": "4.3.7",
   "icon": "icon.png",
   "description": "Local AI Cowork metabrain. Exposes The Ledger, Thought Stack, Decision Guard, Session Plan, and Compass dashboard as native MCP tools so every Claude instance can access shared cognitive state.",
-  "long_description": "Nexus is a local metabrain for AI-assisted development. This MCPB extension exposes the Nexus knowledge graph as 24 native MCP tools so any Claude Desktop instance can call nexus_brief at session start, nexus_check_guard before starting work, nexus_push_thought before context-switching, and nexus_pop_thought when returning from interruption — turning the Ledger into ambient memory shared across all concurrent sessions.\n\nRuns standalone (NEXUS_STANDALONE=1) — no external server required. Data stored at ~/.nexus/nexus.json. Optionally connects to the Nexus dashboard at http://localhost:3001 if running (cd C:/Projects/Nexus && npm run dashboard).",
+  "long_description": "Nexus is a local metabrain for AI-assisted development. This MCPB extension exposes the Nexus knowledge graph as 25 native MCP tools so any Claude Desktop instance can call nexus_brief at session start, nexus_check_guard before starting work, nexus_push_thought before context-switching, and nexus_pop_thought when returning from interruption — turning the Ledger into ambient memory shared across all concurrent sessions.\n\nRuns standalone (NEXUS_STANDALONE=1) — no external server required. Data stored at ~/.nexus/nexus.json. Optionally connects to the Nexus dashboard at http://localhost:3001 if running (cd C:/Projects/Nexus && npm run dashboard).",
   "author": {
     "name": "kronosderet",
     "url": "https://github.com/kronosderet/Nexus"
@@ -143,6 +143,10 @@
     {
       "name": "nexus_propose_edges",
       "description": "Overseer-powered knowledge-graph edge suggestions for a decision. Returns a taskId; poll nexus_get_overseer_result, then commit chosen edges via nexus_link_decisions."
+    },
+    {
+      "name": "nexus_version",
+      "description": "Return the running Nexus server version, mode, applied migrations, tool count, uptime, and overseer availability. Use after an MCPB update or Claude Desktop restart to confirm which build is serving."
     }
   ],
   "tools_generated": false,

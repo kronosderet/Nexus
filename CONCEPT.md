@@ -34,7 +34,7 @@ Session ends
 
 ## What Makes It Different
 
-1. **Native MCP integration** — 24 tools callable as naturally as Read or Grep
+1. **Native MCP integration** — 25 tools callable as naturally as Read or Grep
 2. **Local AI Overseer** — strategic analysis via your own GPU, zero cloud
 3. **Knowledge Graph** — typed edges between decisions with blast-radius analysis
 4. **Self-improving** — the Overseer audits its own source code, the graph auto-links
@@ -45,7 +45,7 @@ Session ends
 
 | Layer | Stack |
 |---|---|
-| MCP Server | 24 tools via @modelcontextprotocol/sdk (stdio, standalone) |
+| MCP Server | 25 tools via @modelcontextprotocol/sdk (stdio, standalone) |
 | Dashboard | React 19 + Vite + Tailwind CSS 4 (optional, 8 modules) |
 | Server | Express 5 + TypeScript (dashboard only, MCP is self-contained) |
 | Store | JSON at ~/.nexus/ with atomic writes + 3-gen backup rotation |
