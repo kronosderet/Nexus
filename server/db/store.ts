@@ -4,13 +4,16 @@ import { fileURLToPath } from 'url';
 import type {
   NexusData, Task, ActivityEntry, Session, Scratchpad,
   UsageEntry, GpuSnapshot, Decision, GraphEdge, GraphData, SessionTiming,
-  Bookmark, AdviceEntry, Thought,
+  Bookmark, AdviceEntry, Thought, RiskItem,
 } from '../types.js';
 import { findSimilar } from '../lib/embeddings.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 type IdTable = 'tasks' | 'activity' | 'sessions' | 'scratchpads' | 'bookmarks';
+
+// v4.3.5 P1: typed segment in store.traverse() path — replaces `path: any[]`.
+interface TraversePathSegment { edge: GraphEdge['rel']; from: number; to: number }
 
 // Lazy DB path resolution — must be a function, not a const, because
 // in the esbuild bundle this module is parsed before localApi.ts can
@@ -24,7 +27,7 @@ function getTmpPath() { return getDbPath() + '.tmp'; }
 
 export class NexusStore {
   data: NexusData;
-  _lastRiskScan?: { risks: any[]; scannedAt: string; critical: number; warnings: number };
+  _lastRiskScan?: { risks: RiskItem[]; scannedAt: string; critical: number; warnings: number };
   private _nextId: Record<IdTable, number>;
   private _nextLedgerId = 1;
   private _nextThoughtId = 1;
@@ -107,7 +110,7 @@ export class NexusStore {
         { name: 'family-coop',    patterns: [/\bfamily[- ]coop\b/i] },
         { name: 'Nexus',          patterns: [/\bnexus\b/i, /\bv4\.\d/i, /\bmcp\b/i, /\bmcpb\b/i] },
       ];
-      const inferProject = (t: any): string => {
+      const inferProject = (t: Task): string => {
         // 1. From decision_ids (most authoritative)
         if (Array.isArray(t.decision_ids) && t.decision_ids.length > 0) {
           const projects = t.decision_ids
@@ -172,15 +175,15 @@ export class NexusStore {
       // Recalculate ID counters
       const safeMax = (arr: number[]) => arr.reduce((m, v) => v > m ? v : m, 0);
       this._nextId = {
-        tasks: safeMax((data.tasks || []).map((t: any) => t.id)) + 1,
-        activity: safeMax((data.activity || []).map((a: any) => a.id)) + 1,
-        sessions: safeMax((data.sessions || []).map((s: any) => s.id)) + 1,
-        scratchpads: safeMax((data.scratchpads || []).map((s: any) => s.id)) + 1,
-        bookmarks: safeMax((data.bookmarks || []).map((b: any) => b.id)) + 1,
+        tasks: safeMax((data.tasks || []).map((t: Task) => t.id)) + 1,
+        activity: safeMax((data.activity || []).map((a: ActivityEntry) => a.id)) + 1,
+        sessions: safeMax((data.sessions || []).map((s: Session) => s.id)) + 1,
+        scratchpads: safeMax((data.scratchpads || []).map((s: Scratchpad) => s.id)) + 1,
+        bookmarks: safeMax((data.bookmarks || []).map((b: Bookmark) => b.id)) + 1,
       };
-      this._nextLedgerId = safeMax((data.ledger || []).map((e: any) => e.id)) + 1;
-      this._nextThoughtId = safeMax((data.thoughts || []).map((t: any) => t.id)) + 1;
-      this._nextEdgeId = safeMax((data.graph_edges || []).map((e: any) => e.id)) + 1;
+      this._nextLedgerId = safeMax((data.ledger || []).map((e: Decision) => e.id)) + 1;
+      this._nextThoughtId = safeMax((data.thoughts || []).map((t: Thought) => t.id)) + 1;
+      this._nextEdgeId = safeMax((data.graph_edges || []).map((e: GraphEdge) => e.id)) + 1;
       return true;
     } catch {
       return false;
@@ -522,10 +525,11 @@ export class NexusStore {
   }
 
   /** Link an advice entry to a decision it led to. */
-  linkAdviceToDecision(adviceId: number, decisionId: number): any {
+  linkAdviceToDecision(adviceId: number, decisionId: number): AdviceEntry | null {
     const idx = (this.data.advice || []).findIndex(a => a.id === adviceId);
     if (idx === -1) return null;
-    (this.data.advice[idx] as any).decision_id = decisionId;
+    // AdviceEntry.decision_id is already typed (number?) in types.ts — no cast needed.
+    this.data.advice[idx].decision_id = decisionId;
     this._flush();
     return this.data.advice[idx];
   }
@@ -681,10 +685,10 @@ export class NexusStore {
   getEdgesTo(id: number): GraphEdge[] { return this.data.graph_edges.filter(e => e.to === id); }
   getEdgesFor(id: number): GraphEdge[] { return this.data.graph_edges.filter(e => e.from === id || e.to === id); }
 
-  traverse(startId: number, maxDepth = 3): (Decision & { depth: number; path: any[] })[] {
+  traverse(startId: number, maxDepth = 3): (Decision & { depth: number; path: TraversePathSegment[] })[] {
     const visited = new Set<number>();
-    const result: (Decision & { depth: number; path: any[] })[] = [];
-    const queue: { id: number; depth: number; path: any[] }[] = [{ id: startId, depth: 0, path: [] }];
+    const result: (Decision & { depth: number; path: TraversePathSegment[] })[] = [];
+    const queue: { id: number; depth: number; path: TraversePathSegment[] }[] = [{ id: startId, depth: 0, path: [] }];
 
     while (queue.length > 0) {
       const { id, depth, path } = queue.shift()!;
