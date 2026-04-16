@@ -360,4 +360,48 @@ describe('Knowledge Graph Operations', () => {
       expect(graph.nodes[0].label.length).toBe(50);
     });
   });
+
+  // v4.3.5 P3 — coverage for the new edge types added in v4.3 (task #195)
+  describe('v4.3 edge types (informs + experimental)', () => {
+    it('accepts informs as a valid rel value', () => {
+      g.recordDecision({ decision: 'Plan Archaeology scope', project: 'Nexus' });
+      g.recordDecision({ decision: 'Memory Bridge scope', project: 'Nexus' });
+      const edge = g.addEdge(1, 2, 'informs', 'Plan Archaeology context informs Memory Bridge');
+      expect(edge.rel).toBe('informs');
+      expect(edge.note).toContain('Plan Archaeology');
+    });
+
+    it('accepts experimental as a valid rel value', () => {
+      g.recordDecision({ decision: 'Try Redis', project: 'Nexus' });
+      g.recordDecision({ decision: 'Try SQLite WAL', project: 'Nexus' });
+      const edge = g.addEdge(1, 2, 'experimental', 'Both tried, revisit in 30 days');
+      expect(edge.rel).toBe('experimental');
+    });
+
+    it('includes informs and experimental edges in getEdgesFor', () => {
+      g.recordDecision({ decision: 'A', project: 'Nexus' });
+      g.recordDecision({ decision: 'B', project: 'Nexus' });
+      g.recordDecision({ decision: 'C', project: 'Nexus' });
+      g.addEdge(1, 2, 'informs', '');
+      g.addEdge(1, 3, 'experimental', '');
+
+      const edges = g.getEdgesFor(1);
+      const rels = edges.map(e => e.rel).sort();
+      expect(rels).toEqual(['experimental', 'informs']);
+    });
+
+    it('keeps informs + experimental distinct from led_to in centrality counts', () => {
+      g.recordDecision({ decision: 'Root', project: 'Nexus' });
+      g.recordDecision({ decision: 'A', project: 'Nexus' });
+      g.recordDecision({ decision: 'B', project: 'Nexus' });
+      g.recordDecision({ decision: 'C', project: 'Nexus' });
+      g.addEdge(1, 2, 'led_to', '');
+      g.addEdge(1, 3, 'informs', '');
+      g.addEdge(1, 4, 'experimental', '');
+
+      const top = g.getMostConnected();
+      expect(top.id).toBe(1);
+      expect(top.degree).toBe(3); // all three edges count for centrality
+    });
+  });
 });
