@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 import { NexusStore } from './db/store.ts';
+import { SERVER_VERSION } from './lib/version.ts';
 import { createTaskRoutes } from './routes/tasks.ts';
 import { createActivityRoutes } from './routes/activity.ts';
 import { createPulseRoutes } from './routes/pulse.ts';
@@ -102,7 +103,7 @@ app.get('/api/status', (req, res) => {
   res.json({
     status: 'online',
     message: 'All instruments nominal.',
-    version: '4.3.6',
+    version: SERVER_VERSION,
     uptime: process.uptime(),
   });
 });

@@ -5,6 +5,7 @@ import { join } from 'path';
 import os from 'os';
 import type { NexusStore } from '../db/store.ts';
 import { PROJECTS_DIR } from '../lib/config.ts';
+import { SERVER_VERSION } from '../lib/version.ts';
 
 /**
  * Initialization / health check endpoint.
@@ -38,7 +39,7 @@ interface HealthResults {
 async function runHealthChecks(store: NexusStore): Promise<HealthResults> {
   const results: HealthResults = {
     timestamp: new Date().toISOString(),
-    version: '4.3.6',
+    version: SERVER_VERSION,
     status: 'operational',
     checks: {},
   };

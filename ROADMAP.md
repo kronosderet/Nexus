@@ -139,6 +139,15 @@ Full-repo audit (2026-04-16) produced 10 ranked findings. Decision #5. Shipped:
 - **M2: Zod runtime validation at route boundaries** — activity.meta stringify/parse drift + untyped request bodies.
 - **M3: Split oversized files** — cli/nexus.js (1969), server/mcp/index.ts (1647), server/db/store.ts (1074), server/routes/overseer.ts (674).
 
+### v4.3.7 Patch (version visibility + drift prevention)
+Motivated by the post-v4.3.6-restart friction where neither user nor assistant could answer "which Nexus is serving me?" without side-channel checks (extension-folder manifest, `_appliedMigrations` peek). Decision #6. Shipped:
+- **F1a: `nexus_version` MCP tool** — returns `{version, mode, store_path, applied_migrations, tool_count, uptime_seconds, overseer}`. Zero side-effects; inlined constants + on-disk migration read + ~2s AI-endpoint probe. Tool count bumps 24 → 25.
+- **F1b: Version in `nexus_brief` header** — every brief now starts `◈ NEXUS BRIEF — {project} (v{SERVER_VERSION} · {standalone|dashboard})`. Answers the question without needing `nexus_version` in the common case.
+- **F1c: Single source of truth** — `server/lib/version.ts` reads from root `package.json` via JSON import (works bundled via esbuild, unbundled via tsx). Replaced 7 hardcoded version strings across `server/mcp/index.ts`, `server/dashboard.ts`, `server/index.ts`, `server/routes/init.ts`, `cli/nexus.js`. Docs synced 24 → 25 tools in `README.md` / `CONCEPT.md` / `plugin/README.md` / `mcpb/manifest.json`.
+- **F1c-test: `tests/versionDrift.test.ts`** — 7 new assertions guarding: (a) `cli/package.json.version === package.json.version`, (b) `mcpb/manifest.json.version === package.json.version`, (c) `SERVER_VERSION` from `version.ts` matches root, (d) `TOOL_COUNT_EXPECTED === mcpb/manifest.json.tools.length`, (e) `TOOL_COUNT_EXPECTED === TOOLS array length in mcp/index.ts` (grep-based so tests don't boot the MCP), (f) every manifest tool name exists in the MCP source. Next audit can't surface the same H1/H2 drift class again — CI goes red the moment they disagree.
+- **Smoke-test coverage** — added assertion in `mcpb/smoke-test-bundle.mjs` that `nexus_version` returns the package-declared version and required fields. v4.3.5 I3 precedent.
+- **Release**: 176/176 tests green (was 169 + 7 new drift specs); MCPB rebuilt + smoke-passes on all 25 tools.
+
 ### Queued for v4.3
 - **#188 HARMONIZE: Memory Bridge** — read/write `~/.claude/projects/*/memory/` in brief + record_decision
 - **#192 AMPLIFY: Thought Stack ⇄ spawn_task** — bidirectional

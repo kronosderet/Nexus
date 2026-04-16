@@ -2,7 +2,7 @@
 
 **AI Cowork Metabrain for Claude Code**
 
-A local-first metabrain that gives every Claude Code instance persistent memory, a Knowledge Graph, and a strategic AI advisor. 24 native MCP tools. Zero cloud dependencies.
+A local-first metabrain that gives every Claude Code instance persistent memory, a Knowledge Graph, and a strategic AI advisor. 25 native MCP tools. Zero cloud dependencies.
 
 ## Install as Claude Code Plugin
 
@@ -48,7 +48,7 @@ Nexus solves the biggest problem with AI-assisted development: **Claude forgets 
 - **Self-Critique** — identifies slow tasks, stuck items, completion patterns
 - **Local AI Overseer** (optional) — strategic analysis via LM Studio with up to 200k context
 
-## 24 Native MCP Tools
+## 25 Native MCP Tools
 
 After installing, Claude Code can call these directly — no shell-outs, no CLI:
 
@@ -99,13 +99,13 @@ Install hooks: `nexus hooks install` (from the CLI).
 
 For AI-powered features (Overseer, session plan, code audit), install [LM Studio](https://lmstudio.ai) and load a model. Tested with Gemma 4 31B and Gemma 4 26B A4B (Q4_K_M). Nexus auto-detects LM Studio at `localhost:1234`. GPU-aware inference with AI semaphore — adapts to any hardware.
 
-Without LM Studio, all 21 non-AI tools work normally (3 Overseer tools — `nexus_ask_overseer`, `nexus_ask_overseer_start`, `nexus_get_overseer_result` — plus `nexus_propose_edges` require a local model).
+Without LM Studio, all 21 non-AI tools work normally (4 AI-dependent tools: `nexus_ask_overseer`, `nexus_ask_overseer_start`, `nexus_get_overseer_result`, `nexus_propose_edges` require a local model).
 
 ## Architecture
 
 | Layer | Stack |
 |---|---|
-| MCP | 24 tools, stdio, standalone (no server needed) |
+| MCP | 25 tools, stdio, standalone (no server needed) |
 | Dashboard | React 19 + Vite + Tailwind CSS 4 (optional, 8 modules) |
 | Server | Express 5 + TypeScript (dashboard only) |
 | Store | JSON at `~/.nexus/nexus.json` (atomic writes, 3-gen backup) |

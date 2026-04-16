@@ -63,6 +63,7 @@ async function start() {
   const { createGitHubRoutes } = await import('./routes/github.ts');
   const { createSmartSearchRoutes } = await import('./routes/smartSearch.ts');
   const { createEmbeddingRoutes } = await import('./routes/embeddings.ts');
+  const { SERVER_VERSION } = await import('./lib/version.ts');
 
   const store = new NexusStore();
 
@@ -140,7 +141,7 @@ async function start() {
   });
 
   // Status endpoint
-  app.get('/api/status', (_req, res) => res.json({ status: 'online', version: '4.3.6', mode: 'dashboard', message: 'All instruments nominal, Captain.' }));
+  app.get('/api/status', (_req, res) => res.json({ status: 'online', version: SERVER_VERSION, mode: 'dashboard', message: 'All instruments nominal, Captain.' }));
 
   // SPA fallback (Express 5 uses {*path} not *)
   app.use((_req, res) => {
