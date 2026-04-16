@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
+import type { Decision, GraphEdge } from '../types.ts';
 
 /**
  * Impact Analysis Engine
@@ -10,6 +11,47 @@ import type { NexusStore } from '../db/store.ts';
  * 3. Structural Holes: "Where are connections missing?"
  * 4. Centrality: "Which decisions are most foundational?"
  */
+
+// v4.3.5 P1 — typed BFS result. traverseDirected returns decisions enriched with depth.
+type AffectedDecision = Decision & { _depth: number };
+
+// Contradiction shapes surfaced by /contradictions
+interface SupersededContradiction {
+  type: 'superseded_with_dependents';
+  old: { id: number; decision: string };
+  new: { id: number; decision: string };
+  orphanedDependents: number;
+  message: string;
+}
+interface PotentialConflict {
+  type: 'potential_conflict';
+  a: { id: number; decision: string };
+  b: { id: number; decision: string };
+  trigger: string;
+  message: string;
+}
+type Contradiction = SupersededContradiction | PotentialConflict;
+
+interface CentralityEntry {
+  id: number;
+  decision: string;
+  project: string;
+  inbound: number;
+  outbound: number;
+  total: number;
+}
+
+// Minimal shapes for the LM Studio /models and /messages responses used by /forecast.
+interface AIModelsResponse { data?: Array<{ id?: string }> }
+interface AIMessagesResponse { content?: Array<{ type?: string; text?: string }> }
+
+interface ForecastResult {
+  decision: Decision;
+  affectedCount: number;
+  affected: Array<{ id: number; decision: string; project: string; depth: number }>;
+  depth: number;
+  forecast?: string;
+}
 
 export function createImpactRoutes(store: NexusStore) {
   const router = Router();
@@ -24,18 +66,18 @@ export function createImpactRoutes(store: NexusStore) {
     const affected = traverseDirected(store, id, ['led_to', 'depends_on']);
     // Also get anything directly 'related'
     const related = store.getEdgesFor(id)
-      .filter((e: any) => e.rel === 'related')
-      .map((e: any) => {
+      .filter((e: GraphEdge) => e.rel === 'related')
+      .map((e: GraphEdge) => {
         const otherId = e.from === id ? e.to : e.from;
-        return store.getDecisionById( otherId);
+        return store.getDecisionById(otherId);
       })
-      .filter(Boolean);
+      .filter((d): d is Decision => Boolean(d));
 
     res.json({
       decision,
       blastRadius: affected.length,
-      affected: affected.map((d: any) => ({ id: d.id, decision: d.decision, project: d.project, depth: d._depth })),
-      related: related.map((d: any) => ({ id: d.id, decision: d.decision, project: d.project })),
+      affected: affected.map((d) => ({ id: d.id, decision: d.decision, project: d.project, depth: d._depth })),
+      related: related.map((d) => ({ id: d.id, decision: d.decision, project: d.project })),
       warning: affected.length > 5
         ? `Changing this decision impacts ${affected.length} downstream decisions. Proceed carefully.`
         : affected.length > 0
@@ -47,14 +89,14 @@ export function createImpactRoutes(store: NexusStore) {
   // Find potential contradictions across the graph
   router.get('/contradictions', (req: Request, res: Response) => {
     const decisions = store.getAllDecisions();
-    const contradictions: any[] = [];
+    const contradictions: Contradiction[] = [];
 
     // Strategy 1: Find 'replaced' edges where old decision still has active dependents
     for (const edge of store.getAllEdges()) {
       if (edge.rel === 'replaced') {
-        const oldDecision = decisions.find((d: any) => d.id === edge.from);
-        const newDecision = decisions.find((d: any) => d.id === edge.to);
-        const oldDependents = store.getEdgesFrom(edge.from).filter((e: any) => e.rel === 'depends_on' || e.rel === 'led_to');
+        const oldDecision = decisions.find((d: Decision) => d.id === edge.from);
+        const newDecision = decisions.find((d: Decision) => d.id === edge.to);
+        const oldDependents = store.getEdgesFrom(edge.from).filter((e: GraphEdge) => e.rel === 'depends_on' || e.rel === 'led_to');
         if (oldDependents.length > 0 && oldDecision && newDecision) {
           contradictions.push({
             type: 'superseded_with_dependents',
@@ -93,7 +135,7 @@ export function createImpactRoutes(store: NexusStore) {
 
           if ((textA.includes(a) && textB.includes(b)) || (textA.includes(b) && textB.includes(a))) {
             // Skip if already linked in any way (same decision thread)
-            const alreadyLinked = store.getAllEdges().find((e: any) =>
+            const alreadyLinked = store.getAllEdges().find((e: GraphEdge) =>
               (e.from === decisions[i].id && e.to === decisions[j].id) ||
               (e.from === decisions[j].id && e.to === decisions[i].id)
             );
@@ -118,9 +160,9 @@ export function createImpactRoutes(store: NexusStore) {
     const decisions = store.getAllDecisions();
     const edges = store.getAllEdges();
 
-    const centrality = decisions.map((d: any) => {
-      const inbound = edges.filter((e: any) => e.to === d.id).length;
-      const outbound = edges.filter((e: any) => e.from === d.id).length;
+    const centrality: CentralityEntry[] = decisions.map((d: Decision) => {
+      const inbound = edges.filter((e: GraphEdge) => e.to === d.id).length;
+      const outbound = edges.filter((e: GraphEdge) => e.from === d.id).length;
       const total = inbound + outbound;
       return {
         id: d.id,
@@ -132,8 +174,8 @@ export function createImpactRoutes(store: NexusStore) {
       };
     });
 
-    centrality.sort((a: any, b: any) => b.total - a.total);
-    const avg = centrality.reduce((s: number, c: any) => s + c.total, 0) / (centrality.length || 1);
+    centrality.sort((a, b) => b.total - a.total);
+    const avg = centrality.reduce((s, c) => s + c.total, 0) / (centrality.length || 1);
 
     res.json({
       centrality: centrality.slice(0, 20),
@@ -153,15 +195,15 @@ export function createImpactRoutes(store: NexusStore) {
 
     // BFS along led_to + depends_on edges, tracking depth
     const affectedRaw = traverseDirected(store, id, ['led_to', 'depends_on']);
-    const affected = affectedRaw.map((d: any) => ({
+    const affected = affectedRaw.map((d) => ({
       id: d.id,
       decision: d.decision,
       project: d.project,
       depth: d._depth,
     }));
-    const maxDepth = affected.reduce((m: number, d: any) => Math.max(m, d.depth || 0), 0);
+    const maxDepth = affected.reduce((m, d) => Math.max(m, d.depth || 0), 0);
 
-    const baseResult: any = {
+    const baseResult: ForecastResult = {
       decision,
       affectedCount: affected.length,
       affected,
@@ -172,7 +214,7 @@ export function createImpactRoutes(store: NexusStore) {
     try {
       const list = affected
         .slice(0, 12)
-        .map((d: any) => `- #${d.id} [${d.project}] ${d.decision}`)
+        .map((d) => `- #${d.id} [${d.project}] ${d.decision}`)
         .join('\n');
       const userPrompt = `Given this architectural decision: '${decision.decision}'. ` +
         `If we change or reverse this decision, these ${affected.length} downstream decisions would be affected: ` +
@@ -184,9 +226,9 @@ export function createImpactRoutes(store: NexusStore) {
       try {
         const modelsRes = await fetch('http://localhost:1234/v1/models', { signal: AbortSignal.timeout(5000) });
         if (modelsRes.ok) {
-          const modelsData: any = await modelsRes.json();
-          const first = (modelsData.data || []).find((m: any) => m.id && !m.id.includes('embed'));
-          if (first) modelName = first.id;
+          const modelsData: AIModelsResponse = await modelsRes.json();
+          const first = (modelsData.data || []).find((m) => m.id && !m.id.includes('embed'));
+          if (first?.id) modelName = first.id;
         }
       } catch {}
       const aiRes = await fetch('http://localhost:1234/v1/messages', {
@@ -201,9 +243,9 @@ export function createImpactRoutes(store: NexusStore) {
       });
 
       if (aiRes.ok) {
-        const data: any = await aiRes.json();
-        const textBlocks = (data.content || []).filter((b: any) => b.type === 'text');
-        const forecast = textBlocks.map((b: any) => b.text).join('\n').trim();
+        const data: AIMessagesResponse = await aiRes.json();
+        const textBlocks = (data.content || []).filter((b) => b.type === 'text');
+        const forecast = textBlocks.map((b) => b.text || '').join('\n').trim();
         if (forecast) baseResult.forecast = forecast;
       }
     } catch {
@@ -252,7 +294,7 @@ export function createImpactRoutes(store: NexusStore) {
 
       // Only consider edges where BOTH endpoints are in this project
       const intraEdges = edges.filter(
-        (e: any) => idSet.has(e.from) && idSet.has(e.to)
+        (e: GraphEdge) => idSet.has(e.from) && idSet.has(e.to)
       );
       for (const e of intraEdges) union(e.from, e.to);
 
@@ -273,7 +315,7 @@ export function createImpactRoutes(store: NexusStore) {
           sampleTitles: memberIds
             .slice(0, 3)
             .map((id) => {
-              const d = decisions.find((x: any) => x.id === id);
+              const d = decisions.find((x: Decision) => x.id === id);
               return d ? d.decision.slice(0, 60) : `#${id}`;
             }),
         }))
@@ -310,7 +352,7 @@ export function createImpactRoutes(store: NexusStore) {
         const aIds = new Set(projects[projectNames[i]]);
         const bIds = new Set(projects[projectNames[j]]);
         const links = edges.filter(
-          (e: any) =>
+          (e: GraphEdge) =>
             (aIds.has(e.from) && bIds.has(e.to)) ||
             (bIds.has(e.from) && aIds.has(e.to))
         );
@@ -344,9 +386,9 @@ export function createImpactRoutes(store: NexusStore) {
 }
 
 // Follow directed edges (led_to, depends_on) downstream
-function traverseDirected(store: NexusStore, startId: number, edgeTypes: string[], maxDepth = 4) {
+function traverseDirected(store: NexusStore, startId: number, edgeTypes: string[], maxDepth = 4): AffectedDecision[] {
   const visited = new Set<number>();
-  const result: any[] = [];
+  const result: AffectedDecision[] = [];
   const queue: { id: number; depth: number }[] = [{ id: startId, depth: 0 }];
 
   while (queue.length > 0) {
@@ -355,12 +397,12 @@ function traverseDirected(store: NexusStore, startId: number, edgeTypes: string[
     visited.add(id);
 
     if (id !== startId) {
-      const decision = store.getDecisionById( id);
+      const decision = store.getDecisionById(id);
       if (decision) result.push({ ...decision, _depth: depth });
     }
 
     // Only follow specified edge types, in the forward direction
-    const outEdges = store.getAllEdges().filter((e: any) => e.from === id && edgeTypes.includes(e.rel));
+    const outEdges = store.getAllEdges().filter((e: GraphEdge) => e.from === id && edgeTypes.includes(e.rel));
     for (const edge of outEdges) {
       if (!visited.has(edge.to)) queue.push({ id: edge.to, depth: depth + 1 });
     }
