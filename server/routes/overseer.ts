@@ -363,7 +363,7 @@ export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) 
     } else if (focus === 'core') {
       // Core files split into two batches for smaller context windows
       const CORE_BATCH_1 = [
-        'server/db/store.ts', 'server/types.ts', 'server/index.ts',
+        'server/db/store.ts', 'server/types.ts', 'server/dashboard.ts',
         'server/mcp/index.ts', 'server/lib/gpuSignal.ts', 'server/lib/embeddings.ts',
         'server/routes/tasks.ts',
       ];
