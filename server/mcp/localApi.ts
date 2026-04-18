@@ -229,6 +229,25 @@ export async function localApiFetch(path: string, init: LocalApiInit = {}): Prom
       : { ...index, memories: index.memories.slice(0, limit) };
   }
 
+  // ── Memory Bridge import (v4.3.8 #200) ────────────
+  // The MCP tool posts to /api/import-cc-memories (path stays flat for standalone).
+  // Dashboard mode uses /api/cc-memory/import via createMemoryRoutes — accept both here
+  // so the same MCP tool works in either mode without path-munging.
+  if ((pathname === '/api/import-cc-memories' || pathname === '/api/cc-memory/import') && method === 'POST') {
+    const result = store.importAllCCMemories({
+      project: typeof body.project === 'string' ? body.project : undefined,
+      dryRun: !!body.dry_run,
+      force: !!body.force,
+    });
+    if (!result.dryRun && (result.imported > 0 || result.updated > 0)) {
+      store.addActivity(
+        'memory_import',
+        `Memory Bridge -- imported ${result.imported}, updated ${result.updated}, skipped ${result.skipped}`
+      );
+    }
+    return result;
+  }
+
   // ── Overseer risks ────────────────────────────────
   if (pathname === '/api/overseer/risks') {
     // Lightweight risk scan — no AI needed

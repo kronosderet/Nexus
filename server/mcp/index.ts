@@ -396,7 +396,7 @@ const TOOLS: Tool[] = [
         rationale: { type: 'string', description: 'New context/rationale (optional).' },
         project: { type: 'string', description: 'New project assignment (optional).' },
         tags: { type: 'array', items: { type: 'string' }, description: 'New tags (optional).' },
-        lifecycle: { type: 'string', enum: ['proposed', 'active', 'validated', 'deprecated'], description: 'Decision lifecycle state (optional).' },
+        lifecycle: { type: 'string', enum: ['proposed', 'active', 'validated', 'deprecated', 'reference'], description: 'Decision lifecycle state (optional). \'reference\' marks imported CC memories — v4.3.8.' },
         confidence: { type: 'number', description: 'Confidence score 0-1 (optional).' },
       },
       required: ['id'],
@@ -869,6 +869,36 @@ const TOOLS: Tool[] = [
       'Call this when you need to verify which Nexus build is serving the session (after an MCPB update, a Claude Desktop restart, ' +
       'or when debugging a tool that should exist but doesn\'t). Cheap and side-effect-free.',
     inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    // v4.3.8 #200 — Memory Bridge first-run import. Turns CC\'s auto-memory files
+    // (~/.claude/projects/*/memory/*.md) into first-class `lifecycle: \'reference\'` decisions
+    // in the Ledger so they become searchable, taggable, and link-targetable. Idempotent.
+    name: 'nexus_import_cc_memories',
+    description:
+      'Import Claude Code\'s auto-memory files as reference decisions in The Ledger. ' +
+      'Scans ~/.claude/projects/*/memory/*.md (what CC writes automatically) and inserts each ' +
+      'as a decision with lifecycle=\'reference\' and tag \'cc-memory\'. Dedup by file path — ' +
+      'safe to re-run; skips already-imported memories and refreshes ones whose content changed. ' +
+      'Use dry_run first to preview what would be imported. References don\'t pollute getActiveDecisions ' +
+      'or test-gap analysis but ARE searchable via nexus_search and linkable via nexus_link_decisions.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project: {
+          type: 'string',
+          description: 'Optional: only import memories whose inferred project matches (case-insensitive). E.g. "Nexus", "Shadowrun".',
+        },
+        dry_run: {
+          type: 'boolean',
+          description: 'If true, report counts + samples without writing. Recommended for the first invocation. Default false.',
+        },
+        force: {
+          type: 'boolean',
+          description: 'If true, re-import even already-tracked memories (refreshes their decision content). Default false.',
+        },
+      },
+    },
   },
 ];
 
@@ -1603,6 +1633,44 @@ async function handleTool(name: string, args: any): Promise<string> {
         `  applied_migrations: ${appliedMigrations.length > 0 ? appliedMigrations.join(', ') : '(none)'}`,
         `  overseer:           ${ai.available ? `${ai.provider} · ${ai.model}` : 'unavailable'}`,
       ];
+      return lines.join('\n');
+    }
+
+    case 'nexus_import_cc_memories': {
+      // v4.3.8 #200 — Memory Bridge first-run import.
+      const body = JSON.stringify({
+        project: args?.project,
+        dry_run: !!args?.dry_run,
+        force: !!args?.force,
+      });
+      type ImportResult = {
+        imported: number; skipped: number; updated: number; failed: number;
+        totalScanned: number; dryRun: boolean;
+        samples: Array<{ path: string; project: string | null; type: string; name: string; action: string }>;
+      };
+      const result = await nexusFetch('/api/import-cc-memories', { method: 'POST', body }) as ImportResult;
+
+      const header = result.dryRun ? '◈ Memory Bridge import — dry run' : '◈ Memory Bridge import complete';
+      const lines = [
+        header,
+        `  ${result.totalScanned} memor${result.totalScanned === 1 ? 'y' : 'ies'} scanned${args?.project ? ` (filtered to project: ${args.project})` : ''}`,
+        `  · ${result.imported} new${result.dryRun ? ' (would import)' : ''}`,
+        `  · ${result.skipped} already on file (skipped)`,
+        `  · ${result.updated} updated${result.dryRun ? ' (would refresh)' : ''}`,
+      ];
+      if (result.failed > 0) lines.push(`  · ${result.failed} failed — see server logs`);
+      if (result.samples.length > 0) {
+        lines.push('');
+        lines.push('  Samples:');
+        for (const s of result.samples) {
+          const projTag = s.project ? ` (${s.project})` : '';
+          lines.push(`    › [${s.type}] ${s.name}${projTag}  ${s.action}`);
+        }
+      }
+      if (result.dryRun && (result.imported > 0 || result.updated > 0)) {
+        lines.push('');
+        lines.push('  Re-invoke without dry_run to apply.');
+      }
       return lines.join('\n');
     }
 

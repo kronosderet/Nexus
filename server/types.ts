@@ -70,7 +70,10 @@ export interface Decision {
   tags: string[];
   created_at: string;
   deprecated?: boolean;
-  lifecycle?: 'proposed' | 'active' | 'validated' | 'deprecated';  // v4.2
+  // v4.3.8 #200 — 'reference' marks a Decision imported from CC's auto-memory files
+  // (via nexus_import_cc_memories). References are opt-in: excluded from
+  // getActiveDecisions() and test-gap analysis, but still searchable and link-targetable.
+  lifecycle?: 'proposed' | 'active' | 'validated' | 'deprecated' | 'reference';  // v4.2 + v4.3.8
   confidence?: number;        // v4.2: 0-1 scale
   last_reviewed_at?: string;  // v4.2: ISO timestamp
 }
@@ -164,6 +167,10 @@ export interface NexusData {
   // v4.3.6 M1 — tracks which idempotent one-shot migrations have run so cold-start
   // doesn't re-scan all tasks/decisions every time. Keys are migration IDs like "v4.3.5-C1".
   _appliedMigrations?: Record<string, string>; // migration_id → ISO timestamp applied
+  // v4.3.8 #200 — tracks CC memory files imported as reference Decisions.
+  // Key = absolute file path, value = {decisionId, mtime at time of import}.
+  // Lets nexus_import_cc_memories skip already-imported memories and detect content drift.
+  _memoryImports?: Record<string, { decisionId: number; mtime: string }>;
 }
 
 export interface ScheduledScan {
