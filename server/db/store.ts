@@ -7,6 +7,7 @@ import type {
   Bookmark, AdviceEntry, Thought, RiskItem,
 } from '../types.js';
 import { findSimilar } from '../lib/embeddings.ts';
+import { scanCCMemories, type MemoryEntry } from '../lib/memoryIndex.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -68,6 +69,8 @@ export class NexusStore {
     if (!this.data.bookmarks) this.data.bookmarks = [];
     if (!this.data.advice) this.data.advice = [];
     if (!this.data.thoughts) this.data.thoughts = [];
+    // v4.3.8 #200 — initialize CC memory import map. Used by importCCMemory/importAllCCMemories.
+    if (!this.data._memoryImports) this.data._memoryImports = {};
 
     const safeMax = (arr: number[]) => arr.reduce((m, v) => v > m ? v : m, 0);
     this._nextId = {
@@ -260,7 +263,10 @@ export class NexusStore {
   // ── Typed accessors for Ledger / Graph / Timing ────────
   // These replace (store as any).data.* casts in route files.
   getAllDecisions(): Decision[] { return this.data.ledger || []; }
-  getActiveDecisions(): Decision[] { return (this.data.ledger || []).filter(d => !d.deprecated && d.lifecycle !== 'deprecated'); }
+  // v4.3.8 #200 — exclude 'reference' (imported CC memories) from active decisions so
+  // they don't pollute briefs, centrality counts, or the default Ledger surface. They
+  // remain searchable and link-targetable via getAllDecisions / getLedger({ tag }).
+  getActiveDecisions(): Decision[] { return (this.data.ledger || []).filter(d => !d.deprecated && d.lifecycle !== 'deprecated' && d.lifecycle !== 'reference'); }
   getDecisionById(id: number): Decision | null { return (this.data.ledger || []).find(d => d.id === id) || null; }
   deprecateDecision(id: number): Decision | null {
     const d = this.getDecisionById(id);
@@ -587,20 +593,130 @@ export class NexusStore {
     return entries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, limit);
   }
 
-  recordDecision({ decision, context = '', project = 'general', alternatives = [], tags = [] }: {
+  recordDecision({ decision, context = '', project = 'general', alternatives = [], tags = [], lifecycle = 'active', autoLink = true }: {
     decision: string; context?: string; project?: string; alternatives?: string[]; tags?: string[];
+    // v4.3.8 #200 — let callers set lifecycle explicitly (was hardcoded 'active'). Needed for
+    // bulk imports of CC memories as 'reference', and future 'proposed' creation from overseer.
+    lifecycle?: Decision['lifecycle'];
+    // v4.3.8 #200 — skip auto-linking for bulk imports. Default preserves existing behavior.
+    // Without this, importing ~50 memories would manufacture hundreds of noisy `related` edges.
+    autoLink?: boolean;
   }): Decision {
     if (!this.data.ledger) this.data.ledger = [];
     const entry: Decision = {
       id: this._nextLedgerId++,
       decision, context, project, alternatives, tags, created_at: this._now(),
-      lifecycle: 'active',
+      lifecycle,
     };
     this.data.ledger.push(entry);
-    // Auto-link: find related decisions by keyword overlap
-    const linked = this._autoLinkDecision(entry);
+    // Auto-link: find related decisions by keyword overlap (+ async semantic link).
+    if (autoLink) this._autoLinkDecision(entry);
     this._flush();
     return entry;
+  }
+
+  // ── Memory Bridge import (v4.3.8 #200) ───────────────
+  // Imports CC's auto-memory files (scanned via lib/memoryIndex.ts) as reference
+  // decisions in the Ledger. Dedup via _memoryImports map. Handles mtime drift by
+  // updating linked decisions rather than creating duplicates.
+
+  /** Build the `context` body for a reference decision from a MemoryEntry. */
+  private _buildMemoryContext(entry: MemoryEntry): string {
+    const parts: string[] = [];
+    if (entry.description) parts.push(entry.description);
+    if (entry.snippet) parts.push(entry.snippet);
+    parts.push(`[Imported from ${entry.path}]`);
+    return parts.join('\n\n').slice(0, 600);
+  }
+
+  /** Import a single MemoryEntry as a 'reference' Decision. Idempotent via _memoryImports map.
+   *  Returns action: 'imported' (new), 'updated' (mtime drifted or force), 'skipped' (no change). */
+  importCCMemory(entry: MemoryEntry, opts: { force?: boolean } = {}): { decision: Decision; action: 'imported' | 'updated' | 'skipped' } {
+    if (!this.data._memoryImports) this.data._memoryImports = {};
+    const existing = this.data._memoryImports[entry.path];
+    const newTitle = `[${entry.type}] ${entry.name}`.slice(0, 200);
+    const newContext = this._buildMemoryContext(entry);
+
+    if (existing) {
+      const decision = this.getDecisionById(existing.decisionId);
+      if (!decision) {
+        // Stale map entry — underlying decision was deleted. Clear and re-import fresh.
+        delete this.data._memoryImports[entry.path];
+      } else if (!opts.force && existing.mtime === entry.mtime) {
+        // No drift, no force — skip
+        return { decision, action: 'skipped' };
+      } else {
+        // Update in place
+        decision.decision = newTitle;
+        decision.context = newContext;
+        decision.last_reviewed_at = this._now();
+        this.data._memoryImports[entry.path] = { decisionId: decision.id, mtime: entry.mtime };
+        this._flush();
+        return { decision, action: 'updated' };
+      }
+    }
+
+    // Fresh import — recordDecision with autoLink disabled to avoid graph spam.
+    const decision = this.recordDecision({
+      decision: newTitle,
+      context: newContext,
+      project: entry.project || 'general',
+      tags: ['cc-memory', entry.type, entry.encodedProject],
+      lifecycle: 'reference',
+      autoLink: false,
+    });
+    this.data._memoryImports[entry.path] = { decisionId: decision.id, mtime: entry.mtime };
+    this._flush();
+    return { decision, action: 'imported' };
+  }
+
+  /** Scan all CC memory files and import as reference decisions. Idempotent.
+   *  dryRun: report counts + samples without writing.
+   *  force: re-import even if already tracked (refresh content).
+   *  project: only import memories whose inferred project matches (case-insensitive). */
+  importAllCCMemories(opts: { dryRun?: boolean; force?: boolean; project?: string } = {}): {
+    imported: number; skipped: number; updated: number; failed: number;
+    totalScanned: number; dryRun: boolean;
+    samples: Array<{ path: string; project: string | null; type: string; name: string; action: string }>;
+  } {
+    const index = scanCCMemories(9999);
+    const baseResult = { imported: 0, skipped: 0, updated: 0, failed: 0, totalScanned: 0, dryRun: !!opts.dryRun, samples: [] as Array<{ path: string; project: string | null; type: string; name: string; action: string }> };
+    if (!index.available) return baseResult;
+
+    let memories = index.memories;
+    if (opts.project) {
+      const target = opts.project.toLowerCase();
+      memories = memories.filter(m => (m.project || '').toLowerCase() === target);
+    }
+
+    const counts = { imported: 0, skipped: 0, updated: 0, failed: 0 };
+    const samples: Array<{ path: string; project: string | null; type: string; name: string; action: string }> = [];
+    const importsMap = this.data._memoryImports || {};
+
+    for (const entry of memories) {
+      try {
+        let action: 'imported' | 'updated' | 'skipped';
+        if (opts.dryRun) {
+          const existing = importsMap[entry.path];
+          if (!existing) action = 'imported';
+          else if (!opts.force && existing.mtime === entry.mtime) action = 'skipped';
+          else action = 'updated';
+        } else {
+          ({ action } = this.importCCMemory(entry, { force: opts.force }));
+        }
+        counts[action]++;
+        if (samples.length < 8 && action !== 'skipped') {
+          samples.push({ path: entry.path, project: entry.project, type: entry.type, name: entry.name, action });
+        }
+      } catch (err) {
+        counts.failed++;
+        if (process.env.NEXUS_DEBUG) {
+          console.warn(`[memory-import] failed for ${entry.path}:`, (err as Error).message);
+        }
+      }
+    }
+
+    return { ...counts, totalScanned: memories.length, dryRun: !!opts.dryRun, samples };
   }
 
   /** Auto-link a new decision to existing ones via semantic + keyword similarity. */

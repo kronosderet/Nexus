@@ -63,6 +63,7 @@ async function start() {
   const { createGitHubRoutes } = await import('./routes/github.ts');
   const { createSmartSearchRoutes } = await import('./routes/smartSearch.ts');
   const { createEmbeddingRoutes } = await import('./routes/embeddings.ts');
+  const { createMemoryRoutes } = await import('./routes/memory.ts');
   const { SERVER_VERSION } = await import('./lib/version.ts');
 
   const store = new NexusStore();
@@ -129,6 +130,9 @@ async function start() {
   app.use('/api/github', createGitHubRoutes(store, broadcast));
   app.use('/api/smart-search', createSmartSearchRoutes(store));
   app.use('/api/embeddings', createEmbeddingRoutes(store));
+  // v4.3.8 #200 — was previously only served by localApi.ts in standalone mode.
+  // Wire here so dashboard mode handles GET /api/cc-memory and POST /api/cc-memory/import.
+  app.use('/api/cc-memory', createMemoryRoutes(store, broadcast));
 
   // Fleet overview (cross-project priority)
   app.get('/api/fleet', (_req, res) => res.json(store.getFleetOverview()));
