@@ -128,6 +128,23 @@ function OverviewView({ graph, centrality, contradictions, holes }) {
   const edgeTypes = {};
   for (const e of graph?.edges || []) edgeTypes[e.rel] = (edgeTypes[e.rel] || 0) + 1;
 
+  // v4.3.10 #271 — classify `related` edges by origin. store.ts marks them:
+  //   "auto-linked (N% keyword overlap)"      → keyword-auto (sync)
+  //   "semantic-linked (N% cosine similarity)" → semantic-auto (async embeddings)
+  //   everything else                          → manual (user-created via nexus_link_decisions)
+  // Surfaces signal-vs-noise ratio on the dominant edge type (~76% `related` today).
+  const relatedBreakdown = (() => {
+    const bk = { keyword: 0, semantic: 0, manual: 0 };
+    for (const e of graph?.edges || []) {
+      if (e.rel !== 'related') continue;
+      const note = String(e.note || '');
+      if (note.includes('auto-linked')) bk.keyword++;
+      else if (note.includes('semantic-linked')) bk.semantic++;
+      else bk.manual++;
+    }
+    return bk;
+  })();
+
   // Project breakdown
   const projects = {};
   for (const n of graph?.nodes || []) projects[n.project] = (projects[n.project] || 0) + 1;
@@ -157,10 +174,29 @@ function OverviewView({ graph, centrality, contradictions, holes }) {
         <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Edge Types</span>
         <div className="mt-2 space-y-1">
           {Object.entries(edgeTypes).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
-            <div key={type} className="flex items-center gap-2">
-              <span className="text-xs font-mono text-nexus-text-dim w-24">{type}</span>
-              <div className="flex-1 h-1.5 bg-nexus-bg rounded-full"><div className="h-full bg-nexus-amber/50 rounded-full" style={{ width: `${(count / (Math.max(...Object.values(edgeTypes)) || 1)) * 100}%` }} /></div>
-              <span className="text-xs font-mono text-nexus-text-faint w-8 text-right">{count}</span>
+            <div key={type}>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-nexus-text-dim w-24">{type}</span>
+                <div className="flex-1 h-1.5 bg-nexus-bg rounded-full"><div className="h-full bg-nexus-amber/50 rounded-full" style={{ width: `${(count / (Math.max(...Object.values(edgeTypes)) || 1)) * 100}%` }} /></div>
+                <span className="text-xs font-mono text-nexus-text-faint w-8 text-right">{count}</span>
+              </div>
+              {/* v4.3.10 #271 — `related` origin breakdown so auto-link noise is separable from
+                  real manual links. Only shown for the dominant type. */}
+              {type === 'related' && count > 0 && (
+                <div className="flex items-center gap-3 pl-26 mt-0.5 ml-24 text-[9px] font-mono text-nexus-text-faint">
+                  <span title="Auto-linked by keyword overlap (store.ts _autoLinkDecision)">
+                    keyword-auto <span className="text-nexus-text-dim">{relatedBreakdown.keyword}</span>
+                  </span>
+                  <span className="text-nexus-border">·</span>
+                  <span title="Auto-linked by semantic similarity (embeddings + cosine)">
+                    semantic-auto <span className="text-nexus-text-dim">{relatedBreakdown.semantic}</span>
+                  </span>
+                  <span className="text-nexus-border">·</span>
+                  <span title="Manually linked via nexus_link_decisions">
+                    manual <span className={relatedBreakdown.manual > 0 ? 'text-nexus-green' : 'text-nexus-text-dim'}>{relatedBreakdown.manual}</span>
+                  </span>
+                </div>
+              )}
             </div>
           ))}
         </div>
