@@ -37,22 +37,60 @@ function probePort(host, port, timeoutMs = 200) {
   });
 }
 
+// v4.4.0 #369 — canonical project-name map catches lowercase-drift at detection time
+// (pkg.json "name" fields are always lowercase but the Ledger uses capital form).
+// Paired with the v4.4.0-H2 store migration that normalizes existing records.
+const PROJECT_CASE_MAP = new Map([
+  ['nexus', 'Nexus'],
+  ['nexus-cli', 'Nexus'],
+  ['direwolf', 'direwolf'],  // stays lowercase — canonical
+]);
+function normalizeProjectName(name) {
+  if (!name) return name;
+  const mapped = PROJECT_CASE_MAP.get(name.toLowerCase());
+  return mapped || name;
+}
+
+// v4.4.0 #369 — smarter project detection, four-tier fallback.
+// Before: pkg.json name → git origin → cwd basename. Missed CLAUDE.md hints.
+// Now adds a primary CLAUDE.md check for explicit "Project: <name>" markers, and
+// normalizes every output through the canonical casing map.
 function detectProject() {
   const cwd = process.cwd();
+
+  // 1. CLAUDE.md explicit marker (most authoritative — user-written intent)
+  try {
+    const claudeMd = join(cwd, 'CLAUDE.md');
+    if (existsSync(claudeMd)) {
+      const content = readFileSync(claudeMd, 'utf-8').slice(0, 4000);
+      const match = content.match(/^#\s+(.+?)\s*(?:—|$)/m); // "# Project Name" on first heading
+      if (match?.[1]) {
+        const name = match[1].trim().split(/\s+/)[0]; // first word
+        if (name && name.length > 1) return normalizeProjectName(name);
+      }
+    }
+  } catch {}
+
+  // 2. package.json name (most common; lowercase by npm convention)
   try {
     const pkgPath = join(cwd, 'package.json');
     if (existsSync(pkgPath)) {
       const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
       const name = (pkg.name || '').replace(/^@[^/]+\//, '');
-      if (name.length > 1) return name;
+      if (name.length > 1) return normalizeProjectName(name);
     }
   } catch {}
+
+  // 3. git origin URL (repo name from remote)
   try {
     const remote = execSync('git remote get-url origin', { cwd, encoding: 'utf-8', timeout: 2000 }).trim();
     const match = remote.match(/[/:]([^/]+?)(?:\.git)?$/);
-    if (match?.[1]) return match[1];
+    if (match?.[1]) return normalizeProjectName(match[1]);
   } catch {}
-  return cwd.split(/[/\\]/).pop() || 'unknown';
+
+  // 4. CWD basename fallback
+  const fallback = cwd.split(/[/\\]/).pop() || 'unknown';
+  return normalizeProjectName(fallback);
 }
 
 async function main() {

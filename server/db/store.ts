@@ -249,6 +249,42 @@ export class NexusStore {
       markApplied('v4.3.9-H1');
     }
 
+    // v4.4.0 H2 — second hygiene pass catching residue v4.3.9-H1 didn't touch.
+    // Observed in the beta SessionStart hook output: "Fleet uncommitted: Nexus: 1 · nexus: 1"
+    // means the sessions log contains BOTH case variants of "Nexus" as distinct project keys.
+    // This extends the casing-normalization map with the lowercase-first-letter pattern and
+    // does one more sweep. Any future drift gets added here.
+    if (!applied['v4.4.0-H2']) {
+      const caseMapV2 = new Map<string, string>([
+        // "nexus" (lowercase, from hook's detectProject reading pkg.json "name") → "Nexus"
+        ['nexus', 'Nexus'],
+      ]);
+      const normalize = (p: string | undefined): { value: string | undefined; changed: boolean } => {
+        if (!p) return { value: p, changed: false };
+        const mapped = caseMapV2.get(p);
+        if (mapped && mapped !== p) return { value: mapped, changed: true };
+        return { value: p, changed: false };
+      };
+      let casingFixedV2 = 0;
+      for (const t of this.data.tasks) {
+        const n = normalize(t.project);
+        if (n.changed) { t.project = n.value!; casingFixedV2++; }
+      }
+      for (const s of this.data.sessions || []) {
+        const n = normalize(s.project);
+        if (n.changed) { s.project = n.value!; casingFixedV2++; }
+      }
+      for (const d of this.data.ledger || []) {
+        const n = normalize(d.project);
+        if (n.changed) { d.project = n.value!; casingFixedV2++; }
+      }
+      if (casingFixedV2 > 0) {
+        console.error(`◈ Migration v4.4.0 H2: normalized ${casingFixedV2} 'nexus' → 'Nexus' casing issues.`);
+        changed += casingFixedV2;
+      }
+      markApplied('v4.4.0-H2');
+    }
+
     if (changed > 0) this._flush();
   }
 
