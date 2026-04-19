@@ -77,20 +77,34 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
     res.json({ extracted: added, total: (store.getAllDecisions()).length });
   });
 
-  // Auto-link: use AI to find relationships between decisions
+  // Auto-link: find relationships between decisions via temporal + keyword + tag heuristics.
+  // v4.3.10 #272 — supports ?dry_run=true (or body.dry_run=true) which returns the counts +
+  // up to 10 sample proposed edges without writing. Lets the UI preview scope before committing.
   router.post('/auto-link', async (req: Request, res: Response) => {
+    const dryRun = req.query.dry_run === 'true' || req.body?.dry_run === true;
     const decisions = store.getLedger({ limit: 60 });
-    if (decisions.length < 2) return res.json({ linked: 0 });
+    if (decisions.length < 2) return res.json({ linked: 0, dryRun, samples: [] });
 
     // Group by project for intra-project linking
-    const byProject: Record<string, any[]> = {};
+    const byProject: Record<string, Decision[]> = {};
     for (const d of decisions) {
       if (!byProject[d.project]) byProject[d.project] = [];
       byProject[d.project].push(d);
     }
 
     let linked = 0;
+    const samples: Array<{ from: number; to: number; rel: string; note: string }> = [];
     const existingEdges = new Set(store.getAllEdges().map((e: GraphEdge) => `${e.from}-${e.to}`));
+    const commit = (from: number, to: number, rel: GraphEdge['rel'], note: string) => {
+      if (dryRun) {
+        if (samples.length < 10) samples.push({ from, to, rel, note });
+      } else {
+        store.addEdge(from, to, rel, note);
+      }
+      const key = `${from}-${to}`;
+      existingEdges.add(key);
+      linked++;
+    };
 
     for (const [project, decs] of Object.entries(byProject)) {
       // Link sequential decisions in same project (temporal chain)
@@ -99,13 +113,11 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
         const key = `${sorted[i].id}-${sorted[i+1].id}`;
         const keyRev = `${sorted[i+1].id}-${sorted[i].id}`;
         if (!existingEdges.has(key) && !existingEdges.has(keyRev)) {
-          store.addEdge(sorted[i].id, sorted[i + 1].id, 'led_to', `Sequential in ${project}`);
-          existingEdges.add(key);
-          linked++;
+          commit(sorted[i].id, sorted[i + 1].id, 'led_to', `Sequential in ${project}`);
         }
       }
 
-      // Link decisions that share keywords (semantic similarity via text overlap)
+      // Link decisions that share keywords (text overlap)
       for (let i = 0; i < decs.length; i++) {
         for (let j = i + 1; j < decs.length; j++) {
           const key = `${decs[i].id}-${decs[j].id}`;
@@ -114,19 +126,17 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
 
           const wordsA = new Set(decs[i].decision.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3));
           const wordsB = new Set(decs[j].decision.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3));
-          const overlap = [...wordsA].filter(w => wordsB.has(w)).length;
+          const shared = [...wordsA].filter(w => wordsB.has(w));
 
-          if (overlap >= 2) {
-            store.addEdge(decs[i].id, decs[j].id, 'related', `Shared terms: ${[...wordsA].filter(w => wordsB.has(w)).join(', ')}`);
-            existingEdges.add(key);
-            linked++;
+          if (shared.length >= 2) {
+            commit(decs[i].id, decs[j].id, 'related', `Shared terms: ${shared.join(', ')}`);
           }
         }
       }
     }
 
     // Cross-project: link decisions with same tags
-    const byTag: Record<string, any[]> = {};
+    const byTag: Record<string, Decision[]> = {};
     for (const d of decisions) {
       for (const t of (d.tags || [])) {
         if (!byTag[t]) byTag[t] = [];
@@ -140,16 +150,16 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
           const key = `${decs[i].id}-${decs[j].id}`;
           const keyRev = `${decs[j].id}-${decs[i].id}`;
           if (existingEdges.has(key) || existingEdges.has(keyRev)) continue;
-          store.addEdge(decs[i].id, decs[j].id, 'related', `Shared tag: ${tag}`);
-          existingEdges.add(key);
-          linked++;
+          commit(decs[i].id, decs[j].id, 'related', `Shared tag: ${tag}`);
         }
       }
     }
 
-    const entry = store.addActivity('graph', `Knowledge Graph: auto-linked ${linked} connections`);
-    broadcast({ type: 'activity', payload: entry });
-    res.json({ linked, totalEdges: store.getAllEdges().length });
+    if (!dryRun && linked > 0) {
+      const entry = store.addActivity('graph', `Knowledge Graph: auto-linked ${linked} connections`);
+      broadcast({ type: 'activity', payload: entry });
+    }
+    res.json({ linked, totalEdges: store.getAllEdges().length, dryRun, samples });
   });
 
   // ── Knowledge Graph edges ──────────────

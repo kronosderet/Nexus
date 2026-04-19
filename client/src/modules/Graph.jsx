@@ -52,9 +52,26 @@ export default function GraphModule() {
   const holes = graphSlice.data?.holes || null;
   const loading = graphSlice.loading;
 
-  async function autoLink() {
-    try { await api.autoLinkGraph(); graphSlice.refresh(); } catch {}
+  // v4.3.10 #272 — two-phase auto-link: preview then confirm. Users get a count +
+  // sample edges before any writes happen, so they can see whether to proceed.
+  const [autoLinkPreview, setAutoLinkPreview] = useState(null);
+  const [autoLinkBusy, setAutoLinkBusy] = useState(false);
+  async function autoLinkPreviewRun() {
+    setAutoLinkBusy(true);
+    try {
+      const preview = await api.autoLinkGraphPreview();
+      setAutoLinkPreview(preview);
+    } catch {} finally { setAutoLinkBusy(false); }
   }
+  async function autoLinkConfirm() {
+    setAutoLinkBusy(true);
+    try {
+      await api.autoLinkGraph();
+      setAutoLinkPreview(null);
+      graphSlice.refresh();
+    } catch {} finally { setAutoLinkBusy(false); }
+  }
+  function autoLinkCancel() { setAutoLinkPreview(null); }
 
   async function runBlast() {
     if (!blastId) return;
@@ -107,10 +124,64 @@ export default function GraphModule() {
           );
         })}
         <div className="flex-1" />
-        <button onClick={autoLink} className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono text-nexus-text-faint hover:text-nexus-amber border border-nexus-border rounded transition-colors">
+        <button
+          onClick={autoLinkPreviewRun}
+          disabled={autoLinkBusy || !!autoLinkPreview}
+          className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono text-nexus-text-faint hover:text-nexus-amber border border-nexus-border rounded transition-colors disabled:opacity-50"
+          title="Preview proposed auto-links before committing"
+        >
           <RefreshCw size={10} /> Auto-link
         </button>
       </div>
+
+      {/* v4.3.10 #272 — preview panel shown when autoLinkPreview is populated.
+          Displays proposed count + up to 10 sample edges, with Confirm/Cancel. */}
+      {autoLinkPreview && (
+        <div className="mb-4 bg-nexus-surface border border-nexus-amber/30 rounded-xl p-4">
+          <div className="flex items-baseline justify-between mb-2">
+            <h3 className="text-sm text-nexus-text">
+              Auto-link preview &mdash; would create <span className="text-nexus-amber">{autoLinkPreview.linked}</span> new edge{autoLinkPreview.linked !== 1 ? 's' : ''}
+            </h3>
+            <span className="text-[10px] font-mono text-nexus-text-faint">
+              graph would grow to {autoLinkPreview.totalEdges + autoLinkPreview.linked}
+            </span>
+          </div>
+          {autoLinkPreview.samples?.length > 0 && (
+            <div className="space-y-1 mb-3 max-h-40 overflow-y-auto">
+              {autoLinkPreview.samples.map((s, i) => (
+                <div key={i} className="text-[10px] font-mono text-nexus-text-faint flex items-baseline gap-2">
+                  <span className="text-nexus-amber shrink-0">#{s.from}</span>
+                  <span className="text-nexus-text-dim">&rarr;</span>
+                  <span className="text-nexus-amber shrink-0">#{s.to}</span>
+                  <span className="text-nexus-blue shrink-0">[{s.rel}]</span>
+                  <span className="truncate" title={s.note}>{s.note}</span>
+                </div>
+              ))}
+              {autoLinkPreview.linked > autoLinkPreview.samples.length && (
+                <p className="text-[10px] font-mono text-nexus-text-faint pl-2">
+                  &hellip; +{autoLinkPreview.linked - autoLinkPreview.samples.length} more (samples capped at 10)
+                </p>
+              )}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={autoLinkConfirm}
+              disabled={autoLinkBusy || autoLinkPreview.linked === 0}
+              className="px-3 py-1 rounded bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/30 text-xs font-mono hover:bg-nexus-amber/20 disabled:opacity-50"
+            >
+              {autoLinkBusy ? 'Committing&hellip;' : `Commit ${autoLinkPreview.linked} edge${autoLinkPreview.linked !== 1 ? 's' : ''}`}
+            </button>
+            <button
+              onClick={autoLinkCancel}
+              disabled={autoLinkBusy}
+              className="px-3 py-1 rounded border border-nexus-border text-xs font-mono text-nexus-text-faint hover:text-nexus-text disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Views */}
       {view === 'overview' && <OverviewView graph={graph} centrality={centrality} contradictions={contradictions} holes={holes} />}
