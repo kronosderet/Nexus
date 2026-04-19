@@ -88,6 +88,8 @@ export const api = {
   // ── Ledger / Graph ─────────────────────────────────────
   getGraphFull: () => request('/ledger/graph/full'),
   autoLinkGraph: () => request('/ledger/auto-link', { method: 'POST' }),
+  // v4.3.10 #272 — dry-run variant returns { linked, samples } without writing.
+  autoLinkGraphPreview: () => request('/ledger/auto-link?dry_run=true', { method: 'POST' }),
 
   // ── Impact ─────────────────────────────────────────────
   getImpactBlast: (id) => request(`/impact/blast/${id}`),
