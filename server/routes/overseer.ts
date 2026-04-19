@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { execSync } from 'child_process';
 import { readdirSync, readFileSync, statSync } from 'fs';
+import os from 'os';
 import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
 import { createGpuAwareSignal } from '../lib/gpuSignal.ts';
@@ -662,9 +663,53 @@ Propose edges from the SUBJECT to one or more CANDIDATES. Remember: JSON only, m
       }
     }
 
-    // Usage warnings
+    // Usage warnings — weekly
     if (ctx.usage?.weekly_percent != null && ctx.usage.weekly_percent <= 20) {
       risks.push({ level: 'critical', category: 'fuel', message: `Weekly Claude usage at ${ctx.usage.weekly_percent}% — ration carefully` });
+    }
+
+    // v4.3.9 #341 — session-fuel pressure (was missing; only weekly was checked).
+    // Tight session budget matters even when weekly is fine.
+    if (ctx.usage?.session_percent != null) {
+      if (ctx.usage.session_percent <= 10) {
+        risks.push({ level: 'critical', category: 'fuel', message: `Session fuel at ${ctx.usage.session_percent}% — wrap up or pivot to a small task`, fix: { cmd: 'nexus fuel', label: 'View fuel' } });
+      } else if (ctx.usage.session_percent <= 20) {
+        risks.push({ level: 'warning', category: 'fuel', message: `Session fuel at ${ctx.usage.session_percent}% — ration remaining tasks`, fix: { cmd: 'nexus fuel', label: 'View fuel' } });
+      }
+    }
+
+    // v4.3.9 #341 — system memory pressure. Local-AI workloads (LM Studio, embeddings)
+    // hit this hard. Reading os directly: cheap, no exec, no FS.
+    const memPct = Math.round(((os.totalmem() - os.freemem()) / os.totalmem()) * 100);
+    if (memPct >= 95) {
+      risks.push({ level: 'critical', category: 'memory', message: `System memory at ${memPct}% — heavy work will swap or OOM` });
+    } else if (memPct >= 85) {
+      risks.push({ level: 'warning', category: 'memory', message: `System memory at ${memPct}% — consider closing apps before running Overseer` });
+    }
+
+    // v4.3.9 #341 — VRAM pressure from the most recent GPU snapshot already in store
+    // (no nvidia-smi exec per request). Overseer itself uses VRAM, so this is a feedback loop.
+    const gpuHistory = store.getGpuHistory(1); // last hour
+    const latestGpu = gpuHistory[gpuHistory.length - 1];
+    if (latestGpu && latestGpu.vram_total > 0) {
+      const vramPct = Math.round((latestGpu.vram_used / latestGpu.vram_total) * 100);
+      if (vramPct >= 95) {
+        risks.push({ level: 'critical', category: 'vram', message: `VRAM at ${vramPct}% (${latestGpu.vram_used}/${latestGpu.vram_total} MiB) — unload a model before the next Overseer call` });
+      } else if (vramPct >= 85) {
+        risks.push({ level: 'warning', category: 'vram', message: `VRAM at ${vramPct}% — next local-AI call may fail or page-thrash` });
+      }
+    }
+
+    // v4.3.9 #341 — orphan decisions. Signals knowledge-graph health.
+    // Orphan = decision with zero in/out edges.
+    const allEdges = store.getAllEdges();
+    const connected = new Set<number>();
+    for (const e of allEdges) { connected.add(e.from); connected.add(e.to); }
+    const orphanCount = store.getAllDecisions().filter(d => !connected.has(d.id)).length;
+    if (orphanCount >= 10) {
+      risks.push({ level: 'warning', category: 'orphans', message: `${orphanCount} orphan decisions — knowledge graph fragmenting`, fix: { cmd: 'nexus graph holes', label: 'Review holes' } });
+    } else if (orphanCount >= 5) {
+      risks.push({ level: 'info', category: 'orphans', message: `${orphanCount} orphan decisions — consider linking via nexus_link_decisions`, fix: { cmd: 'nexus graph holes', label: 'Review holes' } });
     }
 
     res.json({ risks, scannedAt: new Date().toISOString() });
