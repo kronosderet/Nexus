@@ -7,6 +7,7 @@ import {
   Layers, Plus, Trash2, GripVertical, Search, Filter,
 } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
+import FuelFreshnessStamp from '../components/FuelFreshnessStamp.jsx';
 
 // ── Shared helpers ──────────────────────────────────────
 
@@ -70,6 +71,42 @@ const COLUMNS = [
   { key: 'review', label: 'Review', color: 'border-nexus-blue' },
   { key: 'done', label: 'Done', color: 'border-nexus-green' },
 ];
+
+// v4.3.9 #220 — compact fuel chip for Command header. Shows session/weekly %
+// with pressure coloring + minutes-left + freshness stamp. Collapses gracefully
+// when fuel data is unavailable (e.g. fresh install, no readings yet).
+function FuelChip({ fuel }) {
+  if (!fuel?.reported && !fuel?.estimated) return null;
+  const session = fuel.estimated?.session ?? fuel.reported?.session ?? null;
+  const weekly = fuel.estimated?.weekly ?? fuel.reported?.weekly ?? null;
+  const minutesLeft = fuel.session?.minutesRemaining;
+
+  const colorFor = (pct) => (pct == null ? 'text-nexus-text-faint' : pct <= 15 ? 'text-nexus-red' : pct <= 40 ? 'text-nexus-amber' : 'text-nexus-text');
+  const formatMinutes = (m) => {
+    if (m == null) return '';
+    if (m <= 0) return 'expired';
+    if (m < 60) return `~${m}m`;
+    const h = Math.floor(m / 60);
+    const rem = m % 60;
+    return rem > 0 ? `~${h}h ${rem}m` : `~${h}h`;
+  };
+
+  return (
+    <div className="flex items-center gap-2 text-[10px] font-mono">
+      <span className={colorFor(session)}>session {session ?? '?'}%</span>
+      <span className="text-nexus-text-faint">·</span>
+      <span className={colorFor(weekly)}>weekly {weekly ?? '?'}%</span>
+      {minutesLeft != null && (
+        <>
+          <span className="text-nexus-text-faint">·</span>
+          <span className={colorFor(session)}>{formatMinutes(minutesLeft)}</span>
+        </>
+      )}
+      <span className="text-nexus-text-faint">·</span>
+      <FuelFreshnessStamp fuel={fuel} />
+    </div>
+  );
+}
 
 // ── Main module ─────────────────────────────────────────
 
@@ -205,9 +242,15 @@ export default function Command({ ws }) {
               <Compass size={18} className="text-nexus-amber" />
               Command
             </h2>
-            <p className="text-xs font-mono text-nexus-text-faint mt-1">
-              {inProgress.length} active, {backlog.length} plotted, {thoughts.length} held.
-            </p>
+            <div className="flex items-center gap-4 mt-1 text-xs font-mono">
+              <p className="text-nexus-text-faint">
+                {inProgress.length} active, {backlog.length} plotted, {thoughts.length} held.
+              </p>
+              {/* v4.3.9 #220 — fuel visible on Command view so the #1 decision constraint
+                  doesn't require a tab switch. Shows session% · weekly% · minutes-left,
+                  colored by pressure, with freshness stamp so users see staleness. */}
+              <FuelChip fuel={fuel} />
+            </div>
           </div>
           <div className="flex gap-1">
             {[
