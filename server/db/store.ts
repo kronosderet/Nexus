@@ -180,6 +180,75 @@ export class NexusStore {
       markApplied('v4.3.5-I1');
     }
 
+    // v4.3.9 H1: combined hygiene migration — fixes three data-quality bugs the UI audit surfaced.
+    //   #222 Encoding mojibake: U+FFFD replacement chars in task titles (em-dash loss on import)
+    //   #245 Blank project names: sessions logged without project leak as ": 10d" on Fleet staleness
+    //   #273 Case inconsistency: DIREWOLF vs direwolf across task/session/decision records,
+    //        plus "Projects" (cap P) leaking in from CC encoded-dir names (not a real project)
+    // One pass, one apply, all three resolved. Idempotent via _appliedMigrations.
+    if (!applied['v4.3.9-H1']) {
+      const mojibake = /\uFFFD/g;
+      let mojibakeFixed = 0;
+      let blanksFixed = 0;
+      let casingFixed = 0;
+
+      // Project-name normalization map. Keys are case-sensitive exact matches.
+      // DIREWOLF was captured as uppercase in some sessions; canonical is lowercase.
+      // "Projects" (cap P) comes from CC's encoded-dir naming (~/.claude/projects/...) and
+      //   was never meant to be a project label — route it to "general".
+      const projectCaseMap = new Map<string, string>([
+        ['DIREWOLF', 'direwolf'],
+        ['Projects', 'general'],
+      ]);
+      const normalizeProject = (p: string | undefined): { value: string | undefined; changed: boolean } => {
+        if (!p) return { value: p, changed: false };
+        const mapped = projectCaseMap.get(p);
+        if (mapped && mapped !== p) return { value: mapped, changed: true };
+        return { value: p, changed: false };
+      };
+
+      // (a) Mojibake scrub across tasks + decisions (title, description, decision text, context).
+      for (const t of this.data.tasks) {
+        if (t.title && mojibake.test(t.title)) { t.title = t.title.replace(mojibake, '—'); mojibakeFixed++; }
+        if (t.description && mojibake.test(t.description)) { t.description = t.description.replace(mojibake, '—'); mojibakeFixed++; }
+      }
+      for (const d of this.data.ledger || []) {
+        if (d.decision && mojibake.test(d.decision)) { d.decision = d.decision.replace(mojibake, '—'); mojibakeFixed++; }
+        if (d.context && mojibake.test(d.context)) { d.context = d.context.replace(mojibake, '—'); mojibakeFixed++; }
+      }
+
+      // (b) Blank-project normalization: sessions and tasks/decisions with empty/whitespace project.
+      for (const s of this.data.sessions || []) {
+        if (!s.project || !s.project.trim()) { s.project = 'general'; blanksFixed++; }
+      }
+      for (const t of this.data.tasks) {
+        if (!t.project || !t.project.trim()) { t.project = 'general'; blanksFixed++; }
+      }
+      for (const d of this.data.ledger || []) {
+        if (!d.project || !d.project.trim()) { d.project = 'general'; blanksFixed++; }
+      }
+
+      // (c) Casing normalization across tasks/sessions/decisions.
+      for (const t of this.data.tasks) {
+        const n = normalizeProject(t.project);
+        if (n.changed) { t.project = n.value!; casingFixed++; }
+      }
+      for (const s of this.data.sessions || []) {
+        const n = normalizeProject(s.project);
+        if (n.changed) { s.project = n.value!; casingFixed++; }
+      }
+      for (const d of this.data.ledger || []) {
+        const n = normalizeProject(d.project);
+        if (n.changed) { d.project = n.value!; casingFixed++; }
+      }
+
+      if (mojibakeFixed > 0 || blanksFixed > 0 || casingFixed > 0) {
+        console.error(`◈ Migration v4.3.9 H1: scrubbed ${mojibakeFixed} mojibake chars, ${blanksFixed} blank projects, ${casingFixed} casing issues.`);
+        changed += mojibakeFixed + blanksFixed + casingFixed;
+      }
+      markApplied('v4.3.9-H1');
+    }
+
     if (changed > 0) this._flush();
   }
 
