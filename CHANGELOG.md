@@ -2,11 +2,11 @@
 
 Nexus — The Cartographer. Local-first metabrain plugin for Claude Code.
 
-The v4.3.5 → v4.4.3 arc kicked off after the initial "Audit Shakedown" (v4.3.5)
-released in mid-April 2026. What follows covers 10 versioned releases plus one
+The v4.3.5 → v4.4.4 arc kicked off after the initial "Audit Shakedown" (v4.3.5)
+released in mid-April 2026. What follows covers 11 versioned releases plus one
 major UI audit, one big `Memory Bridge` import feature, the ambient-telemetry
-hook layer (v4.4.0 alpha/beta/final), and three post-v4.4.0 patch releases
-closing UI-audit Tier 1 + Tier 2 backlogs.
+hook layer (v4.4.0 alpha/beta/final), and four post-v4.4.0 patch releases
+closing UI-audit Tier 1 + the small/medium half of Tier 2 backlogs.
 
 ## v4.4.4 — Tier 2 Finale
 
