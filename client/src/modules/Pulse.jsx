@@ -209,6 +209,22 @@ export default function Pulse({ ws }) {
 
   const { system, gpu, projects, git } = pulse;
 
+  // v4.3.9 #233 — honest header. Computes pressure from memory + VRAM (the two signals
+  // most likely to bite local-AI workloads). Thresholds: amber ≥85%, red ≥95%.
+  // Previously subtitle was hardcoded "All instruments nominal" — a lie at 97% memory.
+  const memPct = system.memory?.percent ?? 0;
+  const vramPct = gpu?.vram?.percent ?? 0;
+  const peakPct = Math.max(memPct, vramPct);
+  const pressure = peakPct >= 95 ? 'red' : peakPct >= 85 ? 'amber' : 'green';
+  const pressureLabel =
+    pressure === 'red'
+      ? `Pressure critical — Memory ${memPct}% · VRAM ${vramPct}%`
+      : pressure === 'amber'
+      ? `Pressure elevated — Memory ${memPct}% · VRAM ${vramPct}%`
+      : 'All instruments nominal.';
+  const pressureText = pressure === 'red' ? 'text-nexus-red' : pressure === 'amber' ? 'text-nexus-amber' : 'text-nexus-text-faint';
+  const memCardColor = memPct >= 95 ? 'text-nexus-red' : memPct >= 85 ? 'text-nexus-amber' : 'text-nexus-green';
+
   return (
     <div>
       <div className="mb-6">
@@ -216,7 +232,7 @@ export default function Pulse({ ws }) {
           <Activity size={18} className="text-nexus-amber" />
           System Pulse
         </h2>
-        <p className="text-xs font-mono text-nexus-text-faint mt-1">All instruments nominal.</p>
+        <p className={`text-xs font-mono mt-1 ${pressureText}`}>{pressureLabel}</p>
       </div>
 
       {/* System stats grid */}
@@ -232,7 +248,7 @@ export default function Pulse({ ws }) {
           label="Memory"
           value={`${system.memory.percent}%`}
           sub={`${formatBytes(system.memory.used)} / ${formatBytes(system.memory.total)}`}
-          color={system.memory.percent > 85 ? 'text-nexus-red' : 'text-nexus-green'}
+          color={memCardColor}
         />
         <StatCard
           icon={Clock}
