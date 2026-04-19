@@ -159,7 +159,33 @@ export function createImpactRoutes(store: NexusStore) {
       }
     }
 
-    res.json({ contradictions, total: contradictions.length });
+    // v4.4.4 #309 — historical counter. Count all `contradicts` edges ever created
+    // (these are append-only in the current store model — flagging via the UI writes
+    // an edge that persists). Classify each as "resolved" when at least one endpoint
+    // decision is deprecated, since the conflict no longer reflects an active
+    // contradiction in the graph. Gives the tab a meaningful idle-state readout
+    // instead of a flat "0 · nothing here".
+    const contradictsEdges = store.getAllEdges().filter((e: GraphEdge) => e.rel === 'contradicts');
+    let historicalTotal = contradictsEdges.length;
+    let historicalResolved = 0;
+    const decMap = new Map(decisions.map((d: Decision) => [d.id, d] as const));
+    for (const edge of contradictsEdges) {
+      const a = decMap.get(edge.from);
+      const b = decMap.get(edge.to);
+      if ((a?.deprecated) || (b?.deprecated)) historicalResolved++;
+    }
+    // Potential (auto-detected) contradictions also count toward "ever flagged" so
+    // the headline reflects visible conflicts across both strategies.
+    historicalTotal += contradictions.filter(c => c.type === 'potential_conflict').length;
+
+    res.json({
+      contradictions,
+      total: contradictions.length,
+      historical: {
+        total: historicalTotal,
+        resolved: historicalResolved,
+      },
+    });
   });
 
   // Centrality analysis: which decisions are most connected?

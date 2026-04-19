@@ -134,36 +134,61 @@ export default function ClockWidget({ ws }) {
       )}
 
       {/* Week calendar */}
+      {/* v4.4.4 #238 — burn-rate projection overlay. When a weeklyProjection is
+          available (enough fuel history to compute daily burn), the strip tints
+          days based on projected end-of-day weekly fuel and marks the first day
+          the line crosses zero. Tooltip on each day spells out the projected value. */}
       <div>
         <div className="flex items-center gap-1.5 mb-2">
           <Calendar size={12} className="text-nexus-text-faint" />
           <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider">Week ahead</span>
+          {fuel?.weeklyProjection && (
+            <span className="ml-auto text-[9px] font-mono text-nexus-text-faint" title="Current weekly burn projection">
+              ~{fuel.weeklyProjection.perDay}%/day
+              {fuel.weeklyProjection.runsOutBeforeReset && <span className="text-nexus-red ml-1">· runs out</span>}
+            </span>
+          )}
         </div>
         <div className="grid grid-cols-7 gap-1">
-          {calendar.map((day, i) => (
-            <div
-              key={i}
-              className={`text-center py-1.5 rounded text-[10px] font-mono transition-colors ${
-                day.isToday
-                  ? 'bg-nexus-amber/15 text-nexus-amber border border-nexus-amber/30'
-                  : day.isWeekend
-                  ? 'bg-nexus-bg/50 text-nexus-text-faint'
-                  : day.isWeeklyReset
-                  ? 'bg-nexus-green/10 text-nexus-green border border-nexus-green/20'
-                  : 'bg-nexus-bg text-nexus-text-dim'
-              }`}
-              title={
-                // v4.4.2 #237 — for weekly-reset days explicitly spell out what "reset" means
-                day.isWeeklyReset
-                  ? (day.note ? `Weekly fuel reset · ${day.note}` : `${day.date} · Weekly fuel limit resets this day (all-models bucket refills).`)
-                  : (day.note || day.date)
-              }
-            >
-              <div>{day.date.split(' ')[0]}</div>
-              {day.isWeeklyReset && <div className="text-[7px] mt-0.5">reset</div>}
-              {day.isToday && <div className="text-[7px] mt-0.5">now</div>}
-            </div>
-          ))}
+          {calendar.map((day, i) => {
+            const proj = day.projectedWeekly;
+            const empty = day.isProjectedEmpty;
+            // Base class: preserve today/weekend/reset styling as primary signal.
+            // Projection adds a tint for low-fuel days and a distinct red border
+            // on the runout day so it reads at a glance.
+            const base = day.isToday
+              ? 'bg-nexus-amber/15 text-nexus-amber border border-nexus-amber/30'
+              : day.isWeekend
+              ? 'bg-nexus-bg/50 text-nexus-text-faint'
+              : day.isWeeklyReset
+              ? 'bg-nexus-green/10 text-nexus-green border border-nexus-green/20'
+              : 'bg-nexus-bg text-nexus-text-dim';
+            const projTint = empty
+              ? 'ring-1 ring-nexus-red/60'
+              : proj != null && proj <= 15
+              ? 'ring-1 ring-nexus-red/30'
+              : proj != null && proj <= 40
+              ? 'ring-1 ring-nexus-amber/30'
+              : '';
+            const baseTitle = day.isWeeklyReset
+              ? (day.note ? `Weekly fuel reset · ${day.note}` : `${day.date} · Weekly fuel limit resets this day (all-models bucket refills).`)
+              : (day.note || day.date);
+            const projTitle = proj != null
+              ? `\nProjected weekly: ~${proj}%${empty ? ' · runs out this day' : ''}`
+              : '';
+            return (
+              <div
+                key={i}
+                className={`relative text-center py-1.5 rounded text-[10px] font-mono transition-colors ${base} ${projTint}`}
+                title={`${baseTitle}${projTitle}`}
+              >
+                <div>{day.date.split(' ')[0]}</div>
+                {day.isWeeklyReset && <div className="text-[7px] mt-0.5">reset</div>}
+                {day.isToday && <div className="text-[7px] mt-0.5">now</div>}
+                {empty && !day.isToday && <div className="text-[7px] mt-0.5 text-nexus-red">0%</div>}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

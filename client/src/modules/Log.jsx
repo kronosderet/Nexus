@@ -5,7 +5,7 @@ import {
   ScrollText, BookOpen, Compass, CheckCircle2, Trash2, Settings,
   FileEdit, AlertTriangle, Tag, ChevronDown, ChevronRight, Search, Filter,
   Clock, MapPin, Lightbulb, Brain, MessageSquare, Network, GitCommit,
-  Download, Rocket, BookMarked,
+  Download, Rocket, BookMarked, EyeOff, Eye,
 } from 'lucide-react';
 
 // ── Activity type config ────────────────────────────────
@@ -95,6 +95,14 @@ export default function Log({ onNavigate }) {
   // v4.4.1 #356 — client-side page size for the activity stream. Store keeps 500-750
   // entries; this lets users page beyond the initial 200 cap without a server refetch.
   const [pageSize, setPageSize] = useState(200);
+  // v4.4.4 #357 — time-range filter. Narrows the activity stream to last hour / today /
+  // 7d / all. Day-grouping already exists but audit flagged that 50 "Plotted" events
+  // at 14:00 and 50 at 15:30 live in the same "TODAY" group with no way to slice.
+  const [timeRange, setTimeRange] = useState('all'); // 'all' | '1h' | 'today' | '7d'
+  // v4.4.4 #358 — per-type mute set. Hides selected event types from the stream so
+  // bursty categories (Plotted, Commit) don't bury substantive events. Persists
+  // across the session only — no storage, matches the audit ask ("hide for this session").
+  const [mutedTypes, setMutedTypes] = useState(() => new Set());
 
   const entries = activitySlice.data || [];
   const sessions = sessionsSlice.data || [];
@@ -103,17 +111,33 @@ export default function Log({ onNavigate }) {
 
   // Filtered activity
   const typesPresent = useMemo(() => ['all', ...new Set(entries.map(e => e.type)).values()].sort(), [entries]);
+  // v4.4.4 #357 — resolve time-range preset to a cutoff ms. `all` skips the check.
+  const rangeCutoffMs = useMemo(() => {
+    const now = Date.now();
+    if (timeRange === '1h') return now - 3600000;
+    if (timeRange === 'today') {
+      const d = new Date(); d.setHours(0, 0, 0, 0);
+      return d.getTime();
+    }
+    if (timeRange === '7d') return now - 7 * 86400000;
+    return null;
+  }, [timeRange]);
   const filteredActivityAll = useMemo(() => {
     const q = search.trim().toLowerCase();
     return entries.filter(e => {
       if (typeFilter !== 'all' && e.type !== typeFilter) return false;
+      // v4.4.4 #358 — mute filter. Skipped when the user has already narrowed via
+      // typeFilter (they chose to see that type explicitly).
+      if (typeFilter === 'all' && mutedTypes.has(e.type)) return false;
       if (q && !e.message.toLowerCase().includes(q)) return false;
+      // v4.4.4 #357 — time-range cutoff
+      if (rangeCutoffMs != null && new Date(e.created_at).getTime() < rangeCutoffMs) return false;
       return true;
     }).sort((a, b) => sortOrder === 'asc'
       ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
-  }, [entries, search, typeFilter, sortOrder]);
+  }, [entries, search, typeFilter, sortOrder, rangeCutoffMs, mutedTypes]);
   // v4.4.1 #356 — paginate the filtered stream. filteredActivity is what renders; the
   // "Load N more" button grows pageSize until all filtered entries are visible.
   const filteredActivity = useMemo(() => filteredActivityAll.slice(0, pageSize), [filteredActivityAll, pageSize]);
@@ -189,16 +213,66 @@ export default function Log({ onNavigate }) {
           )}
         </div>
 
+        {/* v4.4.4 #357 — time-range preset pills. Only shown on activity + timeline
+            since session list is typically small and already browsable by project. */}
+        {(tab === 'activity' || tab === 'timeline') && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Clock size={10} className="text-nexus-text-faint" />
+            <span className="text-[10px] font-mono text-nexus-text-faint mr-1">Range:</span>
+            {[
+              { key: 'all', label: 'All' },
+              { key: '1h', label: 'Last hour' },
+              { key: 'today', label: 'Today' },
+              { key: '7d', label: '7d' },
+            ].map(r => (
+              <button key={r.key} onClick={() => setTimeRange(r.key)}
+                className={`px-2 py-0.5 rounded-full text-[10px] font-mono border transition-colors ${timeRange === r.key ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/20' : 'text-nexus-text-faint border-nexus-border hover:text-nexus-text'}`}>
+                {r.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Type chips (activity) or project chips (sessions) */}
         {tab === 'activity' ? (
           <div className="flex items-center gap-1.5 flex-wrap">
             <Filter size={10} className="text-nexus-text-faint" />
-            {typesPresent.map(type => (
-              <button key={type} onClick={() => setTypeFilter(type)}
-                className={`px-2 py-0.5 rounded-full text-[10px] font-mono border transition-colors ${typeFilter === type ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/20' : 'text-nexus-text-faint border-nexus-border hover:text-nexus-text'}`}>
-                {type === 'all' ? 'All' : (TYPE_CONFIG[type]?.label || type)}
+            {typesPresent.map(type => {
+              // v4.4.4 #358 — each type chip has two states now: click to filter-to-this-type
+              // (existing behavior), shift/ctrl-click OR the small eye-toggle to mute/hide.
+              // The mute toggle only renders when typeFilter === 'all' (otherwise the user has
+              // already narrowed to a single type, so mute is moot).
+              const muted = mutedTypes.has(type);
+              const active = typeFilter === type;
+              const isAll = type === 'all';
+              return (
+                <span key={type} className={`inline-flex items-center rounded-full border transition-colors ${active ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/20' : muted ? 'bg-nexus-bg text-nexus-text-faint border-nexus-border line-through opacity-60' : 'text-nexus-text-faint border-nexus-border hover:text-nexus-text'}`}>
+                  <button onClick={() => setTypeFilter(type)}
+                    className="px-2 py-0.5 text-[10px] font-mono">
+                    {isAll ? 'All' : (TYPE_CONFIG[type]?.label || type)}
+                  </button>
+                  {!isAll && typeFilter === 'all' && (
+                    <button
+                      onClick={() => setMutedTypes(prev => {
+                        const next = new Set(prev);
+                        if (next.has(type)) next.delete(type); else next.add(type);
+                        return next;
+                      })}
+                      title={muted ? 'Unmute this type' : 'Mute this type for this session'}
+                      className="px-1 py-0.5 text-[10px] border-l border-current/20 hover:text-nexus-amber"
+                    >
+                      {muted ? <Eye size={9} /> : <EyeOff size={9} />}
+                    </button>
+                  )}
+                </span>
+              );
+            })}
+            {mutedTypes.size > 0 && typeFilter === 'all' && (
+              <button onClick={() => setMutedTypes(new Set())}
+                className="px-2 py-0.5 rounded-full text-[10px] font-mono border border-nexus-border text-nexus-text-faint hover:text-nexus-amber">
+                Unmute all ({mutedTypes.size})
               </button>
-            ))}
+            )}
           </div>
         ) : projects.length > 1 && (
           <div className="flex gap-1 flex-wrap">
@@ -222,7 +296,7 @@ export default function Log({ onNavigate }) {
           <span className="font-mono text-sm text-nexus-text-dim">Scanning the archives...</span>
         </div>
       ) : tab === 'timeline' ? (
-        <TimelineView entries={entries} sessions={sessions} search={search} />
+        <TimelineView entries={entries} sessions={sessions} search={search} rangeCutoffMs={rangeCutoffMs} mutedTypes={mutedTypes} />
       ) : tab === 'activity' ? (
         /* ── Activity stream ─── */
         filteredActivity.length === 0 ? (
@@ -303,7 +377,7 @@ export default function Log({ onNavigate }) {
 }
 
 // ── Timeline View ─────────────────────────────────────────
-function TimelineView({ entries, sessions, search }) {
+function TimelineView({ entries, sessions, search, rangeCutoffMs, mutedTypes }) {
   const q = search.toLowerCase();
   const [expanded, setExpanded] = useState({});
 
@@ -311,6 +385,9 @@ function TimelineView({ entries, sessions, search }) {
     const items = [];
     for (const e of entries) {
       if (q && !e.message.toLowerCase().includes(q)) continue;
+      // v4.4.4 #357 + #358 — apply Log's time-range + mute filters to timeline too
+      if (rangeCutoffMs != null && new Date(e.created_at).getTime() < rangeCutoffMs) continue;
+      if (mutedTypes?.has(e.type)) continue;
       const config = TYPE_CONFIG[e.type] || TYPE_CONFIG.system;
       items.push({
         time: e.created_at, kind: e.type === 'task_done' ? 'task' : e.type === 'decision' ? 'decision' : 'activity',
@@ -319,6 +396,7 @@ function TimelineView({ entries, sessions, search }) {
     }
     for (const s of sessions) {
       if (q && !s.summary.toLowerCase().includes(q) && !s.project.toLowerCase().includes(q)) continue;
+      if (rangeCutoffMs != null && new Date(s.created_at).getTime() < rangeCutoffMs) continue;
       items.push({
         time: s.created_at, kind: 'session', icon: BookOpen, color: 'text-nexus-amber',
         label: s.project, text: s.summary, id: `s-${s.id}`, session: s,
@@ -326,7 +404,7 @@ function TimelineView({ entries, sessions, search }) {
     }
     items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
     return items;
-  }, [entries, sessions, q]);
+  }, [entries, sessions, q, rangeCutoffMs, mutedTypes]);
 
   const grouped = useMemo(() => {
     const g = {};

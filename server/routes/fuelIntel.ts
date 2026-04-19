@@ -133,14 +133,21 @@ function learnTaskCosts(store: NexusStore) {
   }
 
   // Aggregate by task title pattern (group similar tasks)
-  const patterns: Record<string, { count: number; totalCost: number; avgCost: number }> = {};
+  // v4.4.4 #265 — keep per-category task list so the UI can expand an entry to
+  // show the actual tasks that produced the average. Was aggregate-only before;
+  // users had no way to inspect whether a category average was real or a one-off.
+  const patterns: Record<string, { count: number; totalCost: number; avgCost: number; tasks: { title: string; cost: number; session: string }[] }> = {};
   for (const tc of taskCosts) {
-    // Normalize title to a category
     const category = categorizeTask(tc.title);
-    if (!patterns[category]) patterns[category] = { count: 0, totalCost: 0, avgCost: 0 };
+    if (!patterns[category]) patterns[category] = { count: 0, totalCost: 0, avgCost: 0, tasks: [] };
     patterns[category].count++;
     patterns[category].totalCost += tc.estimatedCost;
     patterns[category].avgCost = Math.round((patterns[category].totalCost / patterns[category].count) * 10) / 10;
+    patterns[category].tasks.push({ title: tc.title, cost: tc.estimatedCost, session: tc.session });
+  }
+  // Sort each category's tasks by cost desc (highest cost first shown on expand)
+  for (const cat of Object.values(patterns)) {
+    cat.tasks.sort((a, b) => b.cost - a.cost);
   }
 
   return {
@@ -210,11 +217,38 @@ function analyzeSessionPatterns(store: NexusStore) {
     else if (secondAvg > firstAvg * 1.15) trend = 'degrading';
   }
 
+  // v4.4.4 #264 — week-over-week delta: split sessions into "last 7d" vs "prior 7d"
+  // and compute delta on the three headline metrics so users see direction+magnitude
+  // of change, not just the abstract "improving/stable" badge.
+  const nowMs = Date.now();
+  const weekMs = 7 * 86400000;
+  const thisWeek = sessions.filter(s => new Date(s.startTime).getTime() > nowMs - weekMs);
+  const priorWeek = sessions.filter(s => {
+    const t = new Date(s.startTime).getTime();
+    return t > nowMs - 2 * weekMs && t <= nowMs - weekMs;
+  });
+  function avg(arr: SessionWindow[], key: 'burnRate' | 'durationHours' | 'burned'): number | null {
+    if (arr.length === 0) return null;
+    return arr.reduce((s, x) => s + x[key], 0) / arr.length;
+  }
+  function delta(curr: number | null, prev: number | null): number | null {
+    if (curr == null || prev == null) return null;
+    return Math.round((curr - prev) * 10) / 10;
+  }
+  const wow = {
+    avgBurnRate: delta(avg(thisWeek, 'burnRate'), avg(priorWeek, 'burnRate')),
+    avgSessionDuration: delta(avg(thisWeek, 'durationHours'), avg(priorWeek, 'durationHours')),
+    avgFuelPerSession: delta(avg(thisWeek, 'burned'), avg(priorWeek, 'burned')),
+    thisWeekSessions: thisWeek.length,
+    priorWeekSessions: priorWeek.length,
+  };
+
   return {
     totalSessions: sessions.length,
     avgBurnRate: Math.round(avgBurnRate * 10) / 10,
     avgSessionDuration: Math.round(sessions.reduce((s, x) => s + x.durationHours, 0) / sessions.length * 10) / 10,
     avgFuelPerSession: Math.round(sessions.reduce((s, x) => s + x.burned, 0) / sessions.length * 10) / 10,
+    wow,
     mostEfficient: {
       burnRate: mostEfficient.burnRate,
       time: mostEfficient.startTime,

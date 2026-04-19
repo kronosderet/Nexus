@@ -564,23 +564,62 @@ function CentralityView({ data, onPickBlast, onPickVisual }) {
 }
 
 function ContradictionsView({ data, onRefresh }) {
+  // v4.4.4 #309 — lifetime counter row. Even when active=0, show how many conflicts
+  // have ever been flagged and how many resolved (one side marked deprecated) so the
+  // tab communicates state instead of looking dead. `historical` is computed server-side.
+  const hist = data?.historical;
   return (
     <div className="space-y-4">
-      {/* v4.3.10 #305 — empty-state explanation; kept as a preamble even when edges exist. */}
+      {/* v4.4.4 #309 — always-visible historical counter row */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-nexus-surface border border-nexus-border rounded-xl p-3 text-center">
+          <p className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider mb-1">Active</p>
+          <p className={`text-xl font-light tabular-nums ${data?.total > 0 ? 'text-nexus-amber' : 'text-nexus-green'}`}>{data?.total ?? 0}</p>
+        </div>
+        <div className="bg-nexus-surface border border-nexus-border rounded-xl p-3 text-center" title="Conflicts ever flagged — potential auto-detected plus manually marked via rel=contradicts edges.">
+          <p className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider mb-1">Ever flagged</p>
+          <p className="text-xl font-light tabular-nums text-nexus-text-dim">{hist?.total ?? 0}</p>
+        </div>
+        <div className="bg-nexus-surface border border-nexus-border rounded-xl p-3 text-center" title="Flagged conflicts where at least one decision was later marked deprecated — the opposition no longer applies to an active decision.">
+          <p className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider mb-1">Resolved</p>
+          <p className="text-xl font-light tabular-nums text-nexus-green">{hist?.resolved ?? 0}</p>
+        </div>
+      </div>
+
+      {/* v4.4.4 #308 — expanded educational copy. The v4.3.10 version answered "what
+          is this tab" but not "how do I use it" or "why should I care". Three Q/A
+          blocks cover: definition, motivation, workflow. Still dismissible feel via
+          the "No conflicts flagged" lead when empty. */}
       {data?.total === 0 && (
         <div className="bg-nexus-surface border border-nexus-border rounded-xl p-6">
           <div className="flex items-start gap-3">
             <AlertTriangle size={18} className="text-nexus-amber shrink-0 mt-0.5" />
-            <div className="space-y-2">
-              <p className="text-sm text-nexus-text">No conflicts flagged.</p>
-              <p className="text-xs font-mono text-nexus-text-faint leading-relaxed">
-                This tab lists decisions you&rsquo;ve explicitly marked as opposing each other via
-                <code className="mx-1 px-1 py-0.5 rounded bg-nexus-bg text-nexus-amber">rel=&rsquo;contradicts&rsquo;</code>
-                edges. A zero here doesn&rsquo;t mean nothing contradicts anything &mdash; it means nothing has been tagged yet.
-              </p>
-              <p className="text-xs font-mono text-nexus-text-faint leading-relaxed">
-                Useful when: you changed direction, two projects took opposing paths, a decision was superseded without being marked deprecated.
-              </p>
+            <div className="space-y-3 text-xs font-mono text-nexus-text-faint leading-relaxed">
+              <p className="text-sm text-nexus-text font-sans">No active conflicts.</p>
+
+              <div>
+                <p className="text-nexus-text-dim mb-1">What is a conflict?</p>
+                <p>
+                  Two decisions that oppose each other — different paths chosen at different times, or the same question answered two ways across projects.
+                  Conflicts are tracked via <code className="mx-0.5 px-1 py-0.5 rounded bg-nexus-bg text-nexus-amber">rel=&lsquo;contradicts&rsquo;</code> edges in the knowledge graph.
+                </p>
+              </div>
+
+              <div>
+                <p className="text-nexus-text-dim mb-1">Why should I care?</p>
+                <p>
+                  Without this view, contradictions sit silently in the Ledger — you rediscover them only when re-reading. Flagging makes them visible next session,
+                  so you (or the Overseer) can either reconcile the two, mark the old one deprecated, or split the context by project.
+                </p>
+              </div>
+
+              <div>
+                <p className="text-nexus-text-dim mb-1">How do I use it?</p>
+                <p>
+                  Use the form below to flag a conflict — pick the two decisions, optionally add a note explaining the contradiction. The counter row above tracks
+                  lifetime flags and resolutions. Useful when: you changed direction, two projects took opposing paths, or a decision was superseded without being marked deprecated.
+                </p>
+              </div>
             </div>
           </div>
         </div>

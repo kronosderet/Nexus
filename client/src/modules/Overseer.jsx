@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../hooks/useApi.js';
-import { Brain, RefreshCw, AlertTriangle, Shield, Send, Loader2, Play, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Brain, RefreshCw, AlertTriangle, Shield, Send, Loader2, Play, CheckCircle2, XCircle, Clock, Search, X } from 'lucide-react';
 
 const RISK_ICONS = {
   critical: { color: 'text-nexus-red', bg: 'bg-nexus-red/10 border-nexus-red/20' },
@@ -241,6 +241,13 @@ export default function Overseer() {
   const [gpuInfo, setGpuInfo] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
   const [scans, setScans] = useState([]);
+  // v4.4.4 #344 — search + filter past Q&A. As the conversation history grows
+  // (20+ entries from the advice journal), power users need to find prior strategic
+  // dialogs. Filters: free-text match against question/answer, project mention,
+  // and a date range preset.
+  const [qaSearch, setQaSearch] = useState('');
+  const [qaProject, setQaProject] = useState('all');
+  const [qaRange, setQaRange] = useState('all'); // 'all' | 'today' | '7d' | '30d'
 
   async function fetchRisks() {
     try {
@@ -314,6 +321,53 @@ export default function Overseer() {
       setAsking(false);
     }
   }
+
+  // v4.4.4 #344 — group chatHistory into Q/A pairs and apply filters. Filtering
+  // at the pair level so the answer shows alongside its question when either matches.
+  // `mentionedProjects` is a simple regex scan of answer text for capitalized project
+  // names, deduped — good enough to populate the filter dropdown without a separate
+  // structured project field on the advice entry.
+  const KNOWN_PROJECTS = useMemo(() => ['Nexus', 'Shadowrun', 'Firewall-Godot', 'Firewall', 'Resonance', 'noosphere'], []);
+  const { qaPairs, projectsPresent } = useMemo(() => {
+    const pairs = [];
+    const projects = new Set();
+    for (let i = 0; i < chatHistory.length; i++) {
+      const msg = chatHistory[i];
+      if (msg.role !== 'user') continue;
+      const answer = chatHistory[i + 1]?.role === 'overseer' ? chatHistory[i + 1] : null;
+      const combined = `${msg.text || ''} ${answer?.text || ''}`;
+      const found = KNOWN_PROJECTS.filter(p => new RegExp(`\\b${p}\\b`, 'i').test(combined));
+      for (const p of found) projects.add(p);
+      pairs.push({ qIdx: i, aIdx: answer ? i + 1 : null, question: msg, answer, projects: found });
+    }
+    return { qaPairs: pairs, projectsPresent: ['all', ...projects] };
+  }, [chatHistory, KNOWN_PROJECTS]);
+
+  const filteredIndexes = useMemo(() => {
+    const q = qaSearch.trim().toLowerCase();
+    const nowMs = Date.now();
+    const rangeMs = qaRange === 'today' ? 86400000 : qaRange === '7d' ? 7 * 86400000 : qaRange === '30d' ? 30 * 86400000 : null;
+    const keep = new Set();
+    for (const pair of qaPairs) {
+      if (q) {
+        const hay = `${pair.question.text || ''} ${pair.answer?.text || ''}`.toLowerCase();
+        if (!hay.includes(q)) continue;
+      }
+      if (qaProject !== 'all' && !pair.projects.includes(qaProject)) continue;
+      if (rangeMs != null) {
+        const t = new Date(pair.question.time).getTime();
+        if (nowMs - t > rangeMs) continue;
+      }
+      keep.add(pair.qIdx);
+      if (pair.aIdx != null) keep.add(pair.aIdx);
+    }
+    return keep;
+  }, [qaPairs, qaSearch, qaProject, qaRange]);
+
+  const qaFilterActive = qaSearch.trim() !== '' || qaProject !== 'all' || qaRange !== 'all';
+  const visibleChatHistory = qaFilterActive
+    ? chatHistory.filter((_, i) => filteredIndexes.has(i))
+    : chatHistory;
 
   useEffect(() => {
     fetchRisks();
@@ -415,14 +469,75 @@ export default function Overseer() {
               <Send size={14} className="text-nexus-amber" />
               <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Ask the Overseer</span>
               {chatHistory.length > 0 && (
-                <span className="text-[9px] font-mono text-nexus-text-faint ml-auto">{Math.floor(chatHistory.filter(m => m.role === 'user').length)} questions asked</span>
+                <span className="text-[9px] font-mono text-nexus-text-faint ml-auto">
+                  {qaFilterActive ? `${visibleChatHistory.filter(m => m.role === 'user').length} of ` : ''}
+                  {Math.floor(chatHistory.filter(m => m.role === 'user').length)} questions asked
+                </span>
               )}
             </div>
+
+            {/* v4.4.4 #344 — search + filter past Q&A. Only shown when there's enough
+                history to be worth filtering (3+ questions). Three filters: free-text,
+                project chip, date range. Combine as AND. Clear-all pill resets state. */}
+            {qaPairs.length >= 3 && (
+              <div className="mb-3 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative flex-1 min-w-[180px]">
+                    <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-nexus-text-faint" />
+                    <input
+                      value={qaSearch}
+                      onChange={(e) => setQaSearch(e.target.value)}
+                      placeholder="Search past Q&A..."
+                      className="w-full bg-nexus-bg border border-nexus-border rounded-lg pl-7 pr-3 py-1 text-[11px] text-nexus-text font-mono focus:border-nexus-amber focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex gap-1">
+                    {['all', 'today', '7d', '30d'].map(r => (
+                      <button
+                        key={r}
+                        onClick={() => setQaRange(r)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-mono border transition-colors ${
+                          qaRange === r ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/20' : 'text-nexus-text-faint border-nexus-border hover:text-nexus-text'
+                        }`}
+                      >
+                        {r === 'all' ? 'All' : r === 'today' ? 'Today' : r === '7d' ? '7d' : '30d'}
+                      </button>
+                    ))}
+                  </div>
+                  {qaFilterActive && (
+                    <button
+                      onClick={() => { setQaSearch(''); setQaProject('all'); setQaRange('all'); }}
+                      className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono text-nexus-text-faint hover:text-nexus-amber border border-nexus-border"
+                    >
+                      <X size={9} /> Clear
+                    </button>
+                  )}
+                </div>
+                {projectsPresent.length > 2 && (
+                  <div className="flex gap-1 flex-wrap">
+                    {projectsPresent.map(p => (
+                      <button
+                        key={p}
+                        onClick={() => setQaProject(p)}
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-mono border transition-colors ${
+                          qaProject === p ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/20' : 'text-nexus-text-faint border-nexus-border hover:text-nexus-text'
+                        }`}
+                      >
+                        {p === 'all' ? 'All projects' : p}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Chat history */}
             {chatHistory.length > 0 && (
               <div className="mb-3 max-h-80 overflow-y-auto space-y-2 pr-1">
-                {chatHistory.map((msg, i) => (
+                {qaFilterActive && visibleChatHistory.length === 0 && (
+                  <p className="text-center text-[11px] font-mono text-nexus-text-faint py-4">No Q&A matches these filters.</p>
+                )}
+                {visibleChatHistory.map((msg, i) => (
                   <div key={i} className={`p-2.5 rounded-lg ${
                     msg.role === 'user'
                       ? 'bg-nexus-amber/5 border border-nexus-amber/10 ml-8'
