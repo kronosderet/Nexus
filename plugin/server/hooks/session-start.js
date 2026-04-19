@@ -10,10 +10,31 @@
 
 import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir, totalmem, freemem } from 'node:os';
+import { homedir, totalmem, freemem, platform } from 'node:os';
 import { execSync } from 'node:child_process';
+import net from 'node:net';
 
 const NEXUS_DB = process.env.NEXUS_DB_PATH || join(homedir(), '.nexus', 'nexus.json');
+const PROJECTS_DIR = process.env.NEXUS_PROJECTS_DIR || (platform() === 'win32' ? 'C:\\Projects' : join(homedir(), 'Projects'));
+
+// v4.4.0-beta #375 — async TCP port probe with tight timeout.
+function probePort(host, port, timeoutMs = 200) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let resolved = false;
+    const done = (up) => {
+      if (resolved) return;
+      resolved = true;
+      socket.destroy();
+      resolve(up);
+    };
+    socket.setTimeout(timeoutMs);
+    socket.once('connect', () => done(true));
+    socket.once('timeout', () => done(false));
+    socket.once('error', () => done(false));
+    socket.connect(port, host);
+  });
+}
 
 function detectProject() {
   const cwd = process.cwd();
@@ -33,7 +54,7 @@ function detectProject() {
   return cwd.split(/[/\\]/).pop() || 'unknown';
 }
 
-function main() {
+async function main() {
   const project = detectProject();
 
   // Read store directly — no server dependency
@@ -175,8 +196,80 @@ function main() {
     lines.push(`Store: nexus.json ${sizeMB}MB${bakStr}`);
   } catch {}
 
+  // v4.4.0-beta #371 — test baseline from recent commit log
+  try {
+    const recentLog = execSync('git log --format=%B -n 10 2>nul', { cwd: process.cwd(), encoding: 'utf-8', timeout: 2000 });
+    const testMatch = recentLog.match(/tests[:\s]+(\d+)\/(\d+)/i);
+    if (testMatch) {
+      const [, passed, total] = testMatch;
+      const green = /green/i.test(recentLog.slice(testMatch.index, testMatch.index + 40));
+      const status = passed === total ? (green ? 'green' : 'all passing') : 'partial';
+      lines.push(`Tests: ${passed}/${total} ${status} (from recent commit)`);
+    }
+  } catch {}
+
+  // v4.4.0-beta #374 — Overseer snapshot from `_scheduledScans`
+  const scans = data._scheduledScans || [];
+  const freshnessWindowMin = 60 * 24;
+  const latestDigest = scans.filter(s => s.type === 'digest').sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+  if (latestDigest) {
+    const ageMin = Math.floor((Date.now() - new Date(latestDigest.timestamp).getTime()) / 60000);
+    if (ageMin < freshnessWindowMin) {
+      const r = latestDigest.result || {};
+      const ageStr = ageMin >= 60 ? `${Math.floor(ageMin / 60)}h` : `${ageMin}m`;
+      const summary = r.summary || `${r.totalEvents ?? 0} events · ${r.tasksDone ?? 0} done · ${r.sessions ?? 0} sessions`;
+      lines.push(`Digest (${ageStr} ago): ${summary.slice(0, 120)}`);
+    }
+  }
+  const latestRisk = scans.filter(s => s.type === 'risk').sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+  if (latestRisk) {
+    const ageMin = Math.floor((Date.now() - new Date(latestRisk.timestamp).getTime()) / 60000);
+    if (ageMin < freshnessWindowMin) {
+      const r = latestRisk.result || {};
+      const ageStr = ageMin >= 60 ? `${Math.floor(ageMin / 60)}h` : `${ageMin}m`;
+      const critSuffix = r.critical > 0 ? ` (${r.critical} critical)` : '';
+      lines.push(`Last risk scan (${ageStr} ago): ${r.risks ?? 0} risks${critSuffix}`);
+    }
+  }
+
+  // v4.4.0-beta #373 — fleet-wide uncommitted (top-5 active projects)
+  try {
+    const projectCounts = {};
+    for (const s of (data.sessions || [])) {
+      const p = s.project;
+      if (p && p !== 'general') projectCounts[p] = (projectCounts[p] || 0) + 1;
+    }
+    const topProjects = Object.entries(projectCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name]) => name);
+    const fleet = [];
+    for (const proj of topProjects) {
+      const repoPath = join(PROJECTS_DIR, proj);
+      if (!existsSync(join(repoPath, '.git'))) continue;
+      try {
+        const status = execSync('git status --porcelain', { cwd: repoPath, encoding: 'utf-8', timeout: 500 }).trim();
+        const count = status ? status.split('\n').length : 0;
+        if (count > 0) fleet.push(`${proj}: ${count}`);
+      } catch {}
+    }
+    if (fleet.length > 0) lines.push(`Fleet uncommitted: ${fleet.join(' · ')}`);
+  } catch {}
+
+  // v4.4.0-beta #375 — services heartbeat (parallel TCP probes, 200ms timeout)
+  try {
+    const probes = await Promise.all([
+      probePort('127.0.0.1', 1234, 200).then(up => up ? 'LM Studio' : null),
+      probePort('127.0.0.1', 11434, 200).then(up => up ? 'Ollama' : null),
+      probePort('127.0.0.1', 3001, 200).then(up => up ? 'Dashboard' : null),
+      probePort('127.0.0.1', 5173, 200).then(up => up ? 'Vite' : null),
+    ]);
+    const up = probes.filter(Boolean);
+    if (up.length > 0) lines.push(`Services up: ${up.join(' · ')}`);
+  } catch {}
+
   lines.push(`[/Nexus Metabrain]`);
   console.log(lines.join('\n'));
 }
 
-try { main(); } catch {}
+try { await main(); } catch {}
