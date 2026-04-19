@@ -225,7 +225,23 @@ function BlastView({ blastId, setBlastId, onRun, result }) {
 function CentralityView({ data }) {
   return (
     <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
-      <p className="text-xs font-mono text-nexus-text-faint mb-3">Avg {data?.averageConnections} connections per decision</p>
+      <div className="flex items-baseline justify-between mb-3">
+        <p className="text-xs font-mono text-nexus-text-faint">Avg {data?.averageConnections} connections per decision</p>
+        {/* v4.3.10 #295 — quick explainer so newcomers know what they're reading */}
+        <span
+          className="text-[10px] font-mono text-nexus-text-faint cursor-help border-b border-dashed border-nexus-text-faint"
+          title="Centrality = number of edges (connections) per decision. High-centrality decisions are architectural hubs — changing them affects a lot. This ranks by degree centrality."
+        >
+          what&rsquo;s this?
+        </span>
+      </div>
+      {/* v4.3.10 #293 — column header so the count column is no longer ambiguous */}
+      <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-nexus-border">
+        <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-8">ID</span>
+        <span className="flex-1 text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider">Centrality</span>
+        <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-6 text-right">Edges</span>
+        <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-48">Decision</span>
+      </div>
       <div className="space-y-1.5">
         {data?.centrality?.slice(0, 15).map(c => (
           <div key={c.id} className="flex items-center gap-2">
@@ -233,8 +249,15 @@ function CentralityView({ data }) {
             <div className="flex-1 h-2 bg-nexus-bg rounded-full">
               <div className="h-full bg-nexus-amber/60 rounded-full" style={{ width: `${Math.min(100, c.total * 5)}%` }} />
             </div>
-            <span className="text-xs font-mono text-nexus-text-dim w-6 text-right">{c.total}</span>
-            <span className="text-xs text-nexus-text-dim truncate w-48">{c.decision}</span>
+            <span
+              className="text-xs font-mono text-nexus-text-dim w-6 text-right"
+              title={`${c.total} edge${c.total !== 1 ? 's' : ''} in the knowledge graph`}
+            >{c.total}</span>
+            {/* v4.3.10 #294 — uniform truncation with hover-expand via native title attribute */}
+            <span
+              className="text-xs text-nexus-text-dim truncate w-48 cursor-help"
+              title={c.decision}
+            >{c.decision}</span>
           </div>
         ))}
       </div>
