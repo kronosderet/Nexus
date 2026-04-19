@@ -96,7 +96,10 @@ export default function ClockWidget({ ws }) {
                 <span className="text-[10px] font-mono text-nexus-text-faint uppercase">Session</span>
               </div>
               <span className={`text-xs font-mono font-medium tabular-nums ${sessionMs != null && sessionMs <= 0 ? 'text-nexus-red' : sessionMs != null && sessionMs < 1800000 ? 'text-nexus-amber' : 'text-nexus-text-dim'}`}>
-                {sessionMs == null ? '—' : sessionMs <= 0 ? 'waiting for reset' : formatCountdown(sessionMs)}
+                {/* v4.3.9 #234 — "waiting for reset" implied fuel was paused; rolled-over
+                    window actually means usage now burns against weekly. "window expired"
+                    is shorter and truthful; Fuel view shows the "log a fresh reading" nudge. */}
+                {sessionMs == null ? '—' : sessionMs <= 0 ? 'window expired' : formatCountdown(sessionMs)}
               </span>
             </div>
             <div className="flex items-center gap-2">

@@ -196,7 +196,10 @@ export default function FuelModule() {
               <p><Timer size={10} className="inline mr-1" />Resets in {sessionReset.countdown}</p>
             )}
             {sessionReset?.expired && (
-              <p className="text-nexus-amber"><Timer size={10} className="inline mr-1" />Waiting for next session window</p>
+              // v4.3.9 #234 — "Waiting for next session window" was ambiguous. Users kept
+              // thinking fuel was paused; it's not. Session window rolled over but usage
+              // continues against weekly until a new reading is logged. Say what's true.
+              <p className="text-nexus-amber"><Timer size={10} className="inline mr-1" />Session window expired · log a fresh reading to reset timer</p>
             )}
             {(session <= 0 || timingData?.extra_usage) && <p className="text-nexus-red">On extra usage (session limit reached)</p>}
           </div>
