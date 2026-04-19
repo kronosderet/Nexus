@@ -62,8 +62,15 @@ export function createImpactRoutes(store: NexusStore) {
     const decision = store.getDecisionById( id);
     if (!decision) return res.status(404).json({ error: 'Decision not found.' });
 
+    // v4.4.3 #287 — support ?depth=1|2|3|4 query param. Defaults to 4 (traverseDirected's
+    // internal default) so existing callers are unaffected.
+    const requestedDepth = parseInt(req.query.depth as string, 10);
+    const maxDepthArg = Number.isFinite(requestedDepth) && requestedDepth >= 1 && requestedDepth <= 6
+      ? requestedDepth
+      : undefined;
+
     // Traverse all downstream decisions (follow 'led_to' and 'depends_on' edges)
-    const affected = traverseDirected(store, id, ['led_to', 'depends_on']);
+    const affected = traverseDirected(store, id, ['led_to', 'depends_on'], maxDepthArg);
     // Also get anything directly 'related'
     const related = store.getEdgesFor(id)
       .filter((e: GraphEdge) => e.rel === 'related')
