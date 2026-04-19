@@ -603,34 +603,56 @@ function HolesView({ data }) {
                   </span>
                 </div>
 
-                <div className="space-y-1.5">
-                  {p.clusters.slice(0, 5).map((c, i) => (
-                    <div
-                      key={i}
-                      className={`flex items-start gap-2 px-2 py-1.5 rounded ${
-                        c.size === 1 ? 'bg-nexus-bg/40 border border-nexus-border' : 'bg-nexus-amber/5 border border-nexus-amber/10'
-                      }`}
-                    >
-                      <span className="text-[10px] font-mono text-nexus-text-faint w-12 shrink-0 mt-0.5">
-                        {c.size === 1 ? 'orphan' : `×${c.size}`}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        {c.sampleTitles.map((title, j) => (
-                          <p key={j} className="text-xs text-nexus-text-dim truncate">
-                            {title}
-                          </p>
-                        ))}
-                        {c.size > c.sampleTitles.length && (
-                          <p className="text-[10px] font-mono text-nexus-text-faint">
-                            +{c.size - c.sampleTitles.length} more
-                          </p>
-                        )}
+                {/* v4.4.1 #315 — rearchitected cluster rendering. Each cluster is a clearly
+                    delimited card: prominent pill-shaped size badge, "Cluster of N" header,
+                    then indented sample titles. Orphans get distinct styling (isolated, amber
+                    border) because they're actionable differently from multi-decision clusters. */}
+                <div className="space-y-2">
+                  {p.clusters.slice(0, 5).map((c, i) => {
+                    const isOrphan = c.size === 1;
+                    return (
+                      <div
+                        key={i}
+                        className={`rounded-lg ${
+                          isOrphan
+                            ? 'bg-nexus-amber/5 border border-nexus-amber/30'
+                            : 'bg-nexus-bg/40 border border-nexus-border'
+                        }`}
+                      >
+                        {/* Badge + header row */}
+                        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-nexus-border/40">
+                          <span
+                            className={`text-[10px] font-mono px-2 py-0.5 rounded-full shrink-0 ${
+                              isOrphan
+                                ? 'bg-nexus-amber/20 text-nexus-amber border border-nexus-amber/40'
+                                : 'bg-nexus-text-faint/10 text-nexus-text-dim border border-nexus-border'
+                            }`}
+                          >
+                            {isOrphan ? 'orphan' : `${c.size} decisions`}
+                          </span>
+                          <span className="text-[10px] font-mono text-nexus-text-faint">
+                            {isOrphan ? 'isolated — no edges' : `cluster of ${c.size}`}
+                          </span>
+                        </div>
+                        {/* Sample titles — clearly separated region */}
+                        <div className="px-3 py-2 space-y-0.5">
+                          {c.sampleTitles.map((title, j) => (
+                            <p key={j} className="text-xs text-nexus-text-dim truncate" title={title}>
+                              · {title}
+                            </p>
+                          ))}
+                          {c.size > c.sampleTitles.length && (
+                            <p className="text-[10px] font-mono text-nexus-text-faint pl-2 pt-0.5">
+                              +{c.size - c.sampleTitles.length} more decision{c.size - c.sampleTitles.length !== 1 ? 's' : ''} in this cluster
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {p.clusters.length > 5 && (
-                    <p className="text-[10px] font-mono text-nexus-text-faint pl-2">
-                      +{p.clusters.length - 5} more clusters
+                    <p className="text-[10px] font-mono text-nexus-text-faint pl-2 pt-1">
+                      +{p.clusters.length - 5} more cluster{p.clusters.length - 5 !== 1 ? 's' : ''} not shown
                     </p>
                   )}
                 </div>
