@@ -137,7 +137,20 @@ function OverviewView({ graph, centrality, contradictions, holes }) {
       <StatCard label="Decisions" value={graph?.nodes.length || 0} sub="Total indexed" />
       <StatCard label="Connections" value={graph?.edges.length || 0} sub={`Avg ${centrality?.averageConnections || '?'} per node`} />
       <StatCard label="Conflicts" value={contradictions?.total || 0} sub={contradictions?.total > 0 ? 'Needs attention' : 'All clear'} color={contradictions?.total > 0 ? 'text-nexus-amber' : 'text-nexus-green'} />
-      <StatCard label="Holes" value={holes?.totalHoles || 0} sub={holes?.totalHoles > 0 ? 'Weak cross-links' : 'Well connected'} color={holes?.totalHoles > 0 ? 'text-nexus-amber' : 'text-nexus-green'} />
+      {/* v4.3.9 #313 — Overview chip was showing totalHoles (fragmented-project count = 1) while
+          the Holes tab headlines totalOrphans (= 7). Same concept, different metric. Align on
+          totalOrphans (more actionable — isolated decisions you can fix) and show fragmented
+          projects in the sub-label so both numbers are visible. */}
+      <StatCard
+        label="Holes"
+        value={holes?.totalOrphans || 0}
+        sub={
+          (holes?.totalOrphans || 0) > 0
+            ? `orphan decision${holes?.totalOrphans !== 1 ? 's' : ''}${holes?.totalFragmented > 0 ? ` · ${holes?.totalFragmented} fragmented` : ''}`
+            : 'Well connected'
+        }
+        color={(holes?.totalOrphans || 0) > 0 ? 'text-nexus-amber' : 'text-nexus-green'}
+      />
 
       {/* Edge types */}
       <div className="col-span-2 bg-nexus-surface border border-nexus-border rounded-xl p-4">
