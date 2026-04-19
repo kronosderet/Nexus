@@ -36,22 +36,47 @@ function probePort(host, port, timeoutMs = 200) {
   });
 }
 
+// v4.4.0 #369 — canonical project-name map
+const PROJECT_CASE_MAP = new Map([
+  ['nexus', 'Nexus'],
+  ['nexus-cli', 'Nexus'],
+  ['direwolf', 'direwolf'],
+]);
+function normalizeProjectName(name) {
+  if (!name) return name;
+  const mapped = PROJECT_CASE_MAP.get(name.toLowerCase());
+  return mapped || name;
+}
+
+// v4.4.0 #369 — smarter project detection with CLAUDE.md marker check.
 function detectProject() {
   const cwd = process.cwd();
+  try {
+    const claudeMd = join(cwd, 'CLAUDE.md');
+    if (existsSync(claudeMd)) {
+      const content = readFileSync(claudeMd, 'utf-8').slice(0, 4000);
+      const match = content.match(/^#\s+(.+?)\s*(?:—|$)/m);
+      if (match?.[1]) {
+        const name = match[1].trim().split(/\s+/)[0];
+        if (name && name.length > 1) return normalizeProjectName(name);
+      }
+    }
+  } catch {}
   try {
     const pkgPath = join(cwd, 'package.json');
     if (existsSync(pkgPath)) {
       const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
       const name = (pkg.name || '').replace(/^@[^/]+\//, '');
-      if (name.length > 1) return name;
+      if (name.length > 1) return normalizeProjectName(name);
     }
   } catch {}
   try {
     const remote = execSync('git remote get-url origin', { cwd, encoding: 'utf-8', timeout: 2000 }).trim();
     const match = remote.match(/[/:]([^/]+?)(?:\.git)?$/);
-    if (match?.[1]) return match[1];
+    if (match?.[1]) return normalizeProjectName(match[1]);
   } catch {}
-  return cwd.split(/[/\\]/).pop() || 'unknown';
+  const fallback = cwd.split(/[/\\]/).pop() || 'unknown';
+  return normalizeProjectName(fallback);
 }
 
 async function main() {
