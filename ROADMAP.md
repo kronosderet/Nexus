@@ -96,7 +96,33 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.3 (in flight)
+## Current — v4.4.4 (Tier 2 Finale · shipped 2026-04-19)
+
+The v4.3 → v4.4 arc is **shipped**. 26 MCP tools, 189 tests. Latest release:
+`v4.4.4 — Tier 2 Finale`. See **`CHANGELOG.md`** for full per-release detail
+from v4.3.5 through v4.4.4.
+
+### The arc in one paragraph
+v4.3.5 kicked off with an audit shakedown (data/code/dashboard). v4.3.6
+patched a command-injection vuln. v4.3.7 added version visibility. v4.3.8
+shipped the Memory Bridge first-run import. v4.3.9/v4.3.10 closed UI-audit
+shortlist items. v4.4.0 introduced the ambient-telemetry hook layer (alpha
+→ beta → stable). v4.4.1/v4.4.2/v4.4.3/v4.4.4 closed the UI-audit
+Tier 1 + Tier 2 small/medium backlogs across Fuel, Dashboard, Fleet,
+Graph (Visual/Centrality/Holes/Conflicts), Overseer, Log.
+
+### Remaining from the audit
+- **Tier 2 BIG (2 items)** — `#343` Overseer refine/follow-up mode (system
+  prompt work), `#307` Overseer-powered contradiction detection (LLM scan).
+  Both deferred to their own focused releases.
+- **Tier 3/4** — longtail polish. Not urgent. `nexus_search "Tier 3"` for list.
+
+### Non-audit backlog
+- `#217` Split oversized files (`cli/nexus.js` · `mcp/index.ts` · `store.ts`)
+- `#218` Route tests for github / overseer / webhooks
+- `#219` Zod runtime validation at route boundaries
+
+## Historical — v4.3 (in flight at the time)
 
 ### Philosophy pivot (Decision #144)
 Nexus becomes the reasoning layer ON TOP of CC's native scaffolding (memory, plans, scheduled-tasks, chapters, spawn-task, hooks, skills) — not a parallel universe. Every v4.3 item buckets into HARMONIZE (integrate with CC), AMPLIFY (compose on top), or OWN (Nexus-unique).
@@ -148,16 +174,14 @@ Motivated by the post-v4.3.6-restart friction where neither user nor assistant c
 - **Smoke-test coverage** — added assertion in `mcpb/smoke-test-bundle.mjs` that `nexus_version` returns the package-declared version and required fields. v4.3.5 I3 precedent.
 - **Release**: 176/176 tests green (was 169 + 7 new drift specs); MCPB rebuilt + smoke-passes on all 25 tools.
 
-### Queued for v4.3
-- **#188 HARMONIZE: Memory Bridge** — read/write `~/.claude/projects/*/memory/` in brief + record_decision
-- **#192 AMPLIFY: Thought Stack ⇄ spawn_task** — bidirectional
-- **#193 AMPLIFY: Migrate Overseer scans to `mcp__scheduled-tasks__*`**
-- **#194 AMPLIFY: Calendar-aware fuel**
-- **#196 OWN+HARMONIZE: Overseer reads CC scaffolding** — plans, memory, session JSONLs
-- **#197 OWN: KG auto-edge generation** — Overseer-powered edge suggestions beyond keyword/embedding overlap
-- Remaining AI endpoint consolidation (ai.ts, plan.ts, autoSummary.ts, smartSearch.ts)
-- Task project field support in Command/Kanban
-- family-coop scheduled message checking
+### Queued for v4.3 (superseded — all shipped or rolled into v4.4 arc)
+Kept for historical context. See CHANGELOG for where each item landed:
+- **#188 HARMONIZE: Memory Bridge** — shipped in v4.3.8 (first-run import)
+- **#192 AMPLIFY: Thought Stack ⇄ spawn_task** — deferred; re-evaluate in v4.5
+- **#193 AMPLIFY: Migrate Overseer scans to `mcp__scheduled-tasks__*`** — partial in v4.3.x
+- **#194 AMPLIFY: Calendar-aware fuel** — shipped in v4.3
+- **#196 OWN+HARMONIZE: Overseer reads CC scaffolding** — shipped in v4.3
+- **#197 OWN: KG auto-edge generation** — shipped in v4.3 (`nexus_propose_edges`)
 
 ## Future — v5.0 Vision
 
