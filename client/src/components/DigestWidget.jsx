@@ -83,7 +83,11 @@ export default function DigestWidget({ ws }) {
       {/* Project ranking */}
       {projectRanking.length > 0 && (
         <div className="mb-3">
-          <span className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider">Most active</span>
+          {/* v4.4.2 #236 — label the unit explicitly so "180" isn't ambiguous. */}
+          <div className="flex items-baseline justify-between">
+            <span className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider">Most active</span>
+            <span className="text-[9px] font-mono text-nexus-text-faint" title="Activity events in the selected range">events</span>
+          </div>
           <div className="mt-1.5 space-y-1">
             {projectRanking.slice(0, 4).map((p, i) => {
               const maxCount = projectRanking[0].count;
@@ -97,7 +101,7 @@ export default function DigestWidget({ ws }) {
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <span className="text-[10px] font-mono text-nexus-text-faint w-6 text-right">{p.count}</span>
+                  <span className="text-[10px] font-mono text-nexus-text-faint w-6 text-right" title={`${p.count} activity events in range`}>{p.count}</span>
                 </div>
               );
             })}
