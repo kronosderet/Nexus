@@ -135,10 +135,21 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
       }
     }
 
-    // Cross-project: link decisions with same tags
+    // Cross-project: link decisions with same tags.
+    // v4.4.1 #314 — blacklist generic tags that every project uses as metadata. Without this
+    // guard, `milestone` (52 edges) + `github` (16 edges) dominated the Nexus ↔ Firewall-Godot
+    // cross-project graph with 68/77 false positives. These tags label "version shipping" and
+    // "github repo created" which every project does; shared values don't imply coupling.
+    const GENERIC_TAGS = new Set([
+      'milestone', 'shipped', 'released', 'release', 'audit', 'polish',
+      'github', 'git', 'hygiene-migration', 'version', 'versioning',
+    ]);
+    const isGenericTag = (t: string) => GENERIC_TAGS.has(t.toLowerCase()) || /^v\d/i.test(t);
+
     const byTag: Record<string, Decision[]> = {};
     for (const d of decisions) {
       for (const t of (d.tags || [])) {
+        if (isGenericTag(t)) continue;
         if (!byTag[t]) byTag[t] = [];
         byTag[t].push(d);
       }
