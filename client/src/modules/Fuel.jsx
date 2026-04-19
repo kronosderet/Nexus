@@ -260,9 +260,11 @@ export default function FuelModule() {
             <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Learned Costs</span>
             <span className="text-[9px] font-mono text-nexus-text-faint ml-auto">from {costs.sampleSize} data points</span>
           </div>
+          {/* v4.4.2 #261 — server returns 3-decimal precision (e.g. "1.953"); round to 2
+              so we don't overclaim certainty with a sample size of ~20. */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Stat label="Per prompt" value={`~${costs.sessionPerPrompt}%`} sub={`~${costs.weeklyPerPrompt}% weekly`} />
-            <Stat label="Per task" value={`~${costs.sessionPerTask}%`} sub={`~${costs.weeklyPerTask}% weekly`} />
+            <Stat label="Per prompt" value={`~${Number(costs.sessionPerPrompt).toFixed(2)}%`} sub={`~${Number(costs.weeklyPerPrompt).toFixed(2)}% weekly`} />
+            <Stat label="Per task" value={`~${Number(costs.sessionPerTask).toFixed(2)}%`} sub={`~${Number(costs.weeklyPerTask).toFixed(2)}% weekly`} />
             {capacity?.promptsRemaining != null && (
               <Stat label="Session budget" value={`${capacity.promptsRemaining} prompts`}
                 sub={capacity.tasksRemaining != null ? `or ${capacity.tasksRemaining} tasks` : null} color="text-nexus-green" />
@@ -410,6 +412,14 @@ export default function FuelModule() {
             <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Session History</span>
             <span className="text-[9px] font-mono text-nexus-text-faint ml-auto">{stats.length} sessions</span>
           </div>
+          {/* v4.4.2 #262 — column header row so "pts" is labeled as fuel-reading data points. */}
+          <div className="flex items-center gap-3 text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider pb-1.5 border-b border-nexus-border/50 mb-1">
+            <span className="w-20 shrink-0">Date</span>
+            <span className="flex-1">Burn</span>
+            <span className="w-10 text-right">%</span>
+            <span className="w-12 text-right">Duration</span>
+            <span className="w-14 text-right" title="Fuel readings logged during this session">Readings</span>
+          </div>
           <div className="space-y-2">
             {visible.map((s, i) => (
               <div key={i} className="flex items-center gap-3 text-xs font-mono">
@@ -417,7 +427,7 @@ export default function FuelModule() {
                 <Bar percent={s.burned} className="flex-1" />
                 <span className={`w-10 text-right tabular-nums ${s.burned > 75 ? 'text-nexus-amber' : 'text-nexus-text-dim'}`}>{s.burned}%</span>
                 <span className="text-nexus-text-faint w-12 text-right">{s.duration}h</span>
-                <span className="text-[10px] text-nexus-text-faint w-14 text-right">{s.reports} pts</span>
+                <span className="text-[10px] text-nexus-text-faint w-14 text-right" title={`${s.reports} fuel reading${s.reports !== 1 ? 's' : ''} logged during this session`}>{s.reports}</span>
               </div>
             ))}
           </div>

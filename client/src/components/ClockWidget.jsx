@@ -152,7 +152,12 @@ export default function ClockWidget({ ws }) {
                   ? 'bg-nexus-green/10 text-nexus-green border border-nexus-green/20'
                   : 'bg-nexus-bg text-nexus-text-dim'
               }`}
-              title={day.note || day.date}
+              title={
+                // v4.4.2 #237 — for weekly-reset days explicitly spell out what "reset" means
+                day.isWeeklyReset
+                  ? (day.note ? `Weekly fuel reset · ${day.note}` : `${day.date} · Weekly fuel limit resets this day (all-models bucket refills).`)
+                  : (day.note || day.date)
+              }
             >
               <div>{day.date.split(' ')[0]}</div>
               {day.isWeeklyReset && <div className="text-[7px] mt-0.5">reset</div>}
