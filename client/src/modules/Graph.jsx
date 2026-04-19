@@ -444,6 +444,9 @@ function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, Deci
 }
 
 function CentralityView({ data, onPickBlast, onPickVisual }) {
+  // v4.4.3 #298 — pagination beyond the top-15 cap. Most users care about top hubs, but
+  // scrolling through the long tail matters for orphan-hunting and validation work.
+  const [page, setPage] = useState(15);
   return (
     <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
       <div className="flex items-baseline justify-between mb-3">
@@ -464,7 +467,7 @@ function CentralityView({ data, onPickBlast, onPickVisual }) {
         <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-48">Decision</span>
       </div>
       <div className="space-y-1.5">
-        {data?.centrality?.slice(0, 15).map(c => (
+        {data?.centrality?.slice(0, page).map(c => (
           // v4.4.2 #296 — entire row is a clickable button that jumps to Blast Radius
           // with this decision pre-filled and auto-analyzed. Also shows a "view in graph"
           // icon on hover for deep-linking into Visual (#329).
@@ -499,6 +502,38 @@ function CentralityView({ data, onPickBlast, onPickVisual }) {
             )}
           </div>
         ))}
+        {/* v4.4.3 #298 — pagination footer */}
+        {data?.centrality?.length > page && (
+          <div className="pt-3 flex items-center justify-between">
+            <button
+              onClick={() => setPage(p => Math.min(data.centrality.length, p + 15))}
+              className="text-[10px] font-mono text-nexus-amber hover:text-nexus-amber/80 px-3 py-1 rounded border border-nexus-amber/30 hover:bg-nexus-amber/5"
+            >
+              Show {Math.min(15, data.centrality.length - page)} more
+            </button>
+            <span className="text-[9px] font-mono text-nexus-text-faint">
+              Showing {page} of {data.centrality.length}
+            </span>
+            {data.centrality.length > page && (
+              <button
+                onClick={() => setPage(data.centrality.length)}
+                className="text-[9px] font-mono text-nexus-text-faint hover:text-nexus-amber"
+              >
+                Show all
+              </button>
+            )}
+          </div>
+        )}
+        {data?.centrality?.length > 0 && page >= data.centrality.length && data.centrality.length > 15 && (
+          <div className="pt-2 flex justify-end">
+            <button
+              onClick={() => setPage(15)}
+              className="text-[9px] font-mono text-nexus-text-faint hover:text-nexus-amber"
+            >
+              Collapse to top 15
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -745,21 +780,33 @@ function HolesView({ data, onLinkOrphan, onRefresh, DecisionPicker }) {
         </div>
       )}
 
-      {/* Healthy projects summary */}
+      {/* Healthy projects summary — v4.4.3 #317: explicit "×N decisions" label;
+          v4.4.3 #319: hygiene badge for known data-quality artifacts (DIREWOLF casing
+          drift, "Projects" CC encoded-dir leak). Both were normalized by v4.3.9-H1 +
+          v4.4.0-H2 migrations; if they show up again here, it's a regression signal. */}
       {healthy.length > 0 && (
         <div>
           <h3 className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-[0.2em] mb-2">
             Healthy projects
           </h3>
           <div className="flex flex-wrap gap-1.5">
-            {healthy.map((p) => (
-              <div
-                key={p.project}
-                className="px-2 py-1 rounded-full text-[10px] font-mono bg-nexus-green/5 text-nexus-green border border-nexus-green/20"
-              >
-                {p.project} <span className="opacity-60">×{p.decisions}</span>
-              </div>
-            ))}
+            {healthy.map((p) => {
+              const hygiene = (p.project === 'DIREWOLF' || p.project === 'Projects');
+              return (
+                <div
+                  key={p.project}
+                  className={`px-2 py-1 rounded-full text-[10px] font-mono border ${hygiene
+                    ? 'bg-nexus-amber/5 text-nexus-amber border-nexus-amber/30'
+                    : 'bg-nexus-green/5 text-nexus-green border-nexus-green/20'}`}
+                  title={hygiene
+                    ? `${p.project}: ${p.decisions} decision${p.decisions !== 1 ? 's' : ''} — data-quality artifact (should have been normalized by v4.3.9-H1 / v4.4.0-H2). Regression signal.`
+                    : `${p.project}: ${p.decisions} decision${p.decisions !== 1 ? 's' : ''} — single connected graph`}
+                >
+                  {p.project} <span className="opacity-60">×{p.decisions} decision{p.decisions !== 1 ? 's' : ''}</span>
+                  {hygiene && <span className="ml-1 text-[9px]">⚠</span>}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -1010,6 +1057,10 @@ function VisualView({ graph, initialSelectedId, onSelected }) {
         );
       })()}
 
+      {/* v4.4.3 #331 — on-screen hint for interactive controls that were previously undocumented. */}
+      <p className="text-[9px] font-mono text-nexus-text-faint mb-2 pl-1">
+        drag node to move · click node for details · click outside to deselect
+      </p>
       <div className="bg-nexus-surface border border-nexus-border rounded-xl p-4 flex gap-4">
         <div ref={containerRef} className="flex-1 min-w-0">
           <svg
