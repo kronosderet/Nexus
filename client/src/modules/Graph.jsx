@@ -266,7 +266,32 @@ function CentralityView({ data }) {
 }
 
 function ContradictionsView({ data }) {
-  if (data?.total === 0) return <div className="text-center py-8"><AlertTriangle size={20} className="mx-auto text-nexus-green mb-2" /><p className="text-xs font-mono text-nexus-green">No contradictions detected.</p></div>;
+  // v4.3.10 #305 — empty-state rewritten to be honest. Previously "No contradictions
+  // detected" implied active detection; there isn't one. The number is just the count of
+  // rel='contradicts' edges users have manually created via nexus_link_decisions. Say so.
+  if (data?.total === 0) {
+    return (
+      <div className="bg-nexus-surface border border-nexus-border rounded-xl p-6">
+        <div className="flex items-start gap-3">
+          <AlertTriangle size={18} className="text-nexus-amber shrink-0 mt-0.5" />
+          <div className="space-y-2">
+            <p className="text-sm text-nexus-text">No conflicts flagged.</p>
+            <p className="text-xs font-mono text-nexus-text-faint leading-relaxed">
+              This tab lists decisions you&rsquo;ve explicitly marked as opposing each other via
+              <code className="mx-1 px-1 py-0.5 rounded bg-nexus-bg text-nexus-amber">rel=&rsquo;contradicts&rsquo;</code>
+              edges. A zero here doesn&rsquo;t mean nothing contradicts anything &mdash; it means nothing has been tagged yet.
+            </p>
+            <p className="text-xs font-mono text-nexus-text-faint leading-relaxed">
+              Useful when: you changed direction, two projects took opposing paths, a decision was superseded without being marked deprecated.
+            </p>
+            <p className="text-[10px] font-mono text-nexus-text-dim pt-1">
+              Flag via <code className="px-1 py-0.5 rounded bg-nexus-bg">nexus_link_decisions</code> with <code className="px-1 py-0.5 rounded bg-nexus-bg">rel=&rsquo;contradicts&rsquo;</code>.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="space-y-2">
       {data?.contradictions?.map((c, i) => (
