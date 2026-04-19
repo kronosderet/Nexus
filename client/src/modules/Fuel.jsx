@@ -315,6 +315,27 @@ export default function FuelModule() {
                 );
               });
             })()}
+            {/* v4.4.2 #263 — plain-language recommendation derived from the time-of-day stats.
+                Finds the worst and best slots (if both have n≥2 to avoid n=1 noise) and nudges
+                the user toward the cheaper window. Suppressed if sample sizes are too thin. */}
+            {(() => {
+              const slotKeys = ['morning', 'afternoon', 'evening', 'night'];
+              const eligible = slotKeys
+                .map(k => ({ key: k, ...patterns.timeSlots?.[k] }))
+                .filter(s => s.sessions >= 2 && s.avgBurn != null);
+              if (eligible.length < 2) return null;
+              const sorted = [...eligible].sort((a, b) => a.avgBurn - b.avgBurn);
+              const best = sorted[0];
+              const worst = sorted[sorted.length - 1];
+              if (worst.avgBurn - best.avgBurn < 10) return null;  // not enough spread to matter
+              return (
+                <p className="text-[10px] font-mono text-nexus-amber mt-2 leading-relaxed">
+                  ◈ Your {TIME_SLOT_LABELS[worst.key].split(' ')[0].toLowerCase()} sessions burn
+                  {' '}{worst.avgBurn}% avg — prefer {TIME_SLOT_LABELS[best.key].split(' ')[0].toLowerCase()}
+                  {' '}({best.avgBurn}% avg) for heavy work.
+                </p>
+              );
+            })()}
           </div>
 
           {patterns.mostEfficient && patterns.leastEfficient && (
