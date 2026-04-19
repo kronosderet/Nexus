@@ -265,9 +265,41 @@ export default function Overseer() {
     }
   }
 
-  async function askOverseer() {
+  // v4.4.1 #342 — dedup recent Ask questions. User-facing problem: same question fired
+  // back-to-back generates redundant LLM runs (observed 4× in a row in the audit). Soft-block
+  // on identical text within 30min; show an inline recency warning + "Send anyway" to override.
+  const DEDUP_WINDOW_MIN = 30;
+  const [dedupWarning, setDedupWarning] = useState(null); // { text, minutesAgo, forceNext }
+  function findRecentMatch(q) {
+    const now = Date.now();
+    const normalized = q.toLowerCase().replace(/\s+/g, ' ').trim();
+    // walk history backwards to find a matching user turn
+    for (let i = chatHistory.length - 1; i >= 0; i--) {
+      const entry = chatHistory[i];
+      if (entry.role !== 'user') continue;
+      const entryNormalized = (entry.text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+      if (entryNormalized === normalized) {
+        const minutesAgo = Math.floor((now - new Date(entry.time).getTime()) / 60000);
+        if (minutesAgo < DEDUP_WINDOW_MIN) return { minutesAgo, entry };
+      }
+    }
+    return null;
+  }
+
+  async function askOverseer(opts = {}) {
     if (!question.trim()) return;
     const q = question.trim();
+
+    // Dedup check unless force-next flag is set
+    if (!opts.force) {
+      const match = findRecentMatch(q);
+      if (match) {
+        setDedupWarning({ text: q, minutesAgo: match.minutesAgo });
+        return;
+      }
+    }
+    setDedupWarning(null);
+
     setAsking(true);
     setQuestion('');
     // Add question to history immediately
@@ -421,6 +453,34 @@ export default function Overseer() {
               </div>
             )}
 
+            {/* v4.4.1 #342 — dedup inline warning. Shown when the current question was
+                asked identically in the last 30 min. User can override with "Send anyway". */}
+            {dedupWarning && (
+              <div className="mb-2 px-3 py-2 rounded-lg bg-nexus-amber/5 border border-nexus-amber/30 flex items-start gap-2">
+                <AlertTriangle size={12} className="text-nexus-amber mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-nexus-text">
+                    You asked this {dedupWarning.minutesAgo === 0 ? 'just now' : `${dedupWarning.minutesAgo} min ago`}.
+                  </p>
+                  <p className="text-[10px] font-mono text-nexus-text-faint">
+                    Scroll up to see the previous answer, or re-send to generate a fresh one.
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setDedupWarning(null); askOverseer({ force: true }); }}
+                  className="text-[10px] font-mono text-nexus-amber hover:text-nexus-amber/80 px-2 py-0.5 rounded border border-nexus-amber/30 hover:bg-nexus-amber/10 shrink-0"
+                >
+                  Send anyway
+                </button>
+                <button
+                  onClick={() => setDedupWarning(null)}
+                  className="text-[10px] font-mono text-nexus-text-faint hover:text-nexus-text px-1 shrink-0"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             {/* Input */}
             <div className="flex gap-2">
               <input
@@ -432,7 +492,7 @@ export default function Overseer() {
                 className="flex-1 bg-nexus-bg border border-nexus-border rounded-lg px-3 py-2 text-sm text-nexus-text placeholder:text-nexus-text-faint focus:border-nexus-amber focus:outline-none"
               />
               <button
-                onClick={askOverseer}
+                onClick={() => askOverseer()}
                 disabled={asking || !question.trim()}
                 className="px-4 py-2 rounded-lg bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20 text-xs font-mono hover:bg-nexus-amber/20 transition-colors disabled:opacity-50"
               >
