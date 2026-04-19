@@ -7,6 +7,7 @@ import {
   PieChart, Calendar, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { useNexusFuel } from '../context/useNexus.js';
+import FuelFreshnessStamp from '../components/FuelFreshnessStamp.jsx';
 
 function color(pct) {
   if (pct == null) return 'text-nexus-text-faint';
@@ -122,17 +123,18 @@ export default function FuelModule() {
   const costs = fuel.costs;
   const capacity = fuel.capacity;
   const forecast = fuel.forecast;
-  const freshness = fuel.estimated?.confidence === 'high' ? 'Fresh reading' : `${fuel.reported?.minutesAgo ?? '?'}m since report`;
-
   return (
     <div>
-      {/* Header */}
+      {/* Header — v4.3.9 #259: use shared FuelFreshnessStamp so Command view + Dashboard
+          ClockWidget can reuse the same staleness-aware age indicator. */}
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-nexus-text flex items-center gap-2">
           <FuelIcon size={18} className="text-nexus-amber" />
           Fuel Management
         </h2>
-        <p className="text-xs font-mono text-nexus-text-faint mt-1">{freshness}</p>
+        <p className="text-xs font-mono mt-1">
+          <FuelFreshnessStamp fuel={fuel} />
+        </p>
       </div>
 
       {/* Plan context */}
