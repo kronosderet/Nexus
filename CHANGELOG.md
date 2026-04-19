@@ -8,6 +8,51 @@ major UI audit, one big `Memory Bridge` import feature, the ambient-telemetry
 hook layer (v4.4.0 alpha/beta/final), and three post-v4.4.0 patch releases
 closing UI-audit Tier 1 + Tier 2 backlogs.
 
+## v4.4.4 — Tier 2 Finale
+
+Eight more Tier 2 items closed — the small/medium remainder of the UI-audit
+Tier 2 backlog. The two BIG items (#343 Overseer refine mode, #307 LLM
+contradiction detection) are carried forward to their own focused releases.
+
+**Fuel (2 tasks)**
+- `#264` Session Patterns headline metrics (burn rate, duration, fuel/session)
+  now show week-over-week delta badges with color-coded direction. Analyzed
+  sub-line exposes this-week / prior-week session counts.
+- `#265` Task Cost by Category is click-to-expand — each row opens a list of
+  the actual tasks that produced the average, with cost + session date.
+  Server response now carries per-category task list.
+
+**Dashboard (1 task)**
+- `#238` ClockWidget week-ahead strip gains a burn-rate projection overlay.
+  Server computes projected end-of-day weekly% based on 72h burn rate; UI
+  tints days ≤40% (amber) / ≤15% (red), highlights the first day the line
+  crosses zero with a red ring + "0%" label.
+
+**Overseer (1 task)**
+- `#344` Past Q&A now searchable once history ≥3 pairs. Three filter axes:
+  free-text (question + answer), date range preset (today / 7d / 30d),
+  detected-project chip. Filters compose as AND with a Clear pill.
+
+**Graph Conflicts (2 tasks)**
+- `#308` Empty-state copy expanded into three Q/A blocks: what is a conflict,
+  why care, how to use it. Keeps the "No conflicts flagged" lead and the
+  `rel='contradicts'` code tag.
+- `#309` Always-visible historical counter row: Active · Ever flagged ·
+  Resolved. "Ever flagged" counts all contradicts edges plus auto-detected
+  potentials; "Resolved" counts flags where at least one endpoint decision
+  is deprecated. Gives the tab a live state readout even at zero active.
+
+**Log (2 tasks)**
+- `#357` Time-range preset pills (All / Last hour / Today / 7d) narrow both
+  the activity stream and the timeline view. Pairs with the existing search
+  for precision lookups during bursty sessions.
+- `#358` Per-type mute toggle — each type chip gains a small eye icon that
+  hides that type from the stream for this session. Muted chips display
+  struck-through. "Unmute all (N)" pill appears when any mute is active.
+  Does not affect single-type-filter mode (user already narrowed).
+
+No breaking changes. 26 MCP tools. Tests 189/189.
+
 ## v4.4.3 — Tier 2 Sweep II
 
 12 more Tier 2 items closed. Mixed-theme release; Graph sub-tabs gain

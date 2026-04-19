@@ -86,6 +86,81 @@ function Stat({ label, value, sub, color: c }) {
   );
 }
 
+// v4.4.4 #264 — week-over-week delta badge for Session Patterns headline metrics.
+// `delta` is (thisWeek − priorWeek). For burn-rate/fuel-per-session, negative = improving (less consumed).
+// For duration, interpretation is neutral — shown as a neutral delta with no improving/degrading color.
+function DeltaBadge({ delta, unit = '', lowerIsBetter = true, neutral = false }) {
+  if (delta == null || delta === 0) {
+    return <span className="inline-flex items-center gap-0.5 text-[10px] font-mono text-nexus-text-faint"><Minus size={10} /> 0{unit}</span>;
+  }
+  const sign = delta > 0 ? '+' : '';
+  let cls = 'text-nexus-text-dim';
+  let Icon = delta > 0 ? TrendingUp : TrendingDown;
+  if (!neutral) {
+    const improving = lowerIsBetter ? delta < 0 : delta > 0;
+    cls = improving ? 'text-nexus-green' : 'text-nexus-red';
+  }
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-mono ${cls}`}>
+      <Icon size={10} /> {sign}{delta}{unit}
+    </span>
+  );
+}
+
+// v4.4.4 #265 — Task Cost by Category was read-only; click to expand shows the
+// underlying tasks that produced each average. Lets users verify whether a gold
+// metric like "Fuel Management 15.3% (3×)" is a real pattern or a one-off skew.
+function TaskCostPanel({ entries, maxCost, totalAnalyzed }) {
+  const [expanded, setExpanded] = useState(null); // category name or null
+  return (
+    <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5 mb-4">
+      <div className="flex items-center gap-2 mb-3">
+        <PieChart size={14} className="text-nexus-amber" />
+        <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Task Cost by Category</span>
+        <span className="text-[9px] font-mono text-nexus-text-faint ml-auto">from {totalAnalyzed} tasks · click to inspect</span>
+      </div>
+      <div className="space-y-1">
+        {entries.map(([cat, v]) => {
+          const isOpen = expanded === cat;
+          const hasTasks = (v.tasks?.length || 0) > 0;
+          return (
+            <div key={cat}>
+              <button
+                type="button"
+                onClick={() => hasTasks && setExpanded(isOpen ? null : cat)}
+                className={`flex items-center gap-3 text-xs font-mono w-full text-left px-1 py-1 rounded transition-colors ${hasTasks ? 'hover:bg-nexus-bg cursor-pointer' : 'cursor-default'}`}
+                aria-expanded={hasTasks ? isOpen : undefined}
+                title={hasTasks ? `Show the ${v.count} task${v.count === 1 ? '' : 's'} behind this average` : undefined}
+              >
+                {hasTasks ? (
+                  isOpen ? <ChevronDown size={10} className="text-nexus-text-faint shrink-0" /> : <ChevronRight size={10} className="text-nexus-text-faint shrink-0" />
+                ) : <span className="w-[10px] shrink-0" />}
+                <span className="w-36 text-nexus-text-dim shrink-0">{cat}</span>
+                <Bar percent={(v.avgCost / maxCost) * 100} className="flex-1" />
+                <span className="w-12 text-right tabular-nums text-nexus-text-dim">{v.avgCost}%</span>
+                <span className="w-14 text-right text-nexus-text-faint">{v.count}×</span>
+              </button>
+              {isOpen && hasTasks && (
+                <div className="mt-1 mb-2 ml-4 pl-3 border-l border-nexus-border/60 space-y-1">
+                  {v.tasks.map((t, i) => (
+                    <div key={i} className="flex items-start gap-2 text-[10px] font-mono">
+                      <span className="w-10 text-right tabular-nums text-nexus-text-dim shrink-0">{t.cost}%</span>
+                      <span className="w-24 text-nexus-text-faint shrink-0" title={new Date(t.session).toLocaleString('cs-CZ')}>
+                        {new Date(t.session).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}
+                      </span>
+                      <span className="text-nexus-text-dim leading-relaxed">{t.title}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function FuelModule() {
   // All fuel data from shared context — no local fetch, no ws.subscribe, no polling
   const { estimator, workload, timing: timingSlice, history: historySlice, fuelIntel } = useNexusFuel();
@@ -284,11 +359,20 @@ export default function FuelModule() {
             <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Session Patterns</span>
             <span className="ml-auto"><TrendBadge trend={patterns.trend} /></span>
           </div>
+          {/* v4.4.4 #264 — week-over-week delta shown next to each headline metric so
+              the "Improving/Stable/Degrading" badge is backed by numbers. Green = improving
+              (burn-rate/fuel down). Red = degrading. Duration is neutral (neither direction
+              is inherently better). Suppressed when prior-week sample is empty. */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-            <Stat label="Analyzed" value={`${patterns.totalSessions}`} sub="sessions" />
-            <Stat label="Avg burn rate" value={`${patterns.avgBurnRate}%/h`} />
-            <Stat label="Avg duration" value={`${patterns.avgSessionDuration}h`} />
-            <Stat label="Avg fuel/session" value={`${patterns.avgFuelPerSession}%`} />
+            <Stat label="Analyzed" value={`${patterns.totalSessions}`} sub={
+              patterns.wow ? `${patterns.wow.thisWeekSessions} this wk · ${patterns.wow.priorWeekSessions} prior` : 'sessions'
+            } />
+            <Stat label="Avg burn rate" value={`${patterns.avgBurnRate}%/h`}
+              sub={patterns.wow?.avgBurnRate != null ? <DeltaBadge delta={patterns.wow.avgBurnRate} unit="%/h" lowerIsBetter={true} /> : null} />
+            <Stat label="Avg duration" value={`${patterns.avgSessionDuration}h`}
+              sub={patterns.wow?.avgSessionDuration != null ? <DeltaBadge delta={patterns.wow.avgSessionDuration} unit="h" neutral={true} /> : null} />
+            <Stat label="Avg fuel/session" value={`${patterns.avgFuelPerSession}%`}
+              sub={patterns.wow?.avgFuelPerSession != null ? <DeltaBadge delta={patterns.wow.avgFuelPerSession} unit="%" lowerIsBetter={true} /> : null} />
           </div>
 
           <div className="space-y-2 mb-4">
@@ -361,23 +445,7 @@ export default function FuelModule() {
         if (entries.length === 0) return null;
         const maxCost = Math.max(1, ...entries.map(([, v]) => v.avgCost));
         return (
-          <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5 mb-4">
-            <div className="flex items-center gap-2 mb-3">
-              <PieChart size={14} className="text-nexus-amber" />
-              <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Task Cost by Category</span>
-              <span className="text-[9px] font-mono text-nexus-text-faint ml-auto">from {taskCosts.totalTasksAnalyzed} tasks</span>
-            </div>
-            <div className="space-y-2">
-              {entries.map(([cat, v]) => (
-                <div key={cat} className="flex items-center gap-3 text-xs font-mono">
-                  <span className="w-40 text-nexus-text-dim shrink-0">{cat}</span>
-                  <Bar percent={(v.avgCost / maxCost) * 100} className="flex-1" />
-                  <span className="w-12 text-right tabular-nums text-nexus-text-dim">{v.avgCost}%</span>
-                  <span className="w-14 text-right text-nexus-text-faint">{v.count}×</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <TaskCostPanel entries={entries} maxCost={maxCost} totalAnalyzed={taskCosts.totalTasksAnalyzed} />
         );
       })()}
 
