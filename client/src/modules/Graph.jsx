@@ -90,14 +90,27 @@ export default function GraphModule() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-lg font-semibold text-nexus-text flex items-center gap-2">
-          <GitBranch size={18} className="text-nexus-amber" />
-          Knowledge Graph
-        </h2>
-        <p className="text-xs font-mono text-nexus-text-faint mt-1">
-          {graph?.nodes.length || 0} decisions, {graph?.edges.length || 0} connections. The architecture in context.
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-nexus-text flex items-center gap-2">
+            <GitBranch size={18} className="text-nexus-amber" />
+            Knowledge Graph
+          </h2>
+          <p className="text-xs font-mono text-nexus-text-faint mt-1">
+            {graph?.nodes.length || 0} decisions, {graph?.edges.length || 0} connections. The architecture in context.
+          </p>
+        </div>
+        {/* v4.4.2 #277 — freshness stamp + manual refresh for the graph slice. Pairs with
+            Fuel view's "read Nm ago" pattern; makes it clear the graph isn't live. */}
+        <button
+          onClick={() => graphSlice.refresh()}
+          disabled={graphSlice.loading}
+          className="flex items-center gap-1 text-[10px] font-mono text-nexus-text-faint hover:text-nexus-amber px-2 py-1 rounded border border-transparent hover:border-nexus-border transition-colors"
+          title="Refresh graph data (edges, centrality, holes, contradictions)"
+        >
+          <RefreshCw size={10} className={graphSlice.loading ? 'animate-spin' : ''} />
+          {graphSlice.loading ? 'refreshing…' : 'refresh'}
+        </button>
       </div>
 
       {/* Tab bar — v4.3.5 P4: ARIA tablist + keyboard nav (Arrow/Home/End) */}
