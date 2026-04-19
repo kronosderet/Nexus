@@ -241,6 +241,17 @@ export default function Command({ ws }) {
             <h2 className="text-lg font-semibold text-nexus-text flex items-center gap-2">
               <Compass size={18} className="text-nexus-amber" />
               Command
+              {/* v4.4.1 #221 — active-project chip so the user knows which project's view
+                  they're looking at. Mirrors the nexus_brief disambiguation. Only shown when
+                  filtered; "All" is implied by absence of chip. */}
+              {projectFilter !== 'all' && (
+                <span
+                  className="ml-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20"
+                  title={`Filtered to project: ${projectFilter}. Click "All" in the filter bar to reset.`}
+                >
+                  {projectFilter}
+                </span>
+              )}
             </h2>
             <div className="flex items-center gap-4 mt-1 text-xs font-mono">
               <p className="text-nexus-text-faint">
