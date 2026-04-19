@@ -2,7 +2,7 @@
 
 **AI Cowork Metabrain for Claude Code**
 
-A local-first metabrain that gives every Claude Code instance persistent memory, a Knowledge Graph, and a strategic AI advisor. 25 native MCP tools. Zero cloud dependencies.
+A local-first metabrain that gives every Claude Code instance persistent memory, a Knowledge Graph, and a strategic AI advisor. 26 native MCP tools. Ambient-telemetry hook layer injects rich context on every session start. Zero cloud dependencies.
 
 ## Install as Claude Code Plugin
 
@@ -41,20 +41,20 @@ Or use slash commands directly: `/nexus-brief`, `/nexus-status`, `/nexus-plan`
 Nexus solves the biggest problem with AI-assisted development: **Claude forgets everything between conversations.** Nexus doesn't.
 
 - **Session Memory** — every conversation is automatically logged with decisions, blockers, and outcomes
-- **Knowledge Graph** — 90+ architectural decisions with 7 typed edges (led_to, depends_on, contradicts, replaced, related, informs, experimental) and blast-radius analysis
+- **Knowledge Graph** — 160+ architectural decisions with 7 typed edges (led_to, depends_on, contradicts, replaced, related, informs, experimental), blast-radius analysis, and cross-tab navigation (Centrality → Blast Radius, Visual focused on node)
 - **Thought Stack** — push context before interruptions, pop when you return. Works across Claude instances.
 - **Decision Guard** — checks for redundant work before you start
 - **Fuel Intelligence** — tracks Claude usage, burn rates, and session planning
 - **Self-Critique** — identifies slow tasks, stuck items, completion patterns
 - **Local AI Overseer** (optional) — strategic analysis via LM Studio with up to 200k context
 
-## 25 Native MCP Tools
+## 26 Native MCP Tools
 
 After installing, Claude Code can call these directly — no shell-outs, no CLI:
 
-**Read:** `nexus_brief`, `nexus_get_plan`, `nexus_check_guard`, `nexus_search`, `nexus_get_critique`, `nexus_predict_gaps`, `nexus_get_blast_radius`, `nexus_ask_overseer`
+**Read:** `nexus_brief`, `nexus_get_plan`, `nexus_check_guard`, `nexus_search`, `nexus_get_critique`, `nexus_predict_gaps`, `nexus_get_blast_radius`, `nexus_ask_overseer`, `nexus_version`
 
-**Write:** `nexus_create_task`, `nexus_complete_task`, `nexus_log_activity`, `nexus_log_session`, `nexus_log_usage`, `nexus_record_decision`, `nexus_update_decision`, `nexus_link_decisions`, `nexus_push_thought`, `nexus_pop_thought`
+**Write:** `nexus_create_task`, `nexus_complete_task`, `nexus_log_activity`, `nexus_log_session`, `nexus_log_usage`, `nexus_record_decision`, `nexus_update_decision`, `nexus_link_decisions`, `nexus_push_thought`, `nexus_pop_thought`, `nexus_import_cc_memories`
 
 **Async AI:** `nexus_ask_overseer_start`, `nexus_get_overseer_result`, `nexus_propose_edges`
 
@@ -87,11 +87,24 @@ Plus: `Ctrl+K` search, `Ctrl+T` thought stack, `Ctrl+/` keyboard shortcuts.
 
 ## Claude Code Lifecycle Hooks
 
-Three hooks fire automatically:
+The SessionStart hook fires automatically and injects a rich ambient-telemetry
+context block at the top of every new Claude Code conversation:
 
-- **SessionStart** — injects metabrain context (fuel, tasks, sessions, decisions, risks, git status)
-- **UserPromptSubmit** — logs each prompt to the activity stream
-- **Stop** — auto-generates session summary + pushes handoff thought for the next instance
+- **Project** auto-detected (CLAUDE.md marker → `package.json` → `git remote` → cwd), normalized through a canonical casing map
+- **Fuel** — session + weekly percentages with freshness stamp ("read Nm ago") and stale warning when >2h old
+- **Tasks** — in-progress items + backlog count + recovery of the top active thought via LIFO pop
+- **Sessions** + **Key decisions** — last 3 sessions + 5 most recent decisions, project-scoped
+- **Tests** — "N/N green" greped from the latest commit message
+- **Git** — branch, uncommitted count, working-tree diff shortstat, commits since last Nexus session
+- **Fleet uncommitted** — top-5 most-active projects' dirty working trees (bounded scan)
+- **Overseer snapshot** — latest digest + risk scan if fresh (<24h)
+- **Services** — parallel TCP probes for LM Studio (:1234), Ollama (:11434), Dashboard (:3001), Vite (:5173)
+- **System** — memory pressure warning at ≥85% / ≥95%; `nexus.json` size + backup age
+- **Chapter** suggestion — priority: resumed thought → in-progress task → default
+
+Total hook latency under 100ms combined. All probes fail-silent — the hook never crashes session start.
+
+Also: **UserPromptSubmit** (currently a no-op stub; reserved for semantic classification work), **Stop** (auto-generates session summary + pushes handoff thought for the next instance).
 
 Install hooks: `nexus hooks install` (from the CLI).
 
@@ -99,19 +112,20 @@ Install hooks: `nexus hooks install` (from the CLI).
 
 For AI-powered features (Overseer, session plan, code audit), install [LM Studio](https://lmstudio.ai) and load a model. Tested with Gemma 4 31B and Gemma 4 26B A4B (Q4_K_M). Nexus auto-detects LM Studio at `localhost:1234`. GPU-aware inference with AI semaphore — adapts to any hardware.
 
-Without LM Studio, all 21 non-AI tools work normally (4 AI-dependent tools: `nexus_ask_overseer`, `nexus_ask_overseer_start`, `nexus_get_overseer_result`, `nexus_propose_edges` require a local model).
+Without LM Studio, all 22 non-AI tools work normally (4 AI-dependent tools: `nexus_ask_overseer`, `nexus_ask_overseer_start`, `nexus_get_overseer_result`, `nexus_propose_edges` require a local model).
 
 ## Architecture
 
 | Layer | Stack |
 |---|---|
-| MCP | 25 tools, stdio, standalone (no server needed) |
-| Dashboard | React 19 + Vite + Tailwind CSS 4 (optional, 8 modules) |
+| MCP | 26 tools, stdio, standalone (no server needed) |
+| Dashboard | React 19 + Vite + Tailwind CSS 4 (optional, 7 modules) |
 | Server | Express 5 + TypeScript (dashboard only) |
-| Store | JSON at `~/.nexus/nexus.json` (atomic writes, 3-gen backup) |
+| Store | JSON at `~/.nexus/nexus.json` (atomic writes, 3-gen backup, idempotent migrations) |
 | AI | LM Studio / Ollama (optional, auto-detected, GPU-aware) |
 | Scheduler | Risk scan (6h) + digest (24h), automated |
-| Tests | 169 Vitest (store, routes, graph, CC scaffolding, estimator) |
+| Hooks | SessionStart ambient telemetry (12+ context injections), <100ms latency |
+| Tests | 189 Vitest (store, routes, graph, CC scaffolding, estimator, memory bridge, hygiene migrations) |
 
 ## Data & Privacy
 
