@@ -364,9 +364,13 @@ export default function Overseer() {
                 onClick={fetchAnalysis}
                 disabled={loading}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded-lg border border-nexus-border hover:border-nexus-amber/30 hover:text-nexus-amber text-nexus-text-dim transition-colors disabled:opacity-50"
+                // v4.4.2 #346 — hover tooltip previews cost + scope so users know what
+                // clicking this costs (local AI runs; no Anthropic fuel, but ~1 GB VRAM
+                // spike for 20-40s while the model generates).
+                title="Runs the Overseer on full fleet state: all projects, tasks, sessions, decisions, git. ~20-40s, ~1 GB VRAM spike on local AI. No Anthropic fuel."
               >
                 {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                {loading ? 'Analyzing...' : 'Analyze Fleet'}
+                {loading ? 'Analyzing…' : 'Analyze Fleet'}
               </button>
             </div>
 
@@ -375,6 +379,10 @@ export default function Overseer() {
                 <Brain size={32} className="mx-auto text-nexus-text-faint mb-3 opacity-30" />
                 <p className="text-sm text-nexus-text-faint">Click "Analyze Fleet" to get strategic guidance.</p>
                 <p className="text-xs text-nexus-text-faint mt-1">The Overseer examines all projects, tasks, sessions, and git state.</p>
+                {/* v4.4.2 #346 — explicit cost disclosure so users see what the click triggers. */}
+                <p className="text-[10px] font-mono text-nexus-text-faint mt-3">
+                  ~20–40s · ~1 GB VRAM spike on local AI · no Anthropic fuel
+                </p>
               </div>
             )}
 
@@ -431,8 +439,21 @@ export default function Overseer() {
                           'bg-nexus-red/10 text-nexus-red'
                         }`}>{msg.outcome}</span>
                       )}
-                      <span className="text-[8px] font-mono text-nexus-text-faint ml-auto">
-                        {new Date(msg.time).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
+                      {/* v4.4.2 #345 — smart timestamp: "HH:MM" for today, "Nd · HH:MM"
+                          for recent days, full date for older. Audit flagged that just
+                          "22:52" was ambiguous across days. */}
+                      <span className="text-[8px] font-mono text-nexus-text-faint ml-auto" title={new Date(msg.time).toLocaleString('cs-CZ')}>
+                        {(() => {
+                          const d = new Date(msg.time);
+                          const now = new Date();
+                          const timeStr = d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+                          if (d.toDateString() === now.toDateString()) return timeStr;
+                          const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+                          if (d.toDateString() === yesterday.toDateString()) return `yest · ${timeStr}`;
+                          const daysAgo = Math.floor((now.getTime() - d.getTime()) / 86400000);
+                          if (daysAgo < 7) return `${daysAgo}d · ${timeStr}`;
+                          return d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }) + ' ' + timeStr;
+                        })()}
                       </span>
                     </div>
                     {msg.role === 'user' ? (
