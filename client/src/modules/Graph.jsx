@@ -114,7 +114,7 @@ export default function GraphModule() {
 
       {/* Views */}
       {view === 'overview' && <OverviewView graph={graph} centrality={centrality} contradictions={contradictions} holes={holes} />}
-      {view === 'blast' && <BlastView blastId={blastId} setBlastId={setBlastId} onRun={runBlast} result={blastResult} />}
+      {view === 'blast' && <BlastView blastId={blastId} setBlastId={setBlastId} onRun={runBlast} result={blastResult} graph={graph} centrality={centrality} />}
       {view === 'centrality' && <CentralityView data={centrality} />}
       {view === 'contradictions' && <ContradictionsView data={contradictions} />}
       {view === 'holes' && <HolesView data={holes} />}
@@ -183,7 +183,39 @@ function OverviewView({ graph, centrality, contradictions, holes }) {
   );
 }
 
-function BlastView({ blastId, setBlastId, onRun, result }) {
+function BlastView({ blastId, setBlastId, onRun, result, graph, centrality }) {
+  // v4.3.10 #284 — build 3-5 suggested decision chips from graph + centrality data so
+  // first-time users have zero-cost starting points. Previously an empty textbox with a
+  // placeholder "e.g. 44" (arbitrary, no context). Suggestions:
+  //   - most-recent decision (highest ID, likely what user just recorded)
+  //   - top 3 highest-centrality (architectural hubs — interesting blast targets)
+  const suggestions = (() => {
+    const picks = [];
+    const seen = new Set();
+    const push = (id, reason, label) => {
+      if (id == null || seen.has(id)) return;
+      seen.add(id);
+      picks.push({ id, reason, label });
+    };
+    // Most-recent decision (highest numeric ID)
+    if (graph?.nodes?.length) {
+      const latest = [...graph.nodes].sort((a, b) => b.id - a.id)[0];
+      if (latest) push(latest.id, 'most recent', String(latest.label || '').slice(0, 40));
+    }
+    // Top-3 highest centrality
+    const topCentral = (centrality?.centrality || []).slice(0, 3);
+    for (const c of topCentral) {
+      push(c.id, `${c.total} edges`, String(c.decision || '').slice(0, 40));
+    }
+    return picks;
+  })();
+
+  const runFor = (id) => {
+    setBlastId(String(id));
+    // onRun reads blastId from parent scope — set + fire in microtask order
+    queueMicrotask(() => onRun());
+  };
+
   return (
     <div>
       <div className="flex gap-2 mb-4">
@@ -198,6 +230,38 @@ function BlastView({ blastId, setBlastId, onRun, result }) {
           Analyze
         </button>
       </div>
+      {/* v4.3.10 #284 — empty-state explainer + suggested chips so users aren't staring at
+          a sterile textbox wondering which ID to try. */}
+      {!result && (
+        <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5 mb-2">
+          <p className="text-xs text-nexus-text-dim mb-3">
+            Blast Radius traces all decisions connected to a starting decision, up to 3 hops
+            out. Use it to understand the architectural impact of changing or deprecating a
+            decision.
+          </p>
+          {suggestions.length > 0 && (
+            <>
+              <span className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider block mb-1.5">
+                Try one
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {suggestions.map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => runFor(s.id)}
+                    className="px-2.5 py-1 rounded-full border border-nexus-border hover:border-nexus-amber/50 hover:bg-nexus-amber/5 text-[10px] font-mono text-nexus-text-faint hover:text-nexus-amber transition-colors text-left max-w-xs"
+                    title={s.label}
+                  >
+                    <span className="text-nexus-amber">#{s.id}</span>
+                    <span className="text-nexus-text-dim"> · {s.reason} · </span>
+                    <span className="truncate">{s.label}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
       {result && (
         <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
           <h3 className="text-sm text-nexus-text mb-1">{result.decision?.decision}</h3>
