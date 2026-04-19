@@ -3,6 +3,7 @@ import { GitBranch, Target, AlertTriangle, BarChart3, Link2, RefreshCw, Search, 
 import { api } from '../hooks/useApi.js';
 import { useNexusFleet } from '../context/useNexus.js';
 import { THEME, PROJECT_PALETTE, EDGE_STYLES, LIFECYCLE_COLORS } from '../lib/theme.js';
+import DecisionPicker from '../components/DecisionPicker.jsx';
 
 // v4.3.5 P4: shared tabs constant so the inline render + keyboard handler agree on order.
 const GRAPH_TABS = [
@@ -185,9 +186,9 @@ export default function GraphModule() {
 
       {/* Views */}
       {view === 'overview' && <OverviewView graph={graph} centrality={centrality} contradictions={contradictions} holes={holes} />}
-      {view === 'blast' && <BlastView blastId={blastId} setBlastId={setBlastId} onRun={runBlast} result={blastResult} graph={graph} centrality={centrality} />}
+      {view === 'blast' && <BlastView blastId={blastId} setBlastId={setBlastId} onRun={runBlast} result={blastResult} graph={graph} centrality={centrality} DecisionPicker={DecisionPicker} />}
       {view === 'centrality' && <CentralityView data={centrality} />}
-      {view === 'contradictions' && <ContradictionsView data={contradictions} />}
+      {view === 'contradictions' && <ContradictionsView data={contradictions} onRefresh={() => graphSlice.refresh()} />}
       {view === 'holes' && <HolesView data={holes} />}
       {view === 'visual' && <VisualView graph={graph} />}
     </div>
@@ -290,7 +291,7 @@ function OverviewView({ graph, centrality, contradictions, holes }) {
   );
 }
 
-function BlastView({ blastId, setBlastId, onRun, result, graph, centrality }) {
+function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, DecisionPicker }) {
   // v4.3.10 #284 — build 3-5 suggested decision chips from graph + centrality data so
   // first-time users have zero-cost starting points. Previously an empty textbox with a
   // placeholder "e.g. 44" (arbitrary, no context). Suggestions:
@@ -325,14 +326,17 @@ function BlastView({ blastId, setBlastId, onRun, result, graph, centrality }) {
 
   return (
     <div>
+      {/* v4.4.1 #285 — DecisionPicker replaces plain numeric input. Type-search by ID,
+          text, project, or tag; dropdown shows top-8 matches; Enter or click to select. */}
       <div className="flex gap-2 mb-4">
-        <input
-          value={blastId}
-          onChange={e => setBlastId(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && onRun()}
-          placeholder="Decision ID (e.g. 44)"
-          className="bg-nexus-bg border border-nexus-border rounded-lg px-3 py-2 text-sm text-nexus-text font-mono focus:border-nexus-amber focus:outline-none w-48"
-        />
+        <div className="w-80">
+          <DecisionPicker
+            value={blastId}
+            onChange={setBlastId}
+            onSelect={() => queueMicrotask(() => onRun())}
+            placeholder="Decision ID or text search..."
+          />
+        </div>
         <button onClick={onRun} className="px-4 py-2 rounded-lg bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20 text-xs font-mono hover:bg-nexus-amber/20">
           Analyze
         </button>
@@ -436,41 +440,107 @@ function CentralityView({ data }) {
   );
 }
 
-function ContradictionsView({ data }) {
-  // v4.3.10 #305 — empty-state rewritten to be honest. Previously "No contradictions
-  // detected" implied active detection; there isn't one. The number is just the count of
-  // rel='contradicts' edges users have manually created via nexus_link_decisions. Say so.
-  if (data?.total === 0) {
-    return (
-      <div className="bg-nexus-surface border border-nexus-border rounded-xl p-6">
-        <div className="flex items-start gap-3">
-          <AlertTriangle size={18} className="text-nexus-amber shrink-0 mt-0.5" />
-          <div className="space-y-2">
-            <p className="text-sm text-nexus-text">No conflicts flagged.</p>
-            <p className="text-xs font-mono text-nexus-text-faint leading-relaxed">
-              This tab lists decisions you&rsquo;ve explicitly marked as opposing each other via
-              <code className="mx-1 px-1 py-0.5 rounded bg-nexus-bg text-nexus-amber">rel=&rsquo;contradicts&rsquo;</code>
-              edges. A zero here doesn&rsquo;t mean nothing contradicts anything &mdash; it means nothing has been tagged yet.
-            </p>
-            <p className="text-xs font-mono text-nexus-text-faint leading-relaxed">
-              Useful when: you changed direction, two projects took opposing paths, a decision was superseded without being marked deprecated.
-            </p>
-            <p className="text-[10px] font-mono text-nexus-text-dim pt-1">
-              Flag via <code className="px-1 py-0.5 rounded bg-nexus-bg">nexus_link_decisions</code> with <code className="px-1 py-0.5 rounded bg-nexus-bg">rel=&rsquo;contradicts&rsquo;</code>.
-            </p>
+function ContradictionsView({ data, onRefresh }) {
+  return (
+    <div className="space-y-4">
+      {/* v4.3.10 #305 — empty-state explanation; kept as a preamble even when edges exist. */}
+      {data?.total === 0 && (
+        <div className="bg-nexus-surface border border-nexus-border rounded-xl p-6">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className="text-nexus-amber shrink-0 mt-0.5" />
+            <div className="space-y-2">
+              <p className="text-sm text-nexus-text">No conflicts flagged.</p>
+              <p className="text-xs font-mono text-nexus-text-faint leading-relaxed">
+                This tab lists decisions you&rsquo;ve explicitly marked as opposing each other via
+                <code className="mx-1 px-1 py-0.5 rounded bg-nexus-bg text-nexus-amber">rel=&rsquo;contradicts&rsquo;</code>
+                edges. A zero here doesn&rsquo;t mean nothing contradicts anything &mdash; it means nothing has been tagged yet.
+              </p>
+              <p className="text-xs font-mono text-nexus-text-faint leading-relaxed">
+                Useful when: you changed direction, two projects took opposing paths, a decision was superseded without being marked deprecated.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
-    );
-  }
-  return (
-    <div className="space-y-2">
+      )}
+
+      {/* v4.4.1 #306 — manual "Flag contradiction" form. Two DecisionPickers + note + submit.
+          Creates a rel='contradicts' edge via /api/ledger/link. Tab was previously read-only. */}
+      <FlagContradictionForm onFlagged={onRefresh} />
+
       {data?.contradictions?.map((c, i) => (
         <div key={i} className="bg-nexus-red/5 border border-nexus-red/20 rounded-lg p-3">
           <p className="text-xs text-nexus-text-dim">{c.message}</p>
           {c.trigger && <span className="text-[10px] font-mono text-nexus-red mt-1 inline-block">Trigger: {c.trigger}</span>}
         </div>
       ))}
+    </div>
+  );
+}
+
+function FlagContradictionForm({ onFlagged }) {
+  const [fromId, setFromId] = useState('');
+  const [toId, setToId] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState(null); // { type: 'ok'|'err', msg }
+
+  async function submit() {
+    const from = parseInt(fromId, 10);
+    const to = parseInt(toId, 10);
+    if (!from || !to || from === to) {
+      setStatus({ type: 'err', msg: 'Pick two different decisions.' });
+      return;
+    }
+    setBusy(true);
+    setStatus(null);
+    try {
+      await api.linkDecisions({ from, to, rel: 'contradicts', note: note.trim() || undefined });
+      setStatus({ type: 'ok', msg: `Flagged #${from} ↔ #${to} as contradicting.` });
+      setFromId(''); setToId(''); setNote('');
+      if (onFlagged) onFlagged();
+    } catch (e) {
+      setStatus({ type: 'err', msg: (e?.message || 'Failed to flag').slice(0, 140) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="bg-nexus-surface border border-nexus-border rounded-xl p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <AlertTriangle size={14} className="text-nexus-amber" />
+        <h3 className="text-xs font-mono text-nexus-amber uppercase tracking-wider">Flag a contradiction</h3>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+        <div>
+          <span className="text-[10px] font-mono text-nexus-text-faint block mb-1">Decision A</span>
+          <DecisionPicker value={fromId} onChange={setFromId} placeholder="Pick or type ID..." />
+        </div>
+        <div>
+          <span className="text-[10px] font-mono text-nexus-text-faint block mb-1">Decision B (contradicts A)</span>
+          <DecisionPicker value={toId} onChange={setToId} placeholder="Pick or type ID..." />
+        </div>
+      </div>
+      <input
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Optional note — why does A contradict B?"
+        className="w-full mb-3 bg-nexus-bg border border-nexus-border rounded-lg px-3 py-2 text-xs text-nexus-text font-mono focus:border-nexus-amber focus:outline-none"
+      />
+      <div className="flex items-center gap-3">
+        <button
+          onClick={submit}
+          disabled={busy || !fromId || !toId}
+          className="px-4 py-1.5 rounded bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/30 text-xs font-mono hover:bg-nexus-amber/20 disabled:opacity-50"
+        >
+          {busy ? 'Flagging…' : 'Flag contradiction'}
+        </button>
+        {status && (
+          <span className={`text-[10px] font-mono ${status.type === 'ok' ? 'text-nexus-green' : 'text-nexus-red'}`}>
+            {status.msg}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
