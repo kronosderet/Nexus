@@ -285,6 +285,31 @@ export class NexusStore {
       markApplied('v4.4.0-H2');
     }
 
+    // v4.4.1 H3 — prune auto-linked edges from the generic-tag explosion (#314 audit).
+    // The v4.3.x auto-link route linked any two decisions sharing a tag cross-project,
+    // without filtering generic tags like "milestone" or "github" that every project uses.
+    // That manufactured ~68 noise edges between Nexus ↔ Firewall-Godot alone. v4.4.1
+    // added a blacklist to the auto-linker; this migration cleans up the residue at rest.
+    if (!applied['v4.4.1-H3']) {
+      const genericTagsSet = new Set([
+        'milestone', 'shipped', 'released', 'release', 'audit', 'polish',
+        'github', 'git', 'hygiene-migration', 'version', 'versioning',
+      ]);
+      const isGeneric = (tag: string) => genericTagsSet.has(tag.toLowerCase()) || /^v\d/i.test(tag);
+      const before = (this.data.graph_edges || []).length;
+      this.data.graph_edges = (this.data.graph_edges || []).filter(e => {
+        const match = /^Shared tag:\s*(.+)$/.exec(e.note || '');
+        if (!match) return true;
+        return !isGeneric(match[1].trim());
+      });
+      const pruned = before - this.data.graph_edges.length;
+      if (pruned > 0) {
+        console.error(`◈ Migration v4.4.1 H3: pruned ${pruned} generic-tag cross-project edges (milestone / github / etc.).`);
+        changed += pruned;
+      }
+      markApplied('v4.4.1-H3');
+    }
+
     if (changed > 0) this._flush();
   }
 
