@@ -1,16 +1,36 @@
-import { useState, useEffect } from 'react';
-import { BarChart3, GitCommit, CheckCircle2, FileEdit, BookOpen, Flame, AlertTriangle, Calendar } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { BarChart3, GitCommit, CheckCircle2, FileEdit, BookOpen, Flame, AlertTriangle, Calendar, RefreshCw } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
 
-export default function DigestWidget() {
+export default function DigestWidget({ ws }) {
   const [digest, setDigest] = useState(null);
   const [range, setRange] = useState('7d');
+  const [fetchedAt, setFetchedAt] = useState(null);
 
-  useEffect(() => {
-    api.getDigest(range).then(setDigest).catch(() => {});
+  const refresh = useCallback(() => {
+    api.getDigest(range).then(d => { setDigest(d); setFetchedAt(Date.now()); }).catch(() => {});
   }, [range]);
 
+  // Initial + range-change fetch
+  useEffect(() => { refresh(); }, [refresh]);
+
+  // v4.4.1 #235 — auto-refresh on WS events that affect digest stats.
+  // Previously cached "0 commits" long after a commit landed. Now subscribes to
+  // activity / task_update / session_created / task_deleted and refetches.
+  useEffect(() => {
+    if (!ws?.subscribe) return;
+    return ws.subscribe((msg) => {
+      if (msg.type === 'activity' || msg.type === 'task_update' || msg.type === 'task_deleted' || msg.type === 'session_created') {
+        refresh();
+      }
+    });
+  }, [ws, refresh]);
+
   if (!digest) return null;
+
+  // Freshness age for display
+  const ageSec = fetchedAt ? Math.floor((Date.now() - fetchedAt) / 1000) : 0;
+  const ageStr = ageSec < 60 ? `${ageSec}s` : ageSec < 3600 ? `${Math.floor(ageSec / 60)}m` : `${Math.floor(ageSec / 3600)}h`;
 
   const { stats, projectRanking, busiestDay, activeBlockers, summary } = digest;
 
@@ -22,20 +42,31 @@ export default function DigestWidget() {
           <BarChart3 size={16} className="text-nexus-amber" />
           <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Activity Digest</span>
         </div>
-        <div className="flex gap-1">
-          {['24h', '7d', '30d'].map((r) => (
-            <button
-              key={r}
-              onClick={() => setRange(r)}
-              className={`px-2 py-0.5 text-[10px] font-mono rounded transition-colors ${
-                range === r
-                  ? 'bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20'
-                  : 'text-nexus-text-faint hover:text-nexus-text border border-transparent'
-              }`}
-            >
-              {r}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          {/* v4.4.1 #235 — freshness indicator + manual refresh */}
+          <button
+            onClick={refresh}
+            className="flex items-center gap-1 text-[10px] font-mono text-nexus-text-faint hover:text-nexus-amber transition-colors"
+            title={`Last updated ${ageStr} ago. Click to refresh.`}
+          >
+            <RefreshCw size={9} />
+            {ageStr}
+          </button>
+          <div className="flex gap-1">
+            {['24h', '7d', '30d'].map((r) => (
+              <button
+                key={r}
+                onClick={() => setRange(r)}
+                className={`px-2 py-0.5 text-[10px] font-mono rounded transition-colors ${
+                  range === r
+                    ? 'bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20'
+                    : 'text-nexus-text-faint hover:text-nexus-text border border-transparent'
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

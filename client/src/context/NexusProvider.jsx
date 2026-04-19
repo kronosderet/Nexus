@@ -57,12 +57,15 @@ function useSlice(fetchFn, pollMs = null) {
 }
 
 // ── WS invalidation map ──────────────────────────────
+// v4.4.1 #247 — task + session events now also invalidate `fleet` and `pulse` so Fleet
+// project cards (task counts, sessions) reflect reality without manual refresh. Previously
+// they cached stale counts until a full page reload.
 const WS_MAP = {
-  task_update:      ['tasks'],
-  task_deleted:     ['tasks'],
-  activity:         ['activity'],
+  task_update:      ['tasks', 'fleet', 'pulse'],
+  task_deleted:     ['tasks', 'fleet', 'pulse'],
+  activity:         ['activity', 'fleet', 'pulse'],
   thought:          ['thoughts'],
-  session_created:  ['sessions'],
+  session_created:  ['sessions', 'fleet', 'pulse'],
   usage_update:     ['estimator', 'workload', 'timing', 'fuelIntel'],
   gpu_snapshot:     ['pulse'],
   decision_update:  ['graph'],
