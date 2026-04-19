@@ -247,12 +247,18 @@ export default function Log({ onNavigate }) {
                     const clickable = !!(config.module && onNavigate);
                     const Tag = clickable ? 'button' : 'div';
                     const onClick = clickable ? () => onNavigate(config.module) : undefined;
+                    // v4.4.3 #359 — expand-on-click for truncated messages. If message is
+                    // long enough to visually truncate (>~120 chars), show an expandable state.
+                    // Non-navigation entries become the expand toggle; navigation entries
+                    // still navigate on primary click but have a native tooltip with full text.
+                    const MSG_TRUNC = 120;
+                    const isLong = (entry.message || '').length > MSG_TRUNC;
                     return (
                       <Tag
                         key={entry.id}
                         {...(clickable ? { onClick, type: 'button' } : {})}
                         className={`flex items-start gap-3 py-2 px-3 rounded-lg transition-colors w-full text-left ${clickable ? 'hover:bg-nexus-surface cursor-pointer' : 'hover:bg-nexus-surface/50'}`}
-                        title={clickable ? `Click to open ${config.module}` : undefined}
+                        title={clickable ? `Click to open ${config.module}` : (isLong ? entry.message : undefined)}
                       >
                         <span className="text-xs font-mono text-nexus-text-faint w-12 pt-0.5 shrink-0">{formatTime(entry.created_at)}</span>
                         <Icon size={14} className={`${config.color} mt-0.5 shrink-0`} />
