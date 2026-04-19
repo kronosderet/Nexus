@@ -200,18 +200,22 @@ async function start() {
       const res = await fetch(`http://localhost:${PORT}/api/digest?range=7d`);
       if (!res.ok) return;
       const data = await res.json();
+      // v4.3.9 #340 — digest API returns stats nested and the summary field is `summary`, not `headline`.
+      // Previous code read top-level data.totalEvents/tasksDone/sessions/headline which are ALL undefined,
+      // so every saved scan came out as "undefined events, undefined done, undefined sessions" in the UI.
+      const stats = data.stats ?? {};
       store.addScheduledScan({
         type: 'digest',
         timestamp: new Date().toISOString(),
         result: {
-          totalEvents: data.totalEvents,
-          tasksDone: data.tasksDone,
-          sessions: data.sessions,
-          summary: data.headline,
+          totalEvents: stats.totalEvents ?? 0,
+          tasksDone: stats.tasksCompleted ?? 0,
+          sessions: stats.sessions ?? 0,
+          summary: data.summary,
           topProjects: data.projectRanking?.slice(0, 5),
         },
       });
-      console.log(`  ◈ Scheduled digest: ${data.totalEvents} events, ${data.tasksDone} done, ${data.sessions} sessions`);
+      console.log(`  ◈ Scheduled digest: ${stats.totalEvents ?? 0} events, ${stats.tasksCompleted ?? 0} done, ${stats.sessions ?? 0} sessions`);
     } catch {}
   }
 
