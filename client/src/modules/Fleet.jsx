@@ -152,7 +152,14 @@ export default function Fleet() {
           Fleet
         </h2>
         <p className="text-xs font-mono text-nexus-text-faint mt-1">
-          {projects.length} projects · {totalTasks} open tasks · {totalSessions} sessions logged
+          {/* v4.4.1 #246 — "open" explicitly means not-done (backlog + in_progress + review)
+              consistent with card display and server-side pulse.ts logic. Title makes the
+              semantic discoverable on hover. */}
+          {projects.length} projects ·{' '}
+          <span title="Not-done tasks: backlog + in_progress + review. Excludes done.">
+            {totalTasks} not-done
+          </span>
+          {' '}· {totalSessions} sessions logged
           {uncommitted.length > 0 && <span className="text-nexus-amber"> · {uncommitted.length} with uncommitted changes</span>}
         </p>
       </div>

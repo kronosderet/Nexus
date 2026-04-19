@@ -61,8 +61,17 @@ export function createPulseRoutes(store: NexusStore) {
       const activityToday = projActivity.filter((a: ActivityEntry) => now - new Date(a.created_at).getTime() < DAY).length;
       const lastActivity = projActivity[0]?.created_at || null;
 
-      // Tasks referencing this project
-      const projTasks = tasks.filter((t: Task) => t.title.toLowerCase().includes(name));
+      // Tasks referencing this project. v4.4.1 #246 — was filtering only by title substring,
+      // which missed every task whose project was set via the `project` field (v4.3.5 C1 added
+      // that field; new tasks via nexus_create_task always have it). Result: Nexus card showed
+      // "2 open" while actual backlog was 150+. Primary: match project field; fall back to
+      // title-substring for legacy records where project wasn't set.
+      const projTasks = tasks.filter((t: Task) => {
+        const projField = (t.project || '').toLowerCase();
+        if (projField && projField === name) return true;
+        if (!projField && t.title.toLowerCase().includes(name)) return true;
+        return false;
+      });
       const openTasks = projTasks.filter((t: Task) => t.status !== 'done').length;
       const doneTasks = projTasks.filter((t: Task) => t.status === 'done').length;
 
