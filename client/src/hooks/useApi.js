@@ -90,6 +90,11 @@ export const api = {
   autoLinkGraph: () => request('/ledger/auto-link', { method: 'POST' }),
   // v4.3.10 #272 — dry-run variant returns { linked, samples } without writing.
   autoLinkGraphPreview: () => request('/ledger/auto-link?dry_run=true', { method: 'POST' }),
+  // v4.4.1 #285 — decision list for DecisionPicker autocomplete across Blast Radius + Conflicts flag form.
+  getLedger: ({ limit = 500 } = {}) => request(`/ledger?limit=${limit}`),
+  // v4.4.1 #306 — manual edge creation (contradiction flag + future general use).
+  linkDecisions: ({ from, to, rel = 'related', note = '' }) =>
+    request('/ledger/link', { method: 'POST', body: JSON.stringify({ from, to, rel, note }) }),
 
   // ── Impact ─────────────────────────────────────────────
   getImpactBlast: (id) => request(`/impact/blast/${id}`),
