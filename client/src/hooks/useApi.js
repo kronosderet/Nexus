@@ -97,7 +97,11 @@ export const api = {
     request('/ledger/link', { method: 'POST', body: JSON.stringify({ from, to, rel, note }) }),
 
   // ── Impact ─────────────────────────────────────────────
-  getImpactBlast: (id) => request(`/impact/blast/${id}`),
+  getImpactBlast: (id, opts = {}) => {
+    // v4.4.3 #287 — optional depth param (1-6, default 4 server-side)
+    const qs = opts.depth ? `?depth=${opts.depth}` : '';
+    return request(`/impact/blast/${id}${qs}`);
+  },
   getImpactCentrality: () => request('/impact/centrality'),
   getImpactContradictions: () => request('/impact/contradictions'),
   getImpactForecast: (decisionId) => request(`/impact/forecast/${decisionId}`),

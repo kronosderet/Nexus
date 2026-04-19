@@ -74,9 +74,11 @@ export default function GraphModule() {
   }
   function autoLinkCancel() { setAutoLinkPreview(null); }
 
+  // v4.4.3 #287 — depth slider state shared between BlastView and the analysis call.
+  const [blastDepth, setBlastDepth] = useState(3);
   async function runBlast() {
     if (!blastId) return;
-    try { setBlastResult(await api.getImpactBlast(blastId)); } catch {}
+    try { setBlastResult(await api.getImpactBlast(blastId, { depth: blastDepth })); } catch {}
   }
 
   // v4.4.2 #286, #296, #329 — cross-tab navigation helpers. Other views call these to
@@ -88,7 +90,7 @@ export default function GraphModule() {
     setView('blast');
     // Fire the analysis in the next tick so setBlastId takes effect before runBlast reads it
     try {
-      setBlastResult(await api.getImpactBlast(idStr));
+      setBlastResult(await api.getImpactBlast(idStr, { depth: blastDepth }));
     } catch {}
   }
   function jumpToVisual(decisionId) {
@@ -221,7 +223,7 @@ export default function GraphModule() {
 
       {/* Views */}
       {view === 'overview' && <OverviewView graph={graph} centrality={centrality} contradictions={contradictions} holes={holes} />}
-      {view === 'blast' && <BlastView blastId={blastId} setBlastId={setBlastId} onRun={runBlast} result={blastResult} graph={graph} centrality={centrality} DecisionPicker={DecisionPicker} onAnalyzeLatest={analyzeLatest} />}
+      {view === 'blast' && <BlastView blastId={blastId} setBlastId={setBlastId} onRun={runBlast} result={blastResult} graph={graph} centrality={centrality} DecisionPicker={DecisionPicker} onAnalyzeLatest={analyzeLatest} depth={blastDepth} setDepth={setBlastDepth} />}
       {view === 'centrality' && <CentralityView data={centrality} onPickBlast={jumpToBlast} onPickVisual={jumpToVisual} />}
       {view === 'contradictions' && <ContradictionsView data={contradictions} onRefresh={() => graphSlice.refresh()} />}
       {view === 'holes' && <HolesView data={holes} onLinkOrphan={(id) => jumpToBlast(id)} onRefresh={() => graphSlice.refresh()} DecisionPicker={DecisionPicker} />}
@@ -326,7 +328,7 @@ function OverviewView({ graph, centrality, contradictions, holes }) {
   );
 }
 
-function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, DecisionPicker, onAnalyzeLatest }) {
+function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, DecisionPicker, onAnalyzeLatest, depth = 3, setDepth }) {
   // v4.3.10 #284 — build 3-5 suggested decision chips from graph + centrality data so
   // first-time users have zero-cost starting points. Previously an empty textbox with a
   // placeholder "e.g. 44" (arbitrary, no context). Suggestions:
@@ -385,6 +387,28 @@ function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, Deci
           >
             Latest
           </button>
+        )}
+        {/* v4.4.3 #287 — depth slider (1-4 hops). Default 3. Higher = more diffuse, shallower
+            = focus on immediate neighbors. */}
+        {setDepth && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-nexus-border bg-nexus-bg">
+            <span className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider">Depth</span>
+            {[1, 2, 3, 4].map(n => (
+              <button
+                key={n}
+                onClick={() => setDepth(n)}
+                className={`w-6 h-6 rounded text-[10px] font-mono transition-colors ${
+                  depth === n
+                    ? 'bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/30'
+                    : 'text-nexus-text-faint hover:text-nexus-text border border-transparent'
+                }`}
+                title={`${n} hop${n !== 1 ? 's' : ''} — ${n === 1 ? 'immediate neighbors only' : n >= 4 ? 'full transitive closure' : 'moderate reach'}`}
+              >
+                {n}
+              </button>
+            ))}
+            <span className="text-[9px] font-mono text-nexus-text-faint">hops</span>
+          </div>
         )}
       </div>
       {/* v4.3.10 #284 — empty-state explainer + suggested chips so users aren't staring at
