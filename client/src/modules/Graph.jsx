@@ -79,6 +79,28 @@ export default function GraphModule() {
     try { setBlastResult(await api.getImpactBlast(blastId)); } catch {}
   }
 
+  // v4.4.2 #286, #296, #329 — cross-tab navigation helpers. Other views call these to
+  // jump into Blast Radius or Visual with a decision pre-focused.
+  const [visualFocusId, setVisualFocusId] = useState(null);
+  async function jumpToBlast(decisionId) {
+    const idStr = String(decisionId);
+    setBlastId(idStr);
+    setView('blast');
+    // Fire the analysis in the next tick so setBlastId takes effect before runBlast reads it
+    try {
+      setBlastResult(await api.getImpactBlast(idStr));
+    } catch {}
+  }
+  function jumpToVisual(decisionId) {
+    setVisualFocusId(decisionId);
+    setView('visual');
+  }
+  function analyzeLatest() {
+    if (!graph?.nodes?.length) return;
+    const latest = [...graph.nodes].sort((a, b) => b.id - a.id)[0];
+    if (latest) jumpToBlast(latest.id);
+  }
+
   if (loading) {
     return (
       <div className="flex items-center gap-3 justify-center h-64">
@@ -199,11 +221,11 @@ export default function GraphModule() {
 
       {/* Views */}
       {view === 'overview' && <OverviewView graph={graph} centrality={centrality} contradictions={contradictions} holes={holes} />}
-      {view === 'blast' && <BlastView blastId={blastId} setBlastId={setBlastId} onRun={runBlast} result={blastResult} graph={graph} centrality={centrality} DecisionPicker={DecisionPicker} />}
-      {view === 'centrality' && <CentralityView data={centrality} />}
+      {view === 'blast' && <BlastView blastId={blastId} setBlastId={setBlastId} onRun={runBlast} result={blastResult} graph={graph} centrality={centrality} DecisionPicker={DecisionPicker} onAnalyzeLatest={analyzeLatest} />}
+      {view === 'centrality' && <CentralityView data={centrality} onPickBlast={jumpToBlast} onPickVisual={jumpToVisual} />}
       {view === 'contradictions' && <ContradictionsView data={contradictions} onRefresh={() => graphSlice.refresh()} />}
-      {view === 'holes' && <HolesView data={holes} />}
-      {view === 'visual' && <VisualView graph={graph} />}
+      {view === 'holes' && <HolesView data={holes} onLinkOrphan={(id) => jumpToBlast(id)} onRefresh={() => graphSlice.refresh()} DecisionPicker={DecisionPicker} />}
+      {view === 'visual' && <VisualView graph={graph} initialSelectedId={visualFocusId} onSelected={setVisualFocusId} />}
     </div>
   );
 }
@@ -304,7 +326,7 @@ function OverviewView({ graph, centrality, contradictions, holes }) {
   );
 }
 
-function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, DecisionPicker }) {
+function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, DecisionPicker, onAnalyzeLatest }) {
   // v4.3.10 #284 — build 3-5 suggested decision chips from graph + centrality data so
   // first-time users have zero-cost starting points. Previously an empty textbox with a
   // placeholder "e.g. 44" (arbitrary, no context). Suggestions:
@@ -341,7 +363,7 @@ function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, Deci
     <div>
       {/* v4.4.1 #285 — DecisionPicker replaces plain numeric input. Type-search by ID,
           text, project, or tag; dropdown shows top-8 matches; Enter or click to select. */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 flex-wrap">
         <div className="w-80">
           <DecisionPicker
             value={blastId}
@@ -353,6 +375,17 @@ function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, Deci
         <button onClick={onRun} className="px-4 py-2 rounded-lg bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20 text-xs font-mono hover:bg-nexus-amber/20">
           Analyze
         </button>
+        {/* v4.4.2 #286 — one-click shortcut to analyze the most recent decision. Uses
+            graph.nodes (already loaded) to find the highest ID; no extra fetch. */}
+        {onAnalyzeLatest && (
+          <button
+            onClick={onAnalyzeLatest}
+            className="px-3 py-2 rounded-lg border border-nexus-border hover:border-nexus-amber/30 hover:text-nexus-amber text-xs font-mono text-nexus-text-dim transition-colors"
+            title="Analyze the most recently recorded decision"
+          >
+            Latest
+          </button>
+        )}
       </div>
       {/* v4.3.10 #284 — empty-state explainer + suggested chips so users aren't staring at
           a sterile textbox wondering which ID to try. */}
@@ -410,7 +443,7 @@ function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, Deci
   );
 }
 
-function CentralityView({ data }) {
+function CentralityView({ data, onPickBlast, onPickVisual }) {
   return (
     <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
       <div className="flex items-baseline justify-between mb-3">
@@ -432,20 +465,38 @@ function CentralityView({ data }) {
       </div>
       <div className="space-y-1.5">
         {data?.centrality?.slice(0, 15).map(c => (
-          <div key={c.id} className="flex items-center gap-2">
-            <span className="text-xs font-mono text-nexus-text-faint w-8">#{c.id}</span>
-            <div className="flex-1 h-2 bg-nexus-bg rounded-full">
-              <div className="h-full bg-nexus-amber/60 rounded-full" style={{ width: `${Math.min(100, c.total * 5)}%` }} />
-            </div>
-            <span
-              className="text-xs font-mono text-nexus-text-dim w-6 text-right"
-              title={`${c.total} edge${c.total !== 1 ? 's' : ''} in the knowledge graph`}
-            >{c.total}</span>
-            {/* v4.3.10 #294 — uniform truncation with hover-expand via native title attribute */}
-            <span
-              className="text-xs text-nexus-text-dim truncate w-48 cursor-help"
-              title={c.decision}
-            >{c.decision}</span>
+          // v4.4.2 #296 — entire row is a clickable button that jumps to Blast Radius
+          // with this decision pre-filled and auto-analyzed. Also shows a "view in graph"
+          // icon on hover for deep-linking into Visual (#329).
+          <div key={c.id} className="flex items-center gap-2 group">
+            <button
+              onClick={() => onPickBlast && onPickBlast(c.id)}
+              className="flex items-center gap-2 flex-1 min-w-0 text-left hover:bg-nexus-amber/5 rounded px-1 -mx-1 py-0.5 transition-colors"
+              title="Open Blast Radius for this decision"
+            >
+              <span className="text-xs font-mono text-nexus-text-faint w-8">#{c.id}</span>
+              <div className="flex-1 h-2 bg-nexus-bg rounded-full">
+                <div className="h-full bg-nexus-amber/60 rounded-full" style={{ width: `${Math.min(100, c.total * 5)}%` }} />
+              </div>
+              <span
+                className="text-xs font-mono text-nexus-text-dim w-6 text-right"
+                title={`${c.total} edge${c.total !== 1 ? 's' : ''} in the knowledge graph`}
+              >{c.total}</span>
+              <span
+                className="text-xs text-nexus-text-dim truncate w-48 cursor-pointer"
+                title={`${c.decision}\n\nClick: open Blast Radius`}
+              >{c.decision}</span>
+            </button>
+            {/* v4.4.2 #329 — jump to Visual tab focused on this node */}
+            {onPickVisual && (
+              <button
+                onClick={() => onPickVisual(c.id)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-mono text-nexus-text-faint hover:text-nexus-amber px-1.5 py-0.5 rounded border border-transparent hover:border-nexus-border"
+                title="Focus this node in the Visual tab"
+              >
+                <Network size={10} />
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -558,7 +609,7 @@ function FlagContradictionForm({ onFlagged }) {
   );
 }
 
-function HolesView({ data }) {
+function HolesView({ data, onLinkOrphan, onRefresh, DecisionPicker }) {
   if (!data) return null;
   const fragmented = data.fragmented || [];
   const healthy = (data.projectAnalysis || []).filter((p) => !p.isFragmented);
@@ -623,6 +674,7 @@ function HolesView({ data }) {
                 <div className="space-y-2">
                   {p.clusters.slice(0, 5).map((c, i) => {
                     const isOrphan = c.size === 1;
+                    const orphanId = isOrphan && Array.isArray(c.memberIds) ? c.memberIds[0] : null;
                     return (
                       <div
                         key={i}
@@ -643,9 +695,21 @@ function HolesView({ data }) {
                           >
                             {isOrphan ? 'orphan' : `${c.size} decisions`}
                           </span>
-                          <span className="text-[10px] font-mono text-nexus-text-faint">
+                          <span className="text-[10px] font-mono text-nexus-text-faint flex-1">
                             {isOrphan ? 'isolated — no edges' : `cluster of ${c.size}`}
                           </span>
+                          {/* v4.4.2 #316 — "Link this orphan" shortcut: jumps to Blast Radius
+                              on the orphan, which is often enough to find its neighbors manually.
+                              A dedicated link-picker modal is a future enhancement. */}
+                          {isOrphan && orphanId != null && onLinkOrphan && (
+                            <button
+                              onClick={() => onLinkOrphan(orphanId)}
+                              className="text-[10px] font-mono text-nexus-amber hover:text-nexus-amber/80 px-2 py-0.5 rounded border border-nexus-amber/30 hover:bg-nexus-amber/10 shrink-0"
+                              title="Open Blast Radius for this orphan — find candidates to link via Auto-link preview."
+                            >
+                              Link →
+                            </button>
+                          )}
                         </div>
                         {/* Sample titles — clearly separated region */}
                         <div className="px-3 py-2 space-y-0.5">
@@ -740,10 +804,16 @@ function hashProjectColor(project) {
   return PROJECT_PALETTE[Math.abs(h) % PROJECT_PALETTE.length];
 }
 
-function VisualView({ graph }) {
+function VisualView({ graph, initialSelectedId, onSelected }) {
   const HEIGHT = 400;
   const [hoveredId, setHoveredId] = useState(null);
-  const [selectedId, setSelectedId] = useState(null);
+  // v4.4.2 #329 — accept initialSelectedId from parent so cross-tab "focus this node"
+  // clicks (from Centrality or Holes) land on the Visual tab with the target already
+  // selected + its detail sidebar open.
+  const [selectedId, setSelectedId] = useState(initialSelectedId ?? null);
+  useEffect(() => {
+    if (initialSelectedId != null) setSelectedId(initialSelectedId);
+  }, [initialSelectedId]);
   const [hiddenProjects, setHiddenProjects] = useState(new Set());
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(600);
