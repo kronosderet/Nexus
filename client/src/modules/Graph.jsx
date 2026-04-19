@@ -613,22 +613,28 @@ function VisualView({ graph }) {
         <StatCard label="Components" value={components} sub={components === 1 ? 'Fully connected' : 'Disconnected clusters'} />
       </div>
 
-      {/* Project toggle chips */}
+      {/* Project toggle chips — double as color legend (each chip's color = its node color).
+          v4.3.10 #326 adds the caption so the chips' legend role is explicit. */}
       {(() => {
         const projectSet = [...new Set(graph.nodes.map(n => n.project))].sort();
         return (
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {projectSet.map(p => {
-              const c = hashProjectColor(p);
-              const hidden = hiddenProjects.has(p);
-              return (
-                <button key={p} data-project={p} onClick={onToggleProject}
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded-full border transition-all ${hidden ? 'opacity-30 border-nexus-border text-nexus-text-faint' : 'border-current'}`}
-                  style={{ color: hidden ? undefined : c.fill, borderColor: hidden ? undefined : c.fill + '40' }}>
-                  {p}
-                </button>
-              );
-            })}
+          <div className="mb-3">
+            <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider block mb-1.5">
+              Projects (click to filter · colors match node circles)
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {projectSet.map(p => {
+                const c = hashProjectColor(p);
+                const hidden = hiddenProjects.has(p);
+                return (
+                  <button key={p} data-project={p} onClick={onToggleProject}
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded-full border transition-all ${hidden ? 'opacity-30 border-nexus-border text-nexus-text-faint' : 'border-current'}`}
+                    style={{ color: hidden ? undefined : c.fill, borderColor: hidden ? undefined : c.fill + '40' }}>
+                    {p}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         );
       })()}
@@ -678,7 +684,9 @@ function VisualView({ graph }) {
               const isSel = selectedId === n.id;
               const lc = n.lifecycle;
               const lcColor = LIFECYCLE_COLORS[lc] || LIFECYCLE_COLORS.active;
-              const lcLetter = lc === 'validated' ? 'V' : lc === 'proposed' ? 'P' : lc === 'deprecated' ? 'D' : 'A';
+              // v4.3.10 #327 — added 'R' for v4.3.8 reference decisions (imported CC memories).
+              // Previously reference lifecycle rendered as 'A', mislabeling nodes.
+              const lcLetter = lc === 'validated' ? 'V' : lc === 'proposed' ? 'P' : lc === 'deprecated' ? 'D' : lc === 'reference' ? 'R' : 'A';
               return (
                 <g key={n.id}>
                   <circle
@@ -724,7 +732,8 @@ function VisualView({ graph }) {
                   fontSize={10}
                   fontFamily="ui-monospace, monospace"
                 >
-                  #{hovered.id} [{hovered.lifecycle || 'active'}] {String(hovered.label || '').slice(0, 35)}
+                  {/* v4.3.10 #325 — include project so hover tooltip tells the full story. */}
+                  #{hovered.id} [{hovered.project || 'general'} · {hovered.lifecycle || 'active'}] {String(hovered.label || '').slice(0, 30)}
                 </text>
               </g>
             )}
@@ -736,6 +745,25 @@ function VisualView({ graph }) {
               <div key={key} className="flex items-center gap-1.5">
                 <svg width="20" height="8"><line x1="0" y1="4" x2="20" y2="4" stroke={s.stroke} strokeWidth="1.5" strokeDasharray={s.dash} /></svg>
                 <span className="text-[9px] font-mono text-nexus-text-faint">{s.label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* v4.3.10 #327 — lifecycle letter legend. Letters inside node circles were cryptic
+              without this key: V=validated, A=active, D=deprecated, P=proposed,
+              R=reference (imported CC memory, v4.3.8). */}
+          <div className="mt-2 flex flex-wrap gap-3 pt-2 border-t border-nexus-border/50">
+            <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider mr-1">Lifecycle</span>
+            {[
+              { letter: 'A', label: 'active' },
+              { letter: 'V', label: 'validated' },
+              { letter: 'P', label: 'proposed' },
+              { letter: 'D', label: 'deprecated' },
+              { letter: 'R', label: 'reference (imported)' },
+            ].map(({ letter, label }) => (
+              <div key={letter} className="flex items-center gap-1">
+                <span className="text-[9px] font-mono text-nexus-amber font-bold">{letter}</span>
+                <span className="text-[9px] font-mono text-nexus-text-faint">= {label}</span>
               </div>
             ))}
           </div>
