@@ -22,19 +22,34 @@ function daysSince(dateStr) {
   return `${days}d ago`;
 }
 
-function ProjectCard({ project, fleet }) {
+function ProjectCard({ project, fleet, onNavigate }) {
   const heat = heatBadge(project.heat);
   const fleetTask = fleet?.topTasks?.find(t => {
     const proj = (t.title.match(/\[(\w+)\]/)?.[1] || '').toLowerCase();
     return proj === project.name.toLowerCase();
   });
 
+  // v4.4.3 #250 — click card title to jump to Command. Command filters by project
+  // naturally if we navigate; future: pass project as target filter too (requires
+  // Command accepting initialProjectFilter prop — follow-up).
+  const handleCardJump = () => { if (onNavigate) onNavigate('command'); };
+
   return (
-    <div className={`rounded-xl border p-4 transition-colors ${heatColor(project.heat)}`}>
+    <div className={`rounded-xl border p-4 transition-colors ${heatColor(project.heat)} ${onNavigate ? 'hover:border-nexus-amber/40 cursor-pointer' : ''}`}>
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div>
-          <h3 className="text-sm font-medium text-nexus-text">{project.name}</h3>
+          {onNavigate ? (
+            <button
+              onClick={handleCardJump}
+              className="text-sm font-medium text-nexus-text hover:text-nexus-amber transition-colors text-left"
+              title={`Open Command view (${project.name})`}
+            >
+              {project.name}
+            </button>
+          ) : (
+            <h3 className="text-sm font-medium text-nexus-text">{project.name}</h3>
+          )}
           {project.git?.branch && (
             <p className="text-[10px] font-mono text-nexus-text-faint flex items-center gap-1 mt-0.5">
               <GitBranch size={9} />{project.git.branch}
@@ -77,12 +92,18 @@ function ProjectCard({ project, fleet }) {
           </span>
         </div>
 
-        {/* Activity */}
+        {/* Activity — v4.4.3 #251: Fleet card measures rolling 7d activity count
+            (same as Dashboard Digest in 7d-range mode). Tooltip spells out semantics
+            so the disparity between 7d-rolling (card) and calendar-week (Digest 7d)
+            is legible. */}
         <div className="flex items-center gap-1.5">
           <Activity size={10} className="text-nexus-text-faint" />
-          <span className="text-[10px] font-mono text-nexus-text-faint">
+          <span
+            className="text-[10px] font-mono text-nexus-text-faint"
+            title="Activity events in the last 7 days (rolling window)"
+          >
             {project.activity?.week > 0 ? (
-              <><span className="text-nexus-text">{project.activity.week}</span> events/week</>
+              <><span className="text-nexus-text">{project.activity.week}</span> events last 7d</>
             ) : 'Quiet'}
           </span>
         </div>
@@ -121,7 +142,7 @@ function ProjectCard({ project, fleet }) {
   );
 }
 
-export default function Fleet() {
+export default function Fleet({ onNavigate }) {
   const { fleet: fleetSlice } = useNexusFleet();
   const projects = fleetSlice.data?.projects || [];
   const fleet = fleetSlice.data?.overview || null;
@@ -194,17 +215,27 @@ export default function Fleet() {
                   {t.priority >= 2 ? '!!' : t.priority >= 1 ? '!' : ' '}
                 </span>
                 <span className="text-nexus-text-dim flex-1 truncate">#{t.id} {t.title}</span>
-                <span className="text-nexus-text-faint text-[10px]">{t.ageDays}d</span>
+                {/* v4.4.3 #249 — show numeric priority score so ranking is legible beyond
+                    the !! bangs. Score factors in priority × age × project staleness. */}
+                {t.score != null && (
+                  <span
+                    className="text-[9px] font-mono text-nexus-text-faint tabular-nums w-8 text-right"
+                    title={`Priority score: ${t.score.toFixed(2)} (priority × age × project-staleness)`}
+                  >
+                    {t.score.toFixed(1)}
+                  </span>
+                )}
+                <span className="text-nexus-text-faint text-[10px] w-8 text-right">{t.ageDays}d</span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Project cards */}
+      {/* Project cards — v4.4.3 #250: onNavigate passed so card title click jumps to Command */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {[...hot, ...warm, ...cold].map(p => (
-          <ProjectCard key={p.name} project={p} fleet={fleet} />
+          <ProjectCard key={p.name} project={p} fleet={fleet} onNavigate={onNavigate} />
         ))}
       </div>
 
