@@ -888,6 +888,15 @@ function VisualView({ graph, initialSelectedId, onSelected }) {
   const [hiddenProjects, setHiddenProjects] = useState(new Set());
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(600);
+  // v4.4.3 #330 — search input state. Highlights matching node IDs + focuses first match.
+  const [searchQuery, setSearchQuery] = useState('');
+  // v4.4.3 #334 — edge-type filter: hide auto-linked `related` edges (keyword + semantic).
+  // With 76% of edges being auto-linked `related`, this toggle exposes the typed backbone
+  // (led_to / depends_on / contradicts / informs) for architectural clarity.
+  const [hideAutoLinked, setHideAutoLinked] = useState(false);
+  // v4.4.3 #335 — color mode: 'project' (default) or 'cluster' (connected-component).
+  // Cluster mode makes the "5 disconnected clusters" claim visually verifiable.
+  const [colorMode, setColorMode] = useState('project');
 
   // v4.3.5 I4: delegated project-toggle handler — one stable callback for N buttons.
   const onToggleProject = useCallback((e) => {
@@ -1021,10 +1030,15 @@ function VisualView({ graph, initialSelectedId, onSelected }) {
       }
     }
     const roots = new Set();
-    for (const n of nodes) roots.add(find(n.id));
+    const nodeComponent = {};  // v4.4.3 #335 — node id → root (component) id
+    for (const n of nodes) {
+      const root = find(n.id);
+      roots.add(root);
+      nodeComponent[n.id] = root;
+    }
     const components = roots.size;
 
-    return { positions, degree, components };
+    return { positions, degree, components, nodeComponent };
   }, [graph]);
 
   if (!graph || !graph.nodes || graph.nodes.length === 0) {
@@ -1036,7 +1050,7 @@ function VisualView({ graph, initialSelectedId, onSelected }) {
     );
   }
 
-  const { positions, degree, components } = layout;
+  const { positions, degree, components, nodeComponent } = layout;
   const maxDegree = Math.max(1, ...Object.values(degree || {}));
   const nodeRadius = (id) => {
     const d = (degree && degree[id]) || 0;
@@ -1046,6 +1060,34 @@ function VisualView({ graph, initialSelectedId, onSelected }) {
   const hovered = hoveredId != null
     ? graph.nodes.find((n) => n.id === hoveredId)
     : null;
+
+  // v4.4.3 #330 — search matches: node IDs that match the query (by ID, text, project).
+  // Matching nodes get a pulse ring; non-matching fade.
+  const searchMatches = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return null; // no search = show all normally
+    const matches = new Set();
+    for (const n of (graph?.nodes || [])) {
+      const idStr = String(n.id);
+      const label = String(n.label || n.decision || '').toLowerCase();
+      const project = String(n.project || '').toLowerCase();
+      if (idStr === q || idStr.includes(q) || label.includes(q) || project.includes(q)) {
+        matches.add(n.id);
+      }
+    }
+    return matches;
+  }, [searchQuery, graph?.nodes]);
+
+  // v4.4.3 #335 — palette for cluster coloring. Cycles through a fixed set so
+  // cluster identity is visually distinct without relying on project hash.
+  const CLUSTER_PALETTE = ['#f5b043', '#4ec3e0', '#a78bfa', '#60d97e', '#f07178', '#d8b4fe', '#fbbf24', '#38bdf8'];
+  const clusterColorFor = (nodeId) => {
+    const root = nodeComponent?.[nodeId];
+    if (!root) return { fill: '#94a3b8', stroke: '#64748b' };
+    // Map root id to a palette index
+    const idx = Math.abs(root) % CLUSTER_PALETTE.length;
+    return { fill: CLUSTER_PALETTE[idx], stroke: CLUSTER_PALETTE[idx] };
+  };
 
   return (
     <div>
@@ -1081,6 +1123,47 @@ function VisualView({ graph, initialSelectedId, onSelected }) {
         );
       })()}
 
+      {/* v4.4.3 #330 + #334 + #335 — search input + edge filter + color mode toggle */}
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-nexus-text-faint" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search node by ID / text / project..."
+            className="w-full bg-nexus-bg border border-nexus-border rounded-lg pl-7 pr-2 py-1 text-[10px] text-nexus-text font-mono focus:border-nexus-amber focus:outline-none"
+          />
+          {searchMatches != null && (
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-mono text-nexus-text-faint">
+              {searchMatches.size} match
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => setHideAutoLinked(v => !v)}
+          className={`text-[10px] font-mono px-2 py-1 rounded border transition-colors ${hideAutoLinked ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/30' : 'text-nexus-text-faint border-nexus-border hover:text-nexus-text'}`}
+          title={hideAutoLinked ? 'Showing typed backbone only (led_to / depends_on / contradicts / informs). Click to show all edges including auto-linked related.' : 'Click to hide auto-linked related edges (keyword + semantic) and reveal the typed backbone.'}
+        >
+          {hideAutoLinked ? '◆ Typed only' : 'Hide auto-linked'}
+        </button>
+        <div className="flex gap-0.5 border border-nexus-border rounded">
+          <button
+            onClick={() => setColorMode('project')}
+            className={`text-[10px] font-mono px-2 py-1 transition-colors ${colorMode === 'project' ? 'bg-nexus-amber/10 text-nexus-amber' : 'text-nexus-text-faint hover:text-nexus-text'}`}
+            title="Color nodes by project (default)"
+          >
+            by project
+          </button>
+          <button
+            onClick={() => setColorMode('cluster')}
+            className={`text-[10px] font-mono px-2 py-1 transition-colors ${colorMode === 'cluster' ? 'bg-nexus-amber/10 text-nexus-amber' : 'text-nexus-text-faint hover:text-nexus-text'}`}
+            title="Color nodes by connected component (visualizes the 'N disconnected clusters' claim)"
+          >
+            by cluster
+          </button>
+        </div>
+      </div>
+
       {/* v4.4.3 #331 — on-screen hint for interactive controls that were previously undocumented. */}
       <p className="text-[9px] font-mono text-nexus-text-faint mb-2 pl-1">
         drag node to move · click node for details · click outside to deselect
@@ -1104,6 +1187,13 @@ function VisualView({ graph, initialSelectedId, onSelected }) {
               const nodeB = graph.nodes.find(n => n.id === e.to);
               if (nodeA && hiddenProjects.has(nodeA.project)) return null;
               if (nodeB && hiddenProjects.has(nodeB.project)) return null;
+              // v4.4.3 #334 — hide auto-linked `related` edges when toggle is on.
+              // Detection: edge.note prefixed with "auto-linked" (keyword) or
+              // "semantic-linked" (semantic embeddings) — matches store.ts notes.
+              if (hideAutoLinked && e.rel === 'related') {
+                const note = String(e.note || '');
+                if (note.startsWith('auto-linked') || note.startsWith('semantic-linked')) return null;
+              }
               const isHi = hoveredId != null && (e.from === hoveredId || e.to === hoveredId);
               const isSel = selectedId != null && (e.from === selectedId || e.to === selectedId);
               const style = EDGE_STYLES[e.rel] || EDGE_STYLES.related;
@@ -1124,17 +1214,21 @@ function VisualView({ graph, initialSelectedId, onSelected }) {
               const p = positions[n.id];
               if (!p) return null;
               if (hiddenProjects.has(n.project)) return null;
-              const color = hashProjectColor(n.project);
+              // v4.4.3 #335 — color mode toggle
+              const color = colorMode === 'cluster' ? clusterColorFor(n.id) : hashProjectColor(n.project);
               const r = nodeRadius(n.id);
               const isHi = hoveredId === n.id;
               const isSel = selectedId === n.id;
+              // v4.4.3 #330 — search fade: matching nodes stay opaque, non-matching dim
+              const isSearchMatch = searchMatches == null || searchMatches.has(n.id);
+              const searchFade = !isSearchMatch;
               const lc = n.lifecycle;
               const lcColor = LIFECYCLE_COLORS[lc] || LIFECYCLE_COLORS.active;
               // v4.3.10 #327 — added 'R' for v4.3.8 reference decisions (imported CC memories).
               // Previously reference lifecycle rendered as 'A', mislabeling nodes.
               const lcLetter = lc === 'validated' ? 'V' : lc === 'proposed' ? 'P' : lc === 'deprecated' ? 'D' : lc === 'reference' ? 'R' : 'A';
               return (
-                <g key={n.id}>
+                <g key={n.id} opacity={searchFade ? 0.2 : 1}>
                   <circle
                     cx={p.x}
                     cy={p.y}
@@ -1149,6 +1243,22 @@ function VisualView({ graph, initialSelectedId, onSelected }) {
                     onMouseLeave={() => setHoveredId(null)}
                     onClick={(ev) => { ev.stopPropagation(); setSelectedId(prev => prev === n.id ? null : n.id); }}
                   />
+                  {/* v4.4.3 #330 — pulse ring on search-matched nodes to draw the eye */}
+                  {searchMatches != null && isSearchMatch && searchQuery.trim() && (
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={r + 4}
+                      fill="none"
+                      stroke={THEME.amber}
+                      strokeOpacity={0.7}
+                      strokeWidth={1.5}
+                      pointerEvents="none"
+                    >
+                      <animate attributeName="r" values={`${r + 3};${r + 7};${r + 3}`} dur="1.5s" repeatCount="indefinite" />
+                      <animate attributeName="stroke-opacity" values="0.7;0.2;0.7" dur="1.5s" repeatCount="indefinite" />
+                    </circle>
+                  )}
                   {lc && r >= 6 && (
                     <text x={p.x} y={p.y + 3} textAnchor="middle" fill={lcColor} fontSize={8} fontWeight="bold" fontFamily="ui-monospace" pointerEvents="none">
                       {lcLetter}
