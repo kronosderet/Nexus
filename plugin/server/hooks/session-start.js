@@ -8,9 +8,9 @@
  * Fails silently if no data exists yet — Claude starts cold, no crash.
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
+import { homedir, totalmem, freemem } from 'node:os';
 import { execSync } from 'node:child_process';
 
 const NEXUS_DB = process.env.NEXUS_DB_PATH || join(homedir(), '.nexus', 'nexus.json');
@@ -49,11 +49,18 @@ function main() {
   const lines = [];
   lines.push(`[Nexus Metabrain] Project: ${project}`);
 
-  // Fuel (latest usage reading)
+  // Fuel (latest usage reading) — v4.4.0-alpha #368: includes age stamp + stale warning.
   const usage = (data.usage || []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   if (usage.length > 0) {
     const latest = usage[0];
-    lines.push(`Fuel: session ${latest.session_percent ?? '?'}% | weekly ${latest.weekly_percent ?? '?'}%`);
+    const ageMin = Math.floor((Date.now() - new Date(latest.created_at).getTime()) / 60000);
+    const ageStr = ageMin >= 60
+      ? `${Math.floor(ageMin / 60)}h${ageMin % 60 > 0 ? ` ${ageMin % 60}m` : ''}`
+      : `${ageMin}m`;
+    const staleSuffix = ageMin >= 120 ? ' ⚠ STALE — re-read fuel before pacing decisions'
+      : ageMin >= 60 ? ' (reading aging)'
+      : '';
+    lines.push(`Fuel: session ${latest.session_percent ?? '?'}% | weekly ${latest.weekly_percent ?? '?'}% (read ${ageStr} ago${staleSuffix})`);
   }
 
   // Tasks
@@ -113,12 +120,59 @@ function main() {
     }
   }
 
-  // Git status
+  // Git status + v4.4.0-alpha extensions (#372 delta since last session, #378 diff stat)
   try {
     const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: process.cwd(), encoding: 'utf-8', timeout: 2000 }).trim();
     const status = execSync('git status --porcelain', { cwd: process.cwd(), encoding: 'utf-8', timeout: 2000 }).trim();
     const uncommitted = status ? status.split('\n').length : 0;
     lines.push(`Git: ${branch}${uncommitted > 0 ? `, ${uncommitted} uncommitted` : ', clean'}`);
+
+    // #378 — working-tree diff summary
+    if (uncommitted > 0) {
+      try {
+        const shortstat = execSync('git diff --shortstat HEAD 2>nul', { cwd: process.cwd(), encoding: 'utf-8', timeout: 2000 }).trim();
+        if (shortstat) lines.push(`  Working tree: ${shortstat}`);
+      } catch {}
+    }
+
+    // #372 — commits landed since last session
+    const lastSession = (data.sessions || [])
+      .filter(s => !project || s.project?.toLowerCase() === project.toLowerCase())
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+    if (lastSession?.created_at) {
+      try {
+        const since = lastSession.created_at;
+        const delta = execSync(`git log --oneline --since="${since}" 2>nul`, { cwd: process.cwd(), encoding: 'utf-8', timeout: 2000 }).trim();
+        if (delta) {
+          const commits = delta.split('\n');
+          lines.push(`Git delta since last session: ${commits.length} commit${commits.length !== 1 ? 's' : ''}`);
+          for (const line of commits.slice(0, 3)) lines.push(`  ${line}`);
+          if (commits.length > 3) lines.push(`  … +${commits.length - 3} more`);
+        }
+      } catch {}
+    }
+  } catch {}
+
+  // #376 — system memory pressure
+  try {
+    const memPct = Math.round(((totalmem() - freemem()) / totalmem()) * 100);
+    if (memPct >= 95) lines.push(`⚠ Memory CRITICAL: ${memPct}% — heavy work will swap or OOM`);
+    else if (memPct >= 85) lines.push(`⚠ Memory elevated: ${memPct}% — consider closing apps`);
+  } catch {}
+
+  // #377 — nexus.json size + backup freshness
+  try {
+    const mainStat = statSync(NEXUS_DB);
+    const sizeMB = (mainStat.size / 1048576).toFixed(1);
+    let bakStr = '';
+    const bakPath = NEXUS_DB + '.bak';
+    if (existsSync(bakPath)) {
+      const bakStat = statSync(bakPath);
+      const bakAgeMin = Math.floor((Date.now() - bakStat.mtime.getTime()) / 60000);
+      const bakAgeStr = bakAgeMin >= 60 ? `${Math.floor(bakAgeMin / 60)}h` : `${bakAgeMin}m`;
+      bakStr = ` · backup ${bakAgeStr} ago`;
+    }
+    lines.push(`Store: nexus.json ${sizeMB}MB${bakStr}`);
   } catch {}
 
   lines.push(`[/Nexus Metabrain]`);
