@@ -3,10 +3,45 @@
 Nexus — The Cartographer. Local-first metabrain plugin for Claude Code.
 
 The v4.3.5 → v4.4.4 arc kicked off after the initial "Audit Shakedown" (v4.3.5)
-released in mid-April 2026. What follows covers 11 versioned releases plus one
+released in mid-April 2026. What follows covers 12 versioned releases plus one
 major UI audit, one big `Memory Bridge` import feature, the ambient-telemetry
-hook layer (v4.4.0 alpha/beta/final), and four post-v4.4.0 patch releases
-closing UI-audit Tier 1 + the small/medium half of Tier 2 backlogs.
+hook layer (v4.4.0 alpha/beta/final), and five post-v4.4.0 patch releases
+closing UI-audit Tier 1 + the small/medium half of Tier 2 backlogs + doc-drift
+hardening.
+
+## v4.4.5 — Doc-Drift Hardening
+
+Return-trip for v4.3.7's single-source-of-truth promise. The v4.3.7 drift test
+only guarded the MCPB `tools[]` array — it didn't catch free-text "N native MCP
+tools" phrases scattered across 6 other surfaces. As tools were added (v4.3.8's
+`nexus_import_cc_memories`, v4.3.7's `nexus_version`) those free-text counts
+silently drifted: MCPB manifest's `long_description` still said "25" at v4.4.4,
+`plugin/.claude-plugin/plugin.json` still said "20", marketplace.json said "22",
+and `plugin/README.md` was both wrong (25) and missing two tools in its lists.
+
+**Fixes (6 files · drift from 20/22/25 → 26)**
+- `mcpb/manifest.json` long_description: 25 → 26
+- `plugin/README.md`: `Available tools (25)` → `(26)`, added `nexus_version` to
+  the Read list and `nexus_import_cc_memories` to the Write list; fixed the
+  non-AI count from 20 → 22 (26 total − 4 AI-dependent)
+- `cli/nexus.js`: two splash-string occurrences 25 → 26
+- `.claude-plugin/marketplace.json` description: 22 → 26
+- `plugin/.claude-plugin/plugin.json` description: 20 → 26
+
+**Structural guard (`tests/versionDrift.test.ts`)**
+
+Added a `TOOL_COUNT_DRIFT_CHECKS` array — 12 new assertions scanning every
+current-state surface for a `"N native MCP tools"` / `"Available tools (N)"` /
+architecture-table `"| N tools"` pattern. Each mismatch fails with the regex
+that missed and the captured count vs. `TOOL_COUNT_EXPECTED`. Historical
+changelogs (`ROADMAP.md`, this file, `docs/HANDOVER-*.md`) are exempt — they
+intentionally record prior counts.
+
+The v4.3.7 promise — "next audit can't surface the same drift class again" —
+now actually holds for the free-text surfaces it originally missed.
+
+**Tests:** 189 → **201** (+12 drift specs).
+**MCPB:** rebuilt at v4.4.5, smoke-passes on all 26 tools.
 
 ## v4.4.4 — Tier 2 Finale
 

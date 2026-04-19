@@ -13,7 +13,7 @@
     {
       "name": "nexus",
       "source": "./plugin",
-      "description": "AI Cowork metabrain with Knowledge Graph, Thought Stack, Fuel Intelligence, and local AI Overseer. 22 native MCP tools for persistent session memory across Claude instances.",
+      "description": "AI Cowork metabrain with Knowledge Graph, Thought Stack, Fuel Intelligence, and local AI Overseer. 26 native MCP tools for persistent session memory across Claude instances.",
       "version": "4.2.0",
       "author": {
         "name": "kronosderet"
