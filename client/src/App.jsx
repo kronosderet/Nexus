@@ -93,7 +93,9 @@ export default function App() {
       <main className="flex-1 overflow-auto p-4 md:p-6 pt-14 md:pt-6">
         <NexusProvider ws={ws}>
           <ErrorBoundary resetKey={activeModule}>
-            <ActiveComponent ws={ws} />
+            {/* v4.4.1 #354 — onNavigate prop gives modules a way to jump to sibling views
+                (e.g. Log entries click-through to Command / Graph). Used in Log.jsx. */}
+            <ActiveComponent ws={ws} onNavigate={setActiveModule} />
           </ErrorBoundary>
         </NexusProvider>
       </main>

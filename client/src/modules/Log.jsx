@@ -4,26 +4,37 @@ import { useNexusCore } from '../context/useNexus.js';
 import {
   ScrollText, BookOpen, Compass, CheckCircle2, Trash2, Settings,
   FileEdit, AlertTriangle, Tag, ChevronDown, ChevronRight, Search, Filter,
-  Clock,
+  Clock, MapPin, Lightbulb, Brain, MessageSquare, Network, GitCommit,
+  Download, Rocket, BookMarked,
 } from 'lucide-react';
 
 // ── Activity type config ────────────────────────────────
+// v4.4.1 #355 — distinct icon + color per event type so rows scan by shape/color,
+// not just by reading. Expanded to cover all types store.ts emits (graph, git_commit,
+// git_fetch, memory_import) — previously missing entries fell through to "system".
+// Some types sharpened: task_created uses MapPin (plot pin), decision uses Lightbulb,
+// thought uses Brain, prompt uses MessageSquare. Compass kept for command/navigation
+// actions only.
 
 const TYPE_CONFIG = {
-  task_created: { icon: Compass, color: 'text-nexus-amber', label: 'Plotted' },
-  task_done: { icon: CheckCircle2, color: 'text-nexus-green', label: 'Landmark' },
-  task_moved: { icon: Compass, color: 'text-nexus-blue', label: 'Course adjusted' },
-  task_deleted: { icon: Trash2, color: 'text-nexus-red', label: 'Removed' },
-  system: { icon: Settings, color: 'text-nexus-purple', label: 'System' },
-  file_change: { icon: FileEdit, color: 'text-nexus-amber', label: 'Terrain shift' },
-  error: { icon: AlertTriangle, color: 'text-nexus-red', label: 'Uncharted' },
-  auto_summary: { icon: BookOpen, color: 'text-nexus-green', label: 'Auto-summary' },
-  thought: { icon: AlertTriangle, color: 'text-nexus-purple', label: 'Thought' },
-  prompt: { icon: ScrollText, color: 'text-nexus-blue', label: 'Prompt' },
-  session: { icon: BookOpen, color: 'text-nexus-green', label: 'Session' },
-  decision: { icon: Compass, color: 'text-nexus-amber', label: 'Decision' },
-  predict: { icon: AlertTriangle, color: 'text-nexus-blue', label: 'Predict' },
-  deploy: { icon: CheckCircle2, color: 'text-nexus-green', label: 'Deploy' },
+  task_created: { icon: MapPin, color: 'text-nexus-amber', label: 'Plotted', module: 'command' },
+  task_done: { icon: CheckCircle2, color: 'text-nexus-green', label: 'Landmark', module: 'command' },
+  task_moved: { icon: Compass, color: 'text-nexus-blue', label: 'Course adjusted', module: 'command' },
+  task_deleted: { icon: Trash2, color: 'text-nexus-red', label: 'Removed', module: 'command' },
+  system: { icon: Settings, color: 'text-nexus-purple', label: 'System', module: null },
+  file_change: { icon: FileEdit, color: 'text-nexus-amber', label: 'Terrain shift', module: null },
+  error: { icon: AlertTriangle, color: 'text-nexus-red', label: 'Uncharted', module: null },
+  auto_summary: { icon: BookOpen, color: 'text-nexus-green', label: 'Auto-summary', module: 'log' },
+  thought: { icon: Brain, color: 'text-nexus-purple', label: 'Thought', module: null },
+  prompt: { icon: MessageSquare, color: 'text-nexus-blue', label: 'Prompt', module: null },
+  session: { icon: BookOpen, color: 'text-nexus-green', label: 'Session', module: 'log' },
+  decision: { icon: Lightbulb, color: 'text-nexus-amber', label: 'Decision', module: 'graph' },
+  predict: { icon: AlertTriangle, color: 'text-nexus-blue', label: 'Predict', module: 'overseer' },
+  deploy: { icon: Rocket, color: 'text-nexus-green', label: 'Deploy', module: null },
+  graph: { icon: Network, color: 'text-nexus-purple', label: 'Graph', module: 'graph' },
+  git_commit: { icon: GitCommit, color: 'text-nexus-green', label: 'Commit', module: null },
+  git_fetch: { icon: Download, color: 'text-nexus-blue', label: 'Fetched', module: null },
+  memory_import: { icon: BookMarked, color: 'text-nexus-amber', label: 'Imported', module: 'graph' },
 };
 
 function formatTime(dateStr) { return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
@@ -73,7 +84,7 @@ function SessionCard({ session }) {
 
 // ── Main module ─────────────────────────────────────────
 
-export default function Log() {
+export default function Log({ onNavigate }) {
   const { activity: activitySlice, sessions: sessionsSlice } = useNexusCore();
   const [tab, setTab] = useState('activity');
   const [search, setSearch] = useState('');
@@ -81,6 +92,9 @@ export default function Log() {
   const [sortOrder, setSortOrder] = useState('desc');
   const [projectFilter, setProjectFilter] = useState('');
   const [blockersOnly, setBlockersOnly] = useState(false);
+  // v4.4.1 #356 — client-side page size for the activity stream. Store keeps 500-750
+  // entries; this lets users page beyond the initial 200 cap without a server refetch.
+  const [pageSize, setPageSize] = useState(200);
 
   const entries = activitySlice.data || [];
   const sessions = sessionsSlice.data || [];
@@ -89,7 +103,7 @@ export default function Log() {
 
   // Filtered activity
   const typesPresent = useMemo(() => ['all', ...new Set(entries.map(e => e.type)).values()].sort(), [entries]);
-  const filteredActivity = useMemo(() => {
+  const filteredActivityAll = useMemo(() => {
     const q = search.trim().toLowerCase();
     return entries.filter(e => {
       if (typeFilter !== 'all' && e.type !== typeFilter) return false;
@@ -100,6 +114,9 @@ export default function Log() {
       : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
   }, [entries, search, typeFilter, sortOrder]);
+  // v4.4.1 #356 — paginate the filtered stream. filteredActivity is what renders; the
+  // "Load N more" button grows pageSize until all filtered entries are visible.
+  const filteredActivity = useMemo(() => filteredActivityAll.slice(0, pageSize), [filteredActivityAll, pageSize]);
 
   // Filtered sessions
   const projects = useMemo(() => [...new Set(sessions.map(s => s.project))], [sessions]);
@@ -134,7 +151,7 @@ export default function Log() {
             Log
           </h2>
           <p className="text-xs font-mono text-nexus-text-faint mt-1">
-            {tab === 'timeline' ? `${entries.length + sessions.length} events` : tab === 'activity' ? `${filteredActivity.length} of ${entries.length} entries` : `${filteredSessions.length} of ${sessions.length} sessions`}
+            {tab === 'timeline' ? `${entries.length + sessions.length} events` : tab === 'activity' ? `${filteredActivity.length} of ${filteredActivityAll.length} entries (${entries.length} total)` : `${filteredSessions.length} of ${sessions.length} sessions`}
           </p>
         </div>
         <div className="flex gap-1">
@@ -215,6 +232,9 @@ export default function Log() {
           </div>
         ) : (
           <div className="space-y-6">
+            {/* v4.4.1 #356 — Load-more footer. Renders below the day groups once there
+                are more filtered entries than currently visible. Simple pagination
+                growing client-side slice. */}
             {Object.entries(groupedActivity).map(([date, items]) => (
               <div key={date}>
                 <div className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider mb-2 sticky top-0 bg-nexus-bg py-1">{date}</div>
@@ -222,17 +242,41 @@ export default function Log() {
                   {items.map(entry => {
                     const config = TYPE_CONFIG[entry.type] || TYPE_CONFIG.system;
                     const Icon = config.icon;
+                    // v4.4.1 #354 — click-through: types with a `module` map navigate on click.
+                    // Types with `module: null` (system, error, file_change, etc.) stay read-only.
+                    const clickable = !!(config.module && onNavigate);
+                    const Tag = clickable ? 'button' : 'div';
+                    const onClick = clickable ? () => onNavigate(config.module) : undefined;
                     return (
-                      <div key={entry.id} className="flex items-start gap-3 py-2 px-3 rounded-lg hover:bg-nexus-surface transition-colors">
+                      <Tag
+                        key={entry.id}
+                        {...(clickable ? { onClick, type: 'button' } : {})}
+                        className={`flex items-start gap-3 py-2 px-3 rounded-lg transition-colors w-full text-left ${clickable ? 'hover:bg-nexus-surface cursor-pointer' : 'hover:bg-nexus-surface/50'}`}
+                        title={clickable ? `Click to open ${config.module}` : undefined}
+                      >
                         <span className="text-xs font-mono text-nexus-text-faint w-12 pt-0.5 shrink-0">{formatTime(entry.created_at)}</span>
                         <Icon size={14} className={`${config.color} mt-0.5 shrink-0`} />
                         <span className="text-sm text-nexus-text-dim">{entry.message}</span>
-                      </div>
+                      </Tag>
                     );
                   })}
                 </div>
               </div>
             ))}
+            {/* v4.4.1 #356 — Load-more button appears when there are more entries than shown */}
+            {filteredActivity.length < filteredActivityAll.length && (
+              <div className="flex justify-center pt-4">
+                <button
+                  onClick={() => setPageSize(n => n + 200)}
+                  className="px-4 py-2 rounded-lg text-xs font-mono text-nexus-amber hover:bg-nexus-amber/10 border border-nexus-amber/20 transition-colors"
+                >
+                  Load {Math.min(200, filteredActivityAll.length - filteredActivity.length)} more
+                  <span className="text-nexus-text-faint ml-2">
+                    ({filteredActivityAll.length - filteredActivity.length} hidden)
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
         )
       ) : (
