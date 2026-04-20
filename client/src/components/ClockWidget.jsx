@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Clock, Calendar, Timer, Fuel } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
+import { useTweenedNumber } from '../hooks/useMotion.js';
 
 function formatCountdown(ms) {
   if (ms <= 0) return 'now';
@@ -74,6 +75,11 @@ export default function ClockWidget({ ws }) {
   // Burn rate projection
   const proj = fuel?.projection;
 
+  // v4.5.0 — tween the widget's fuel percentages too so dashboard + fuel page
+  // stay consistent when a new reading lands.
+  const sessionTween = useTweenedNumber(fuel?.session ?? 0);
+  const weeklyTween = useTweenedNumber(fuel?.weekly ?? 0);
+
   return (
     <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
       {/* Clock + Date */}
@@ -107,7 +113,7 @@ export default function ClockWidget({ ws }) {
                 <div className={`h-full rounded-full transition-all duration-700 ${(fuel.session ?? 0) <= 15 ? 'bg-nexus-red' : (fuel.session ?? 0) <= 40 ? 'bg-nexus-amber' : 'bg-nexus-green'}`}
                   style={{ width: `${Math.max(2, fuel.session ?? 0)}%` }} />
               </div>
-              <span className="text-[10px] font-mono text-nexus-text-faint tabular-nums w-8 text-right">{fuel.session ?? '?'}%</span>
+              <span className="text-[10px] font-mono text-nexus-text-faint tabular-nums w-8 text-right">{fuel.session != null ? `${Math.round(sessionTween)}%` : '?'}</span>
             </div>
           </div>
 
@@ -127,7 +133,7 @@ export default function ClockWidget({ ws }) {
                 <div className={`h-full rounded-full transition-all duration-700 ${(fuel.weekly ?? 0) <= 15 ? 'bg-nexus-red' : (fuel.weekly ?? 0) <= 40 ? 'bg-nexus-amber' : 'bg-nexus-green'}`}
                   style={{ width: `${Math.max(2, fuel.weekly ?? 0)}%` }} />
               </div>
-              <span className="text-[10px] font-mono text-nexus-text-faint tabular-nums w-8 text-right">{fuel.weekly ?? '?'}%</span>
+              <span className="text-[10px] font-mono text-nexus-text-faint tabular-nums w-8 text-right">{fuel.weekly != null ? `${Math.round(weeklyTween)}%` : '?'}</span>
             </div>
           </div>
         </div>

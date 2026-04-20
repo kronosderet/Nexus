@@ -96,12 +96,16 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.4.9 (Hotfix + Welcome Polish · shipped 2026-04-20)
+## Current — v4.5.0 (Animated Instruments · shipped 2026-04-20)
 
-The v4.3 → v4.4 arc is **fully shipped** — the entire UI-audit backlog is
-resolved. 26 MCP tools, 228 tests. Latest release: `v4.4.9 — Hotfix + Welcome
-Polish` (Log tab TDZ crash fix + WelcomeScreen nautical animation refresh).
-See **`CHANGELOG.md`** for full per-release detail from v4.3.5 through v4.4.9.
+v4.5.0 is a theme-wide microanimation pass: list reveals, page-mount fades,
+WS-driven row flashes, number tweening, success flashes, status-change
+highlights, Overseer scan shimmer. All kinetic polish respects
+`prefers-reduced-motion`. The v4.3 → v4.4 functional arc shipped in v4.4.8
+(Contradiction Scan Engine); v4.5.0 is the visual-polish bookend.
+
+26 MCP tools, 228 tests. See **`CHANGELOG.md`** for full per-release detail
+from v4.3.5 through v4.5.0.
 
 ### The arc in one paragraph
 v4.3.5 kicked off with an audit shakedown (data/code/dashboard). v4.3.6

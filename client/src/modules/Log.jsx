@@ -1,7 +1,8 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { api } from '../hooks/useApi.js';
 import { useNexusCore } from '../context/useNexus.js';
 import Chip from '../components/Chip.jsx';
+import { useWsFlash } from '../hooks/useMotion.js';
 import {
   ScrollText, BookOpen, Compass, CheckCircle2, Trash2, Settings,
   FileEdit, AlertTriangle, Tag, ChevronDown, ChevronRight, Search, Filter,
@@ -146,6 +147,11 @@ export default function Log({ onNavigate }) {
     headerSentinelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  // v4.5.0 — flag newly-arrived activity rows so they can wear an amber flash
+  // on their first render. Non-destructive — drops off after ~1s.
+  const getActivityId = useCallback((e) => e.id, []);
+  const isNewActivity = useWsFlash(entries, getActivityId);
+
   // Filtered activity
   const typesPresent = useMemo(() => ['all', ...new Set(entries.map(e => e.type)).values()].sort(), [entries]);
   // v4.4.4 #357 — resolve time-range preset to a cutoff ms. `all` skips the check.
@@ -203,7 +209,7 @@ export default function Log({ onNavigate }) {
   const loading = tab === 'activity' ? loadingA : loadingS;
 
   return (
-    <div>
+    <div className="animate-page-mount">
       {/* v4.4.5 #382 — sentinel for IntersectionObserver. When it leaves viewport
           we know the user has scrolled down from the top. Sits just above the header
           so the "near top" boundary is a hair above "header visible". */}
@@ -360,7 +366,7 @@ export default function Log({ onNavigate }) {
               <div key={date}>
                 <div className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider mb-2 sticky top-0 bg-nexus-bg py-1">{date}</div>
                 <div className="space-y-1">
-                  {items.map(entry => {
+                  {items.map((entry, i) => {
                     const config = TYPE_CONFIG[entry.type] || TYPE_CONFIG.system;
                     const Icon = config.icon;
                     // v4.4.1 #354 — click-through: types with a `module` map navigate on click.
@@ -374,11 +380,17 @@ export default function Log({ onNavigate }) {
                     // still navigate on primary click but have a native tooltip with full text.
                     const MSG_TRUNC = 120;
                     const isLong = (entry.message || '').length > MSG_TRUNC;
+                    // v4.5.0 — per-row stagger on reveal (cap at 100ms total so
+                    // long lists don't feel sluggish). New WS arrivals get an
+                    // amber flash on top of the reveal.
+                    const delay = Math.min(i * 18, 100);
+                    const wsClass = isNewActivity(entry.id) ? ' animate-ws-flash' : '';
                     return (
                       <Tag
                         key={entry.id}
                         {...(clickable ? { onClick, type: 'button' } : {})}
-                        className={`flex items-start gap-3 py-2 px-3 rounded-lg transition-colors w-full text-left ${clickable ? 'hover:bg-nexus-surface cursor-pointer' : 'hover:bg-nexus-surface/50'}`}
+                        className={`flex items-start gap-3 py-2 px-3 rounded-lg transition-colors w-full text-left animate-row-reveal${wsClass} ${clickable ? 'hover:bg-nexus-surface cursor-pointer' : 'hover:bg-nexus-surface/50'}`}
+                        style={{ animationDelay: `${delay}ms` }}
                         title={clickable ? `Click to open ${config.module}` : (isLong ? entry.message : undefined)}
                       >
                         <span className="text-xs font-mono text-nexus-text-faint w-12 pt-0.5 shrink-0">{formatTime(entry.created_at)}</span>
@@ -430,7 +442,16 @@ export default function Log({ onNavigate }) {
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredSessions.map(s => <SessionCard key={s.id} session={s} />)}
+            {/* v4.5.0 — staggered reveal as sessions list mounts / filters change */}
+            {filteredSessions.map((s, i) => (
+              <div
+                key={s.id}
+                className="animate-row-reveal"
+                style={{ animationDelay: `${Math.min(i * 24, 140)}ms` }}
+              >
+                <SessionCard session={s} />
+              </div>
+            ))}
           </div>
         )
       )}

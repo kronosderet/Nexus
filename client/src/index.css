@@ -116,6 +116,126 @@
   to { transform: translateX(0); opacity: 1; }
 }
 
+/* ──────────────────────────────────────────────────────────
+   v4.5.0 "Animated Instruments" — dashboard-wide microanimations.
+   Goal: motion reinforces state changes, never decorates for its own sake.
+   Every animation respects prefers-reduced-motion (last rule in this block).
+   ────────────────────────────────────────────────────────── */
+
+/* List-reveal: new rows fade in with a tiny y-translate. Fast (180ms)
+   so stacks of 10+ items don't feel staggered-slow. Paired with inline
+   animation-delay for per-row stagger. */
+@keyframes row-reveal {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-row-reveal {
+  animation: row-reveal 0.18s ease-out both;
+}
+
+/* Page-mount: module root fades in on module switch. Subtle — 160ms,
+   no translate, just opacity. Happens once per navigation. */
+@keyframes page-mount {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-page-mount {
+  animation: page-mount 0.16s ease-out both;
+}
+
+/* WS-driven row highlight: amber bg pulse for ~600ms when a new row
+   arrives via websocket. Lets users see what just changed without
+   having to scan the whole list. */
+@keyframes ws-flash {
+  0%   { background-color: rgba(245, 158, 11, 0.18); }
+  100% { background-color: transparent; }
+}
+.animate-ws-flash {
+  animation: ws-flash 0.9s ease-out both;
+}
+
+/* Success flash: quick green wash after an accept/complete/save action.
+   Applied to the container of the changed element; 700ms. */
+@keyframes success-flash {
+  0%   { background-color: rgba(34, 197, 94, 0.22); }
+  100% { background-color: transparent; }
+}
+.animate-success-flash {
+  animation: success-flash 0.7s ease-out both;
+}
+
+/* Status-change highlight: generic amber wash for status transitions
+   (e.g. task moves between kanban columns). Slightly longer than
+   success-flash so the shift registers. */
+@keyframes status-change {
+  0%   { background-color: rgba(245, 158, 11, 0.18); box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35); }
+  100% { background-color: transparent; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+.animate-status-change {
+  animation: status-change 0.9s ease-out both;
+}
+
+/* Overseer scan shimmer: a diagonal highlight that sweeps across a
+   button/container while async work is running. Used on the
+   contradiction-scan button while polling. */
+@keyframes shimmer-sweep {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-shimmer-sweep {
+  background-image: linear-gradient(
+    110deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(245, 158, 11, 0.22) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-sweep 2s linear infinite;
+}
+
+/* Number-tick-in: when a numeric display changes, briefly pop the
+   new value. Paired with React key={value} so React remounts the
+   element on each change. */
+@keyframes number-tick {
+  0%   { opacity: 0.4; transform: translateY(2px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.animate-number-tick {
+  animation: number-tick 0.22s ease-out both;
+}
+
+/* ACCESSIBILITY: respect prefers-reduced-motion for every animation
+   defined above. Users who've opted out of motion see instant state
+   transitions instead of the kinetic polish. CSS transition-* classes
+   on buttons/chips are short enough (<200ms) that we leave them alone;
+   it's the longer keyframe animations that cause motion-sickness issues. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-compass,
+  .animate-nexus-pulse,
+  .animate-radar-sweep,
+  .animate-needle-settle,
+  .animate-sonar-pulse,
+  .animate-letter-reveal,
+  .animate-row-reveal,
+  .animate-page-mount,
+  .animate-ws-flash,
+  .animate-success-flash,
+  .animate-status-change,
+  .animate-shimmer-sweep,
+  .animate-number-tick {
+    animation: none !important;
+  }
+  /* Keep states visible even without the entry animation */
+  .animate-row-reveal,
+  .animate-page-mount,
+  .animate-letter-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
 /* Markdown preview prose */
 .md-preview .md-h1 { font-size: 1.5rem; font-weight: 600; color: var(--color-nexus-amber); margin: 1rem 0 0.5rem; }
 .md-preview .md-h2 { font-size: 1.25rem; font-weight: 600; color: var(--color-nexus-text); margin: 0.8rem 0 0.4rem; }

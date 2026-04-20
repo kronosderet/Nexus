@@ -442,7 +442,7 @@ export default function Overseer() {
   }, []);
 
   return (
-    <div>
+    <div className="animate-page-mount">
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-nexus-text flex items-center gap-2">
           <Brain size={18} className="text-nexus-amber" />
@@ -588,7 +588,10 @@ export default function Overseer() {
                   <p className="text-center text-[11px] font-mono text-nexus-text-faint py-4">No Q&A matches these filters.</p>
                 )}
                 {visibleChatHistory.map((msg, i) => (
-                  <div key={i} className={`p-2.5 rounded-lg ${
+                  <div
+                    key={i}
+                    style={{ animationDelay: `${Math.min(i * 15, 90)}ms` }}
+                    className={`animate-row-reveal p-2.5 rounded-lg ${
                     msg.role === 'user'
                       ? 'bg-nexus-amber/5 border border-nexus-amber/10 ml-8'
                       : 'bg-nexus-bg border border-nexus-border mr-4'

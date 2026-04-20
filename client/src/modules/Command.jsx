@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNexusCore } from '../context/useNexus.js';
 import { useNexusFuel } from '../context/useNexus.js';
 import {
@@ -233,7 +233,7 @@ export default function Command({ ws }) {
   const done = filtered.filter(t => t.status === 'done');
 
   return (
-    <div>
+    <div className="animate-page-mount">
       {/* Header + view toggle + project filter */}
       <div className="mb-4 space-y-3">
         <div className="flex items-start justify-between">
@@ -607,9 +607,22 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
 
 function TaskCard({ task, onUpdate, onDelete, onDragStart }) {
   const prio = PRIORITY_STYLE[task.priority] || PRIORITY_STYLE[0];
+  // v4.5.0 — amber status-change flash when the task's status prop changes.
+  // Key off a ref to the previous status so we flash only on real transitions,
+  // not on mount. 900ms matches the CSS keyframe duration.
+  const prevStatusRef = useRef(task.status);
+  const [statusFlash, setStatusFlash] = useState(false);
+  useEffect(() => {
+    if (prevStatusRef.current !== task.status) {
+      setStatusFlash(true);
+      prevStatusRef.current = task.status;
+      const t = setTimeout(() => setStatusFlash(false), 900);
+      return () => clearTimeout(t);
+    }
+  }, [task.status]);
   return (
     <div draggable onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(task.id)); e.dataTransfer.effectAllowed = 'move'; onDragStart(task.id); }}
-      className="bg-nexus-surface border border-nexus-border rounded-lg p-3 hover:border-nexus-border-bright transition-colors group cursor-grab active:cursor-grabbing">
+      className={`bg-nexus-surface border border-nexus-border rounded-lg p-3 hover:border-nexus-border-bright transition-colors group cursor-grab active:cursor-grabbing ${statusFlash ? 'animate-status-change' : ''}`}>
       <div className="flex items-start gap-2">
         <GripVertical size={12} className="text-nexus-text-faint opacity-0 group-hover:opacity-50 mt-0.5 shrink-0" />
         <div className="flex-1 min-w-0">
@@ -670,7 +683,16 @@ function KanbanView({ tasks, draggingId, setDraggingId, newTaskTitle, setNewTask
               </div>
             </div>
             <div className="space-y-2">
-              {colTasks.map(task => <TaskCard key={task.id} task={task} onUpdate={onUpdate} onDelete={onDelete} onDragStart={setDraggingId} />)}
+              {/* v4.5.0 — staggered reveal as the kanban column fills or filter changes */}
+              {colTasks.map((task, i) => (
+                <div
+                  key={task.id}
+                  className="animate-row-reveal"
+                  style={{ animationDelay: `${Math.min(i * 20, 120)}ms` }}
+                >
+                  <TaskCard task={task} onUpdate={onUpdate} onDelete={onDelete} onDragStart={setDraggingId} />
+                </div>
+              ))}
             </div>
             {/* Show more for Done column */}
             {col.key === 'done' && !showAllDone && totalDone > 20 && (

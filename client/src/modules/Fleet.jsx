@@ -186,7 +186,7 @@ export default function Fleet({ onNavigate }) {
   const uncommitted = projects.filter(p => p.git?.uncommittedChanges > 0);
 
   return (
-    <div>
+    <div className="animate-page-mount">
       {/* Header */}
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-nexus-text flex items-center gap-2">
@@ -253,10 +253,17 @@ export default function Fleet({ onNavigate }) {
         </div>
       )}
 
-      {/* Project cards — v4.4.3 #250: onNavigate passed so card title click jumps to Command */}
+      {/* Project cards — v4.4.3 #250: onNavigate passed so card title click jumps to Command.
+          v4.5.0 — staggered reveal; 30ms per card capped at 180ms. */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {[...hot, ...warm, ...cold].map(p => (
-          <ProjectCard key={p.name} project={p} fleet={fleet} onNavigate={onNavigate} />
+        {[...hot, ...warm, ...cold].map((p, i) => (
+          <div
+            key={p.name}
+            className="animate-row-reveal"
+            style={{ animationDelay: `${Math.min(i * 30, 180)}ms` }}
+          >
+            <ProjectCard project={p} fleet={fleet} onNavigate={onNavigate} />
+          </div>
         ))}
       </div>
 

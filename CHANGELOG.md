@@ -2,13 +2,12 @@
 
 Nexus — The Cartographer. Local-first metabrain plugin for Claude Code.
 
-The v4.3.5 → v4.4.9 arc kicked off after the initial "Audit Shakedown" (v4.3.5)
-released in mid-April 2026. What follows covers 16 versioned releases plus one
+The v4.3.5 → v4.5.0 arc kicked off after the initial "Audit Shakedown" (v4.3.5)
+released in mid-April 2026. What follows covers 17 versioned releases plus one
 major UI audit, one big `Memory Bridge` import feature, the ambient-telemetry
-hook layer (v4.4.0 alpha/beta/final), and nine post-v4.4.0 patch releases
-closing the **entire** UI-audit backlog: Tier 1 + all of Tier 2 (small/medium
-+ both BIG items), doc-drift hardening, audit response, welcome-screen refresh,
-and a Log-tab TDZ hotfix.
+hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
+the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
+Instruments" microanimation pass.
 
 ## v4.4.5 — Doc-Drift Hardening
 
@@ -43,6 +42,67 @@ now actually holds for the free-text surfaces it originally missed.
 
 **Tests:** 189 → **201** (+12 drift specs).
 **MCPB:** rebuilt at v4.4.5, smoke-passes on all 26 tools.
+
+## v4.5.0 — Animated Instruments
+
+First minor-version bump since v4.4.0. Theme-wide microanimation pass across
+the dashboard. The UI went from "correct and functional" to "feels alive" —
+every module gets kinetic polish that reinforces state changes without
+becoming decorative noise. Full `prefers-reduced-motion` respect means users
+who opted out of motion see instant transitions.
+
+**Foundation (`client/src/index.css`, `client/src/hooks/useMotion.js`)**
+- Eight new CSS keyframes: `row-reveal`, `page-mount`, `ws-flash`,
+  `success-flash`, `status-change`, `shimmer-sweep`, `number-tick`, plus
+  welcome-screen carryovers from v4.4.9.
+- `useTweenedNumber(target, {duration})` — requestAnimationFrame cubic-out
+  easing for numeric displays. Snaps instantly under reduced-motion.
+- `useWsFlash(items, getId)` — detects items that arrived after first mount
+  so rows can wear an amber flash class once. First-render items never flash.
+- `PREFERS_REDUCED_MOTION` constant for JS-side bailouts.
+- Single `@media (prefers-reduced-motion: reduce)` block disables every
+  decorative animation in one place.
+
+**List reveals** — every list that grows during a session now reveals rows
+with a tiny y-translate + opacity fade (180ms per row, 18–40ms stagger,
+capped so long lists don't feel sluggish):
+- Log activity stream (w/ WS flash on newly-arrived rows)
+- Log sessions list
+- Fleet project cards
+- Command kanban task cards (all columns)
+- Overseer chat history
+- Graph suggested-contradiction cards
+
+**Page-mount fade** — every module's top-level `<div>` gets `animate-page-mount`
+(160ms opacity fade) so navigating between modules feels intentional rather
+than abrupt. Applied to: Command, Pulse, Fleet, Fuel, Graph, Overseer, Log.
+
+**Number tweening** — Fuel gauges (session + weekly) and ClockWidget fuel
+percentages now animate from old value to new when the user logs a fresh
+reading, instead of jumping instantly. 450ms cubic-out.
+
+**Success flash** — `SuggestedContradictionCard` wears `animate-success-flash`
+(green wash, 700ms) after Accept/Dismiss before the parent unmounts it.
+
+**Status-change highlight** — `TaskCard` tracks its previous status via a ref;
+on change, wears `animate-status-change` (amber bg + ring, 900ms). Fires when
+tasks move between kanban columns.
+
+**Overseer scan shimmer** — `ScanContradictionsPanel` scan button wears
+`animate-shimmer-sweep` while polling. Diagonal amber highlight sweeps across
+the button every 2s to signal the async work is live without competing with
+the spinner.
+
+**WebSocket-driven row flash** — Log activity rows that arrive via WS after
+the component mounts wear `animate-ws-flash` (amber wash, 900ms) on their
+first render. Lets users spot live updates without scanning.
+
+No breaking changes. No new dependencies — all pure CSS + RAF-based JS hooks.
+Production build: 47 kB CSS (+ ~0.8 kB for the new keyframes), 428 kB JS
+(unchanged — the motion hooks inline into the main chunk).
+
+**228 tests.** No new specs needed — motion is declarative and visual;
+regression testing covered by the existing render tests.
 
 ## v4.4.9 — Hotfix + Welcome Polish
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useTweenedNumber } from '../hooks/useMotion.js';
 import {
   Fuel as FuelIcon, Clock, Timer, Zap,
   TrendingUp, TrendingDown, Minus,
@@ -196,6 +197,10 @@ export default function FuelModule() {
 
   const session = fuel.estimated?.session ?? 0;
   const weekly = fuel.estimated?.weekly ?? 0;
+  // v4.5.0 — tween the headline gauges so fuel log updates don't feel jarring.
+  // Respects prefers-reduced-motion via the hook's PREFERS_REDUCED_MOTION check.
+  const sessionTween = useTweenedNumber(session);
+  const weeklyTween = useTweenedNumber(weekly);
   const used = Math.round(100 - session);
   const intensity = usageIntensity(used);
   const cs = wl?.currentSession;
@@ -207,7 +212,7 @@ export default function FuelModule() {
   const capacity = fuel.capacity;
   const forecast = fuel.forecast;
   return (
-    <div>
+    <div className="animate-page-mount">
       {/* Header — v4.3.9 #259: use shared FuelFreshnessStamp so Command view + Dashboard
           ClockWidget can reuse the same staleness-aware age indicator. */}
       <div className="mb-6">
@@ -273,7 +278,7 @@ export default function FuelModule() {
         <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Session</span>
-            <span className={`text-2xl font-light tabular-nums ${color(session)}`}>{session}%</span>
+            <span className={`text-2xl font-light tabular-nums ${color(session)}`}>{Math.round(sessionTween)}%</span>
           </div>
           <Bar percent={session} height="h-3" />
           <div className="mt-3 space-y-1 text-xs font-mono text-nexus-text-faint">
@@ -293,7 +298,7 @@ export default function FuelModule() {
         <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Weekly</span>
-            <span className={`text-2xl font-light tabular-nums ${color(weekly)}`}>{weekly}%</span>
+            <span className={`text-2xl font-light tabular-nums ${color(weekly)}`}>{Math.round(weeklyTween)}%</span>
           </div>
           <Bar percent={weekly} height="h-3" />
           <div className="mt-3 space-y-1 text-xs font-mono text-nexus-text-faint">

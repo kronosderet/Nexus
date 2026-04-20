@@ -226,7 +226,7 @@ export default function Pulse({ ws }) {
   const memCardColor = memPct >= 95 ? 'text-nexus-red' : memPct >= 85 ? 'text-nexus-amber' : 'text-nexus-green';
 
   return (
-    <div>
+    <div className="animate-page-mount">
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-nexus-text flex items-center gap-2">
           <Activity size={18} className="text-nexus-amber" />

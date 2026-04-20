@@ -121,7 +121,7 @@ export default function GraphModule({ navOptions }) {
   }
 
   return (
-    <div>
+    <div className="animate-page-mount">
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h2 className="text-lg font-semibold text-nexus-text flex items-center gap-2">
@@ -595,7 +595,16 @@ function ContradictionsView({ data, onRefresh }) {
             <span className="text-[10px] font-mono text-nexus-text-faint ml-auto">{suggestions.length} pending review</span>
           </div>
           <div className="space-y-2">
-            {suggestions.map(s => <SuggestedContradictionCard key={s.id} suggestion={s} onDecision={onRefresh} />)}
+            {/* v4.5.0 — staggered reveal so fresh Overseer suggestions appear with flow */}
+            {suggestions.map((s, i) => (
+              <div
+                key={s.id}
+                className="animate-row-reveal"
+                style={{ animationDelay: `${Math.min(i * 40, 160)}ms` }}
+              >
+                <SuggestedContradictionCard suggestion={s} onDecision={onRefresh} />
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -744,7 +753,7 @@ function ScanContradictionsPanel({ onComplete }) {
         <button
           onClick={startScan}
           disabled={status === 'running'}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded-lg border border-nexus-blue/30 text-nexus-blue hover:bg-nexus-blue/10 transition-colors disabled:opacity-50"
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded-lg border border-nexus-blue/30 text-nexus-blue hover:bg-nexus-blue/10 transition-colors disabled:opacity-50 ${status === 'running' ? 'animate-shimmer-sweep' : ''}`}
           title="Scans same-project decision pairs with cosine similarity ≥0.65; asks the Overseer to classify each. Stores accepted/dismissed decisions so pairs don't re-surface."
         >
           {status === 'running' ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
@@ -771,6 +780,9 @@ function ScanContradictionsPanel({ onComplete }) {
 function SuggestedContradictionCard({ suggestion, onDecision }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  // v4.5.0 — brief success flash after accept/dismiss before the card unmounts
+  // when the parent refetches. Gives the user confirmation their click registered.
+  const [flashClass, setFlashClass] = useState('');
   const confPct = Math.round((suggestion.confidence || 0) * 100);
   const simPct = Math.round((suggestion.similarity || 0) * 100);
 
@@ -779,7 +791,9 @@ function SuggestedContradictionCard({ suggestion, onDecision }) {
     try {
       if (action === 'accept') await api.acceptSuggestedContradiction(suggestion.id);
       else await api.dismissSuggestedContradiction(suggestion.id);
-      if (onDecision) onDecision();
+      setFlashClass('animate-success-flash');
+      // Let the flash play briefly before the parent refresh unmounts us.
+      setTimeout(() => { if (onDecision) onDecision(); }, 350);
     } catch (e) {
       setError(e.message || 'Failed');
     } finally {
@@ -788,7 +802,7 @@ function SuggestedContradictionCard({ suggestion, onDecision }) {
   }
 
   return (
-    <div className="bg-nexus-bg border border-nexus-blue/20 rounded-lg p-3">
+    <div className={`bg-nexus-bg border border-nexus-blue/20 rounded-lg p-3 ${flashClass}`}>
       <div className="flex items-center gap-2 mb-2">
         <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-nexus-blue/10 text-nexus-blue border border-nexus-blue/20" title="Overseer confidence × cosine similarity at pairing time">
           {confPct}% · sim {simPct}%
