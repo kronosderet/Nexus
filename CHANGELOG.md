@@ -2,7 +2,7 @@
 
 Nexus — The Cartographer. Local-first metabrain plugin for Claude Code.
 
-The v4.3.5 → v4.5.0 arc kicked off after the initial "Audit Shakedown" (v4.3.5)
+The v4.3.5 → v4.5.3 arc kicked off after the initial "Audit Shakedown" (v4.3.5)
 released in mid-April 2026. What follows covers 17 versioned releases plus one
 major UI audit, one big `Memory Bridge` import feature, the ambient-telemetry
 hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
@@ -42,6 +42,35 @@ now actually holds for the free-text surfaces it originally missed.
 
 **Tests:** 189 → **201** (+12 drift specs).
 **MCPB:** rebuilt at v4.4.5, smoke-passes on all 26 tools.
+
+## v4.5.3 — Project Config + History Cleanup
+
+Maintenance release. No new features, no breaking changes for existing users.
+
+**User-configurable project patterns (`server/lib/projectConfig.ts`)**
+- Project classification patterns + extra-project paths now load from an
+  optional user config at `$NEXUS_HOME/projects.json` instead of being
+  hardcoded in multiple server files.
+- Default out-of-the-box patterns match only "Nexus" itself. Anything else
+  is classified via the user's config (or falls back to the default).
+- Shape: `{ "patterns": [{ "name": "MyProj", "patterns": ["\\bmyproj\\b"] }], "extra": [{ "name": "shared", "path": "D:/shared" }] }`.
+- Call-sites updated: `store.ts` (project backfill migration), `memoryIndex.ts`
+  (CC memory project inference), `planIndex.ts` (plan scan), `routes/plan.ts`
+  (task filtering), `routes/pulse.ts` (extra project directories).
+- Client: Overseer Q&A filter now derives "known projects" from the live
+  Fleet slice instead of a static list.
+- MCP tool descriptions: generalized away from specific project-name examples.
+
+**History hygiene**
+- `nexus.json` and `nexus-embeddings.json` were accidentally committed in
+  v1.0 / v1.1 and later removed but persisted in git history — 979 KB of
+  first-developer state recoverable via `git show <old-sha>:nexus.json`.
+  History rewritten via `git-filter-repo` to purge these files from every
+  commit. Anyone who had cloned a pre-v4.5.3 copy will need to reclone.
+- `_appliedMigrations` shape unchanged; migration ids preserved. No data
+  migration needed on existing installs.
+
+228 tests. 27 MCP tools.
 
 ## v4.5.2 — Smoke-Test Self-Cleaning + `nexus_delete_task`
 

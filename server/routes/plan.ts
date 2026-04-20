@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
 import type { Task, RiskItem } from '../types.ts';
+import { classifyProject, DEFAULT_PROJECT_NAME } from '../lib/projectConfig.ts';
 
 // v4.3.5 P1 — shared AI response shapes (mirrored from ai.ts).
 interface AIConfig { base: string; model: string; type: string }
@@ -123,23 +124,22 @@ async function buildSessionPlan(store: NexusStore, projectFilter?: string) {
   const tasks = store.getAllTasks();
   const activeTasks = tasks.filter(t => t.status !== 'done');
 
-  // Filter by project if specified
-  // For "Nexus": includes tasks that explicitly mention Nexus OR don't mention any OTHER project name
-  // For any other project: exact title match
-  const KNOWN_PROJECTS = ['nexus', 'firewall-godot', 'noosphere', 'resonance godot', 'resonance-godot', 'shadowrun'];
+  // v4.5.3 — filter by project using the shared classifier. For the default
+  // project (Nexus), include anything that doesn't classify to another project.
+  // For any other project, include tasks whose title + description classify
+  // to the exact filter name. Previously hardcoded a project-name list here;
+  // now the set is whatever the user has configured in ~/.nexus/projects.json.
   const filtered = projectFilter
     ? activeTasks.filter(t => {
-        const title = t.title.toLowerCase();
-        const filter = projectFilter.toLowerCase();
-        if (title.includes(filter)) return true;
-        if (filter === 'nexus') {
-          // Nexus = anything that doesn't explicitly belong to another known project
-          const belongsToOther = KNOWN_PROJECTS
-            .filter(p => p !== 'nexus')
-            .some(p => title.includes(p));
-          return !belongsToOther;
+        const filterLower = projectFilter.toLowerCase();
+        const taskText = `${t.title || ''} ${t.description || ''}`;
+        if (t.project && t.project.toLowerCase() === filterLower) return true;
+        if (t.title.toLowerCase().includes(filterLower)) return true;
+        // Default-project (usually Nexus): tasks that don't classify to something else
+        if (filterLower === DEFAULT_PROJECT_NAME.toLowerCase()) {
+          return classifyProject(taskText).toLowerCase() === DEFAULT_PROJECT_NAME.toLowerCase();
         }
-        return false;
+        return classifyProject(taskText).toLowerCase() === filterLower;
       })
     : activeTasks;
   const inProgress = filtered.filter(t => t.status === 'in_progress');

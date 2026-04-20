@@ -40,7 +40,6 @@ function probePort(host, port, timeoutMs = 200) {
 const PROJECT_CASE_MAP = new Map([
   ['nexus', 'Nexus'],
   ['nexus-cli', 'Nexus'],
-  ['direwolf', 'direwolf'],
 ]);
 function normalizeProjectName(name) {
   if (!name) return name;

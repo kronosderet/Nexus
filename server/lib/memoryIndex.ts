@@ -19,6 +19,7 @@
 import { homedir } from 'os';
 import { join } from 'path';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
+import { tryClassifyProject } from './projectConfig.ts';
 
 export interface MemoryEntry {
   filename: string;          // e.g. "feedback_fuel_display.md"
@@ -43,33 +44,22 @@ export interface MemoriesIndex {
 
 const PROJECTS_ROOT = process.env.NEXUS_CC_PROJECTS_DIR || join(homedir(), '.claude', 'projects');
 
-// Project inference by encoded dir name — fast path before content inspection.
+// v4.5.3 — project inference deferred to the user-configurable patterns in
+// projectConfig.ts. Directory/content hints previously baked one developer's
+// project names into the module; now we scan the encoded dir + content through
+// the same pattern set the rest of Nexus uses.
 const DIR_HINTS: Array<{ project: string; patterns: RegExp[] }> = [
-  { project: 'Nexus',       patterns: [/C--Projects$/i] }, // C:\Projects hosts Nexus work
-  { project: 'Firewall',    patterns: [/Firewall/i] },
-  { project: 'Shadowrun',   patterns: [/Shadowrun/i] },
-  { project: 'Level',       patterns: [/Level/i] },
-  { project: 'rts',         patterns: [/\brts\b/i] },
-  { project: 'claude-md',   patterns: [/Claude-MD$/i] }, // the top-level Claude-MD dir
-];
-
-// Content-based fallback — matches prose inside the memory body/frontmatter.
-const CONTENT_HINTS: Array<{ project: string; patterns: RegExp[] }> = [
-  { project: 'Nexus',       patterns: [/[\\/]Projects[\\/]Nexus\b/i, /\bNexus\b/] },
-  { project: 'Firewall',    patterns: [/Firewall[- ]?Godot\b/i, /\bFirewall\b/] },
-  { project: 'Shadowrun',   patterns: [/\bShadowrun\b/i, /\bSR3\b/] },
-  { project: 'Level',       patterns: [/[Mm]:[\\/]Level\b/, /Level Magazine/i] },
-  { project: 'rts',         patterns: [/\bNoosphere\b/i, /Claude-MD[\\/]rts\b/i] },
+  { project: 'Nexus',       patterns: [/C--Projects$/i] }, // Windows-encoded C:\Projects path
+  { project: 'claude-md',   patterns: [/Claude-MD$/i] },   // top-level Claude-MD dir
 ];
 
 function inferProject(encodedDir: string, content: string): string | null {
   for (const h of DIR_HINTS) {
     if (h.patterns.some(p => p.test(encodedDir))) return h.project;
   }
-  for (const h of CONTENT_HINTS) {
-    if (h.patterns.some(p => p.test(content))) return h.project;
-  }
-  return null;
+  // Delegate content-based inference to the shared classifier so users can
+  // extend via ~/.nexus/projects.json instead of editing this file.
+  return tryClassifyProject(content);
 }
 
 /** Parse a minimal YAML frontmatter block from the top of a markdown file. */

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../hooks/useApi.js';
+import { useNexusFleet } from '../context/useNexus.js';
 import { Brain, RefreshCw, AlertTriangle, Shield, Send, Loader2, Play, CheckCircle2, XCircle, Clock, Search, X, Copy, Check } from 'lucide-react';
 import Chip from '../components/Chip.jsx';
 
@@ -380,10 +381,16 @@ export default function Overseer() {
 
   // v4.4.4 #344 — group chatHistory into Q/A pairs and apply filters. Filtering
   // at the pair level so the answer shows alongside its question when either matches.
-  // `mentionedProjects` is a simple regex scan of answer text for capitalized project
-  // names, deduped — good enough to populate the filter dropdown without a separate
-  // structured project field on the advice entry.
-  const KNOWN_PROJECTS = useMemo(() => ['Nexus', 'Shadowrun', 'Firewall-Godot', 'Firewall', 'Resonance', 'noosphere'], []);
+  // v4.5.3 — KNOWN_PROJECTS is now derived from the live Fleet slice (user's actual
+  // project names) instead of a hardcoded list of one developer's projects.
+  const { fleet: fleetSlice } = useNexusFleet();
+  const KNOWN_PROJECTS = useMemo(() => {
+    const names = (fleetSlice.data?.projects || []).map(p => p.name).filter(Boolean);
+    // Always include "Nexus" so the self-detection pattern still works even when
+    // the fleet slice hasn't loaded yet.
+    if (!names.some(n => n.toLowerCase() === 'nexus')) names.push('Nexus');
+    return names;
+  }, [fleetSlice.data]);
   const { qaPairs, projectsPresent } = useMemo(() => {
     const pairs = [];
     const projects = new Set();
@@ -730,7 +737,7 @@ export default function Overseer() {
                 onChange={(e) => setQuestion(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !asking && askOverseer()}
                 maxLength={5000}
-                placeholder={askMode === 'refine' ? 'Follow up on the previous answer...' : 'What should I prioritize? / Is Firewall at risk? / ...'}
+                placeholder={askMode === 'refine' ? 'Follow up on the previous answer...' : 'What should I prioritize? / What are the biggest risks? / ...'}
                 className="flex-1 bg-nexus-bg border border-nexus-border rounded-lg px-3 py-2 text-sm text-nexus-text placeholder:text-nexus-text-faint focus:border-nexus-amber focus:outline-none"
               />
               <button

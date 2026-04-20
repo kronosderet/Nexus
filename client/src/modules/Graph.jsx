@@ -1057,9 +1057,9 @@ function HolesView({ data, onLinkOrphan, onRefresh, DecisionPicker }) {
       )}
 
       {/* Healthy projects summary — v4.4.3 #317: explicit "×N decisions" label;
-          v4.4.3 #319: hygiene badge for known data-quality artifacts (DIREWOLF casing
-          drift, "Projects" CC encoded-dir leak). Both were normalized by v4.3.9-H1 +
-          v4.4.0-H2 migrations; if they show up again here, it's a regression signal. */}
+          v4.4.3 #319: hygiene badge for known data-quality artifacts ("Projects"
+          leaking from CC encoded-dir naming). The v4.3.9-H1 / v4.4.0-H2 migrations
+          normalize these; if they show up again it's a regression signal. */}
       {healthy.length > 0 && (
         <div>
           <h3 className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-[0.2em] mb-2">
@@ -1067,7 +1067,7 @@ function HolesView({ data, onLinkOrphan, onRefresh, DecisionPicker }) {
           </h3>
           <div className="flex flex-wrap gap-1.5">
             {healthy.map((p) => {
-              const hygiene = (p.project === 'DIREWOLF' || p.project === 'Projects');
+              const hygiene = (p.project === 'Projects');
               return (
                 <div
                   key={p.project}

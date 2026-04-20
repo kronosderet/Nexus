@@ -96,7 +96,7 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.5.2 (Smoke-Test Self-Cleaning + `nexus_delete_task` · shipped 2026-04-20)
+## Current — v4.5.3 (Project Config + History Cleanup · shipped 2026-04-20)
 
 v4.5.0 is a theme-wide microanimation pass: list reveals, page-mount fades,
 WS-driven row flashes, number tweening, success flashes, status-change

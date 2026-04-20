@@ -92,39 +92,46 @@ describe('v4.3.9 H1 hygiene migration', () => {
   });
 
   it('normalizes DIREWOLF to direwolf and Projects to general', () => {
+    // v4.5.3 — project-case map was emptied (previously normalized hostnames
+    // specific to one developer's install). The test now covers only the
+    // universal blank-project fill. Tasks are seeded with the v4.3.5-C1
+    // migration pre-applied so the blank-project records reach v4.3.9-H1 intact
+    // (otherwise C1's project backfill runs first and fills non-blank values).
     const store = seedAndConstruct({
       tasks: [
-        { id: 1, title: 't', description: '', status: 'backlog', priority: 0, sort_order: 1, linked_files: '[]', project: 'DIREWOLF', created_at: '2026-04-01', updated_at: '2026-04-01' },
-        { id: 2, title: 't2', description: '', status: 'backlog', priority: 0, sort_order: 2, linked_files: '[]', project: 'Projects', created_at: '2026-04-01', updated_at: '2026-04-01' },
+        { id: 1, title: 't', description: '', status: 'backlog', priority: 0, sort_order: 1, linked_files: '[]', project: '', created_at: '2026-04-01', updated_at: '2026-04-01' },
+        { id: 2, title: 't2', description: '', status: 'backlog', priority: 0, sort_order: 2, linked_files: '[]', project: '  ', created_at: '2026-04-01', updated_at: '2026-04-01' },
         { id: 3, title: 't3', description: '', status: 'backlog', priority: 0, sort_order: 3, linked_files: '[]', project: 'Nexus', created_at: '2026-04-01', updated_at: '2026-04-01' },
       ],
       activity: [],
       sessions: [
-        { id: 1, project: 'DIREWOLF', summary: 's', decisions: [], blockers: [], files_touched: [], tags: [], created_at: '2026-04-01' },
+        { id: 1, project: '', summary: 's', decisions: [], blockers: [], files_touched: [], tags: [], created_at: '2026-04-01' },
       ],
       usage: [], gpu_history: [], scratchpads: [], bookmarks: [],
       ledger: [
-        { id: 1, decision: 'x', context: '', project: 'Projects', alternatives: [], tags: [], created_at: '2026-04-01', lifecycle: 'active' },
+        { id: 1, decision: 'x', context: '', project: '', alternatives: [], tags: [], created_at: '2026-04-01', lifecycle: 'active' },
       ],
       graph_edges: [], advice: [], thoughts: [],
+      _appliedMigrations: { 'v4.3.5-C1': '2026-04-01', 'v4.3.5-I1': '2026-04-01' },
     });
     const tasks = store.getAllTasks();
-    expect(tasks.find(t => t.id === 1).project).toBe('direwolf');
-    expect(tasks.find(t => t.id === 2).project).toBe('general');
-    expect(tasks.find(t => t.id === 3).project).toBe('Nexus'); // preserved
-    expect(store.getSessions()[0].project).toBe('direwolf');
+    expect(tasks.find(t => t.id === 1).project).toBe('general');       // blank → general
+    expect(tasks.find(t => t.id === 2).project).toBe('general');       // whitespace → general
+    expect(tasks.find(t => t.id === 3).project).toBe('Nexus');         // preserved
+    expect(store.getSessions()[0].project).toBe('general');
     expect(store.getAllDecisions()[0].project).toBe('general');
   });
 
   it('is idempotent: second construction runs no-op and leaves data unchanged', () => {
     const first = seedAndConstruct({
-      tasks: [{ id: 1, title: 'foo \uFFFD bar', description: '', status: 'backlog', priority: 0, sort_order: 1, linked_files: '[]', project: 'DIREWOLF', created_at: '2026-04-01', updated_at: '2026-04-01' }],
+      tasks: [{ id: 1, title: 'foo \uFFFD bar', description: '', status: 'backlog', priority: 0, sort_order: 1, linked_files: '[]', project: '', created_at: '2026-04-01', updated_at: '2026-04-01' }],
       activity: [], sessions: [], usage: [], gpu_history: [], scratchpads: [], bookmarks: [], ledger: [], graph_edges: [], advice: [], thoughts: [],
+      _appliedMigrations: { 'v4.3.5-C1': '2026-04-01', 'v4.3.5-I1': '2026-04-01' },
     });
     const firstTitle = first.getAllTasks()[0].title;
     const firstProject = first.getAllTasks()[0].project;
     expect(firstTitle).toContain('—');
-    expect(firstProject).toBe('direwolf');
+    expect(firstProject).toBe('general');
     // Second construction reads the already-migrated data — should detect applied marker and skip.
     const second = new NexusStore();
     expect(second.getAllTasks()[0].title).toBe(firstTitle);

@@ -315,7 +315,7 @@ const TOOLS: Tool[] = [
         project: {
           type: 'string',
           description:
-            'Project name (e.g. "Nexus", "Shadowrun", "Firewall-Godot"). Defaults to "Nexus".',
+            'Project name. Defaults to "Nexus" (the workspace itself). Use whatever canonical name you use in your own ledger for other projects.',
         },
       },
     },
@@ -520,7 +520,7 @@ const TOOLS: Tool[] = [
         },
         project: {
           type: 'string',
-          description: 'Optional project name. If omitted, defaults to "Nexus". Use the canonical project name (e.g. "Shadowrun", "noosphere", "Firewall-Godot").',
+          description: 'Optional project name. If omitted, defaults to "Nexus". Use whatever canonical name you use for the target project in your own ledger.',
         },
         status: {
           type: 'string',
@@ -904,7 +904,7 @@ const TOOLS: Tool[] = [
       properties: {
         project: {
           type: 'string',
-          description: 'Optional: only import memories whose inferred project matches (case-insensitive). E.g. "Nexus", "Shadowrun".',
+          description: 'Optional: only import memories whose inferred project matches (case-insensitive).',
         },
         dry_run: {
           type: 'boolean',

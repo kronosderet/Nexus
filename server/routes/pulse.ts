@@ -140,10 +140,11 @@ function getSystemInfo() {
   };
 }
 
-// Extra project directories outside PROJECTS_DIR (e.g. NAS-mounted projects)
-const EXTRA_PROJECTS: Array<{ name: string; path: string }> = [
-  { name: 'family-coop', path: 'M:/family coop' },
-];
+// v4.5.3 — extra project dirs outside PROJECTS_DIR (e.g. NAS mounts) come
+// from the user's ~/.nexus/projects.json config, not hardcoded here. Empty by
+// default so first-time users don't see a phantom "family-coop" entry pointing
+// at a path that doesn't exist on their machine.
+import { getExtraProjects } from '../lib/projectConfig.ts';
 
 function scanProjects() {
   const projectsDir = PROJECTS_DIR;
@@ -158,8 +159,8 @@ function scanProjects() {
       } catch {}
     }
   } catch {}
-  // Add extra project paths
-  for (const ep of EXTRA_PROJECTS) {
+  // Add extra project paths from user config
+  for (const ep of getExtraProjects()) {
     try {
       if (existsSync(ep.path) && !results.some(r => r.name === ep.name)) {
         const hasGit = (() => { try { statSync(join(ep.path, '.git')); return true; } catch { return false; } })();

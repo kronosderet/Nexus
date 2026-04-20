@@ -18,6 +18,7 @@
 import { homedir } from 'os';
 import { join } from 'path';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
+import { tryClassifyProject } from './projectConfig.ts';
 
 export interface PlanEntry {
   filename: string;       // e.g. "concurrent-bouncing-lagoon.md"
@@ -40,16 +41,8 @@ export interface PlansIndex {
 const PLANS_DIR = process.env.NEXUS_CC_PLANS_DIR || join(homedir(), '.claude', 'plans');
 const AGENT_PLAN_PATTERN = /-agent-[a-f0-9]+\.md$/i;
 
-// Project inference — matches against content from the plan file. Order matters:
-// more specific patterns first. Path-based matches beat bare-word matches.
-const PROJECT_HINTS: Array<{ project: string; patterns: RegExp[] }> = [
-  { project: 'Nexus',       patterns: [/[\\/]Projects[\\/]Nexus\b/i, /\bNexus\b/] },
-  { project: 'Shadowrun',   patterns: [/\bShadowrun\b/i] },
-  { project: 'Firewall',    patterns: [/Firewall[- ]?Godot\b/i, /\bFirewall\b/] },
-  { project: 'Level',       patterns: [/[Mm]:[\\/]Level\b/, /Level Magazine/i] },
-  { project: 'family-coop', patterns: [/family[- ]coop\b/i] },
-  { project: 'rts',         patterns: [/Claude-MD[\\/]rts\b/i] },
-];
+// v4.5.3 — project inference delegated to projectConfig.ts so users can
+// extend via ~/.nexus/projects.json instead of editing this file.
 
 export function scanPlans(limit = 30): PlansIndex {
   if (!existsSync(PLANS_DIR)) {
@@ -86,14 +79,10 @@ export function scanPlans(limit = 30): PlansIndex {
         .replace(/^#+\s*/, '')
         .slice(0, 140);
 
-      // Project inference — first hint wins
-      let project: string | null = null;
-      for (const hint of PROJECT_HINTS) {
-        if (hint.patterns.some((p) => p.test(content))) {
-          project = hint.project;
-          break;
-        }
-      }
+      // Project inference via shared classifier. `tryClassifyProject` returns
+      // null when no pattern matches — preserves the old "unknown project"
+      // shape callers depend on.
+      const project: string | null = tryClassifyProject(content);
 
       // Snippet: body content after the title, collapsed whitespace
       const bodyStart = h1Match ? content.indexOf(h1Match[0]) + h1Match[0].length : 0;

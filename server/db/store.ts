@@ -8,6 +8,7 @@ import type {
 } from '../types.js';
 import { findSimilar } from '../lib/embeddings.ts';
 import { scanCCMemories, type MemoryEntry } from '../lib/memoryIndex.ts';
+import { classifyProject } from '../lib/projectConfig.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -102,6 +103,8 @@ export class NexusStore {
     const markApplied = (id: string) => { applied[id] = new Date().toISOString(); };
 
     // v4.3.5 C1: Backfill `project` on tasks (v4.2 added the field but never migrated old tasks).
+    // v4.5.3 — project-detection patterns moved to projectConfig.ts. Users customize via
+    // ~/.nexus/projects.json; default matches "Nexus" and falls through to Nexus otherwise.
     const tasksNeedingProject = applied['v4.3.5-C1'] ? [] : this.data.tasks.filter(t => !t.project);
     if (tasksNeedingProject.length > 0) {
       // Build project name lookup from existing decisions (canonical casing).
@@ -109,18 +112,6 @@ export class NexusStore {
       for (const d of this.data.ledger) {
         if (d.project) decisionProjectById.set(d.id, d.project);
       }
-      // Known project names, ordered by specificity (most specific markers first).
-      // MYE / Ego Hunter / harmony_field uniquely identify Resonance even though the
-      // project shares "P3B" phase-naming with Shadowrun — so Resonance checks first.
-      const knownProjects: Array<{ name: string; patterns: RegExp[] }> = [
-        { name: 'resonance godot',patterns: [/\bResonance\b/i, /\bharmony_field\b/i, /\bMYE\b/, /\bEgo Hunter\b/i, /\bmoxie\b/i] },
-        { name: 'noosphere',      patterns: [/\bNoosphere\b/i, /\bPULSE\b/, /\btensor field\b/i] },
-        { name: 'Firewall-Godot', patterns: [/\bfirewall\b/i, /\bEP1e\b/i] },
-        { name: 'Level',          patterns: [/\bLevel\b/, /\bbyline\b/i, /\bOCR\b/i, /322 PDF/i] },
-        { name: 'Shadowrun',      patterns: [/\bshadowrun\b/i, /\bSR3\b/, /\bP3B\b/, /\bC\d+\b.*\b(BF|FA|TN|damage)\b/] },
-        { name: 'family-coop',    patterns: [/\bfamily[- ]coop\b/i] },
-        { name: 'Nexus',          patterns: [/\bnexus\b/i, /\bv4\.\d/i, /\bmcp\b/i, /\bmcpb\b/i] },
-      ];
       const inferProject = (t: Task): string => {
         // 1. From decision_ids (most authoritative)
         if (Array.isArray(t.decision_ids) && t.decision_ids.length > 0) {
@@ -134,13 +125,9 @@ export class NexusStore {
             return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
           }
         }
-        // 2. Pattern-match against title + description
+        // 2. Pattern-match against title + description via user-configurable patterns
         const haystack = `${t.title || ''} ${t.description || ''}`;
-        for (const kp of knownProjects) {
-          if (kp.patterns.some(p => p.test(haystack))) return kp.name;
-        }
-        // 3. Default
-        return 'Nexus';
+        return classifyProject(haystack);
       };
       for (const t of tasksNeedingProject) {
         t.project = inferProject(t);
@@ -183,23 +170,19 @@ export class NexusStore {
     // v4.3.9 H1: combined hygiene migration — fixes three data-quality bugs the UI audit surfaced.
     //   #222 Encoding mojibake: U+FFFD replacement chars in task titles (em-dash loss on import)
     //   #245 Blank project names: sessions logged without project leak as ": 10d" on Fleet staleness
-    //   #273 Case inconsistency: DIREWOLF vs direwolf across task/session/decision records,
-    //        plus "Projects" (cap P) leaking in from CC encoded-dir names (not a real project)
+    //   #273 Case inconsistency across task/session/decision records, plus "Projects" (cap P)
+    //        leaking in from CC encoded-dir names (not a real project)
     // One pass, one apply, all three resolved. Idempotent via _appliedMigrations.
+    // v4.5.3 — project-case map emptied; it was hardcoded to one developer's hostname
+    // casing. Anyone on older installs who still has that residue can re-seed the map
+    // via a future config hook. The mojibake + blank-project scrubs remain universal.
     if (!applied['v4.3.9-H1']) {
       const mojibake = /\uFFFD/g;
       let mojibakeFixed = 0;
       let blanksFixed = 0;
       let casingFixed = 0;
 
-      // Project-name normalization map. Keys are case-sensitive exact matches.
-      // DIREWOLF was captured as uppercase in some sessions; canonical is lowercase.
-      // "Projects" (cap P) comes from CC's encoded-dir naming (~/.claude/projects/...) and
-      //   was never meant to be a project label — route it to "general".
-      const projectCaseMap = new Map<string, string>([
-        ['DIREWOLF', 'direwolf'],
-        ['Projects', 'general'],
-      ]);
+      const projectCaseMap = new Map<string, string>();
       const normalizeProject = (p: string | undefined): { value: string | undefined; changed: boolean } => {
         if (!p) return { value: p, changed: false };
         const mapped = projectCaseMap.get(p);
