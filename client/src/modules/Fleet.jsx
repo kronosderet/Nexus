@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Ship, GitBranch, FileText, Brain, CheckCircle2, AlertTriangle, Clock, Layers, Activity } from 'lucide-react';
+import { Ship, GitBranch, FileText, Brain, CheckCircle2, AlertTriangle, Clock, Layers, Activity, Network } from 'lucide-react';
 import { useNexusFleet } from '../context/useNexus.js';
 
 function heatColor(heat) {
@@ -33,6 +33,14 @@ function ProjectCard({ project, fleet, onNavigate }) {
   // naturally if we navigate; future: pass project as target filter too (requires
   // Command accepting initialProjectFilter prop — follow-up).
   const handleCardJump = () => { if (onNavigate) onNavigate('command'); };
+  // v4.4.5 #380 — secondary action: jump to Graph/Visual focused on this project.
+  // Passes navOptions so Graph seeds the Visual view with hiddenProjects =
+  // everything except this project name. Resolves the audit finding that project →
+  // graph drill-down was too many clicks.
+  const handleGraphJump = (e) => {
+    e.stopPropagation();
+    if (onNavigate) onNavigate('graph', { graphView: 'visual', focusProject: project.name });
+  };
 
   return (
     <div className={`rounded-xl border p-4 transition-colors ${heatColor(project.heat)} ${onNavigate ? 'hover:border-nexus-amber/40 cursor-pointer' : ''}`}>
@@ -56,7 +64,20 @@ function ProjectCard({ project, fleet, onNavigate }) {
             </p>
           )}
         </div>
-        <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${heat.color}`}>{heat.label}</span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* v4.4.5 #380 — Open in Graph (Visual, filtered to this project) */}
+          {onNavigate && (
+            <button
+              onClick={handleGraphJump}
+              title={`Open ${project.name} in Graph Visual (filtered)`}
+              aria-label={`Open ${project.name} in Graph Visual`}
+              className="p-1 rounded text-nexus-text-faint hover:text-nexus-amber hover:bg-nexus-amber/10 transition-colors"
+            >
+              <Network size={11} />
+            </button>
+          )}
+          <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${heat.color}`}>{heat.label}</span>
+        </div>
       </div>
 
       {/* Stats grid */}

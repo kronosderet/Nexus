@@ -96,11 +96,11 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.4.5 (Doc-Drift Hardening · shipped 2026-04-19)
+## Current — v4.4.6 (Audit Response · shipped 2026-04-20)
 
 The v4.3 → v4.4 arc is **shipped**. 26 MCP tools, 201 tests. Latest release:
-`v4.4.5 — Doc-Drift Hardening`. See **`CHANGELOG.md`** for full per-release
-detail from v4.3.5 through v4.4.5.
+`v4.4.6 — Audit Response`. See **`CHANGELOG.md`** for full per-release
+detail from v4.3.5 through v4.4.6.
 
 ### The arc in one paragraph
 v4.3.5 kicked off with an audit shakedown (data/code/dashboard). v4.3.6

@@ -29,6 +29,14 @@ const MODULES = {
 
 export default function App() {
   const [activeModule, setActiveModule] = useState('command');
+  // v4.4.5 #380 — nav options payload for cross-module hints (e.g. Fleet asks Graph
+  // to open Visual tab focused on a specific project). Consumed by receiving module
+  // on mount; cleared after consumption so it doesn't re-apply on subsequent renders.
+  const [navOptions, setNavOptions] = useState({});
+  const handleNavigate = (moduleKey, options = {}) => {
+    setActiveModule(moduleKey);
+    setNavOptions(options);
+  };
   const [showWelcome, setShowWelcome] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [thoughtsOpen, setThoughtsOpen] = useState(false);
@@ -94,8 +102,10 @@ export default function App() {
         <NexusProvider ws={ws}>
           <ErrorBoundary resetKey={activeModule}>
             {/* v4.4.1 #354 — onNavigate prop gives modules a way to jump to sibling views
-                (e.g. Log entries click-through to Command / Graph). Used in Log.jsx. */}
-            <ActiveComponent ws={ws} onNavigate={setActiveModule} />
+                (e.g. Log entries click-through to Command / Graph). Used in Log.jsx.
+                v4.4.5 #380 — second arg `options` carries hints for the destination
+                module (e.g. { graphView: 'visual', focusProject: 'Nexus' }). */}
+            <ActiveComponent ws={ws} onNavigate={handleNavigate} navOptions={navOptions} />
           </ErrorBoundary>
         </NexusProvider>
       </main>

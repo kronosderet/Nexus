@@ -15,11 +15,19 @@ const GRAPH_TABS = [
   { key: 'visual',         label: 'Visual',       icon: Network },
 ];
 
-export default function GraphModule() {
+export default function GraphModule({ navOptions }) {
   const { graph: graphSlice } = useNexusFleet();
   const [view, setView] = useState('overview');
   const [blastId, setBlastId] = useState('');
   const [blastResult, setBlastResult] = useState(null);
+  // v4.4.5 #380 — project focus hint from nav payload. When set, Visual view seeds
+  // hiddenProjects to hide everything BUT this project. Consumed once per navigation.
+  const [focusProject, setFocusProject] = useState(null);
+  useEffect(() => {
+    if (navOptions?.graphView) setView(navOptions.graphView);
+    if (navOptions?.focusProject) setFocusProject(navOptions.focusProject);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navOptions]);
 
   // v4.3.5 I4: delegated tab handler — one stable useCallback instead of 6 inline closures per render.
   const onSelectTab = useCallback((e) => {
@@ -227,7 +235,7 @@ export default function GraphModule() {
       {view === 'centrality' && <CentralityView data={centrality} onPickBlast={jumpToBlast} onPickVisual={jumpToVisual} />}
       {view === 'contradictions' && <ContradictionsView data={contradictions} onRefresh={() => graphSlice.refresh()} />}
       {view === 'holes' && <HolesView data={holes} onLinkOrphan={(id) => jumpToBlast(id)} onRefresh={() => graphSlice.refresh()} DecisionPicker={DecisionPicker} />}
-      {view === 'visual' && <VisualView graph={graph} initialSelectedId={visualFocusId} onSelected={setVisualFocusId} />}
+      {view === 'visual' && <VisualView graph={graph} initialSelectedId={visualFocusId} onSelected={setVisualFocusId} focusProject={focusProject} onFocusConsumed={() => setFocusProject(null)} />}
     </div>
   );
 }
@@ -914,7 +922,7 @@ function hashProjectColor(project) {
   return PROJECT_PALETTE[Math.abs(h) % PROJECT_PALETTE.length];
 }
 
-function VisualView({ graph, initialSelectedId, onSelected }) {
+function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocusConsumed }) {
   const HEIGHT = 400;
   const [hoveredId, setHoveredId] = useState(null);
   // v4.4.2 #329 — accept initialSelectedId from parent so cross-tab "focus this node"
@@ -925,6 +933,18 @@ function VisualView({ graph, initialSelectedId, onSelected }) {
     if (initialSelectedId != null) setSelectedId(initialSelectedId);
   }, [initialSelectedId]);
   const [hiddenProjects, setHiddenProjects] = useState(new Set());
+  // v4.4.5 #380 — seed hiddenProjects from Fleet "open in graph" jump.
+  // Hides every project EXCEPT the focus target so user lands on a project-
+  // isolated view. Consumed once; parent clears focusProject via onFocusConsumed.
+  useEffect(() => {
+    if (focusProject && graph?.nodes?.length) {
+      const allProjects = new Set(graph.nodes.map(n => n.project).filter(Boolean));
+      const hide = new Set([...allProjects].filter(p => p !== focusProject));
+      setHiddenProjects(hide);
+      if (onFocusConsumed) onFocusConsumed();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusProject, graph]);
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(600);
   // v4.4.3 #330 — search input state. Highlights matching node IDs + focuses first match.

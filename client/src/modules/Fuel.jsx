@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Fuel as FuelIcon, Clock, Timer, Zap,
   TrendingUp, TrendingDown, Minus,
@@ -110,8 +110,16 @@ function DeltaBadge({ delta, unit = '', lowerIsBetter = true, neutral = false })
 // v4.4.4 #265 — Task Cost by Category was read-only; click to expand shows the
 // underlying tasks that produced each average. Lets users verify whether a gold
 // metric like "Fuel Management 15.3% (3×)" is a real pattern or a one-off skew.
+// v4.4.5 #379 — memoize known-categories set so expand-state can't drift if the
+// categorizer output ever changes mid-session (e.g. new "Audit" category appears
+// after a task completion). If the expanded key falls off the set, we collapse
+// it rather than silently orphan the state.
 function TaskCostPanel({ entries, maxCost, totalAnalyzed }) {
   const [expanded, setExpanded] = useState(null); // category name or null
+  const knownCategories = useMemo(() => new Set(entries.map(([cat]) => cat)), [entries]);
+  useEffect(() => {
+    if (expanded != null && !knownCategories.has(expanded)) setExpanded(null);
+  }, [expanded, knownCategories]);
   return (
     <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5 mb-4">
       <div className="flex items-center gap-2 mb-3">

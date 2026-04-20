@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { api } from '../hooks/useApi.js';
 import { useNexusCore } from '../context/useNexus.js';
+import Chip from '../components/Chip.jsx';
 import {
   ScrollText, BookOpen, Compass, CheckCircle2, Trash2, Settings,
   FileEdit, AlertTriangle, Tag, ChevronDown, ChevronRight, Search, Filter,
   Clock, MapPin, Lightbulb, Brain, MessageSquare, Network, GitCommit,
-  Download, Rocket, BookMarked, EyeOff, Eye,
+  Download, Rocket, BookMarked, EyeOff, Eye, ArrowUp,
 } from 'lucide-react';
 
 // ── Activity type config ────────────────────────────────
@@ -104,6 +105,40 @@ export default function Log({ onNavigate }) {
   // across the session only — no storage, matches the audit ask ("hide for this session").
   const [mutedTypes, setMutedTypes] = useState(() => new Set());
 
+  // v4.4.5 #382 — scroll-to-top anchor. Desc sort means newest-at-top; when user
+  // scrolls down and new events arrive, a floating button offers quick return.
+  // Sentinel element at the top of the Log module reports intersection; when it
+  // leaves viewport, we track any entry with a newer ID than the last-seen.
+  const headerSentinelRef = useRef(null);
+  const [topVisible, setTopVisible] = useState(true);
+  const [hasNewSinceScroll, setHasNewSinceScroll] = useState(false);
+  const lastSeenTopIdRef = useRef(null);
+  useEffect(() => {
+    const el = headerSentinelRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([entry]) => {
+      setTopVisible(entry.isIntersecting);
+    }, { root: null, threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  useEffect(() => {
+    // When top is visible, latest entry is counted as "seen" and we reset the badge.
+    if (topVisible) {
+      lastSeenTopIdRef.current = entries[0]?.id ?? null;
+      setHasNewSinceScroll(false);
+      return;
+    }
+    // Top not visible: if newest entry id differs from last seen, there are new events.
+    const newestId = entries[0]?.id ?? null;
+    if (newestId != null && newestId !== lastSeenTopIdRef.current) {
+      setHasNewSinceScroll(true);
+    }
+  }, [entries, topVisible]);
+  const scrollToTop = () => {
+    headerSentinelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const entries = activitySlice.data || [];
   const sessions = sessionsSlice.data || [];
   const loadingA = activitySlice.loading;
@@ -167,6 +202,11 @@ export default function Log({ onNavigate }) {
 
   return (
     <div>
+      {/* v4.4.5 #382 — sentinel for IntersectionObserver. When it leaves viewport
+          we know the user has scrolled down from the top. Sits just above the header
+          so the "near top" boundary is a hair above "header visible". */}
+      <div ref={headerSentinelRef} aria-hidden="true" className="h-px" />
+
       {/* Header + tabs */}
       <div className="mb-6 flex items-start justify-between">
         <div>
@@ -214,7 +254,8 @@ export default function Log({ onNavigate }) {
         </div>
 
         {/* v4.4.4 #357 — time-range preset pills. Only shown on activity + timeline
-            since session list is typically small and already browsable by project. */}
+            since session list is typically small and already browsable by project.
+            v4.4.5 #383 — migrated to shared Chip primitive. */}
         {(tab === 'activity' || tab === 'timeline') && (
           <div className="flex items-center gap-1.5 flex-wrap">
             <Clock size={10} className="text-nexus-text-faint" />
@@ -225,10 +266,9 @@ export default function Log({ onNavigate }) {
               { key: 'today', label: 'Today' },
               { key: '7d', label: '7d' },
             ].map(r => (
-              <button key={r.key} onClick={() => setTimeRange(r.key)}
-                className={`px-2 py-0.5 rounded-full text-[10px] font-mono border transition-colors ${timeRange === r.key ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/20' : 'text-nexus-text-faint border-nexus-border hover:text-nexus-text'}`}>
+              <Chip key={r.key} active={timeRange === r.key} onClick={() => setTimeRange(r.key)}>
                 {r.label}
-              </button>
+              </Chip>
             ))}
           </div>
         )}
@@ -275,16 +315,11 @@ export default function Log({ onNavigate }) {
             )}
           </div>
         ) : projects.length > 1 && (
+          // v4.4.5 #383 — migrated to shared Chip primitive, md size.
           <div className="flex gap-1 flex-wrap">
-            <button onClick={() => setProjectFilter('')}
-              className={`px-2.5 py-1 text-xs font-mono rounded-md transition-colors ${!projectFilter ? 'bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20' : 'text-nexus-text-faint hover:text-nexus-text border border-transparent'}`}>
-              All
-            </button>
+            <Chip size="md" active={!projectFilter} onClick={() => setProjectFilter('')}>All</Chip>
             {projects.map(p => (
-              <button key={p} onClick={() => setProjectFilter(p)}
-                className={`px-2.5 py-1 text-xs font-mono rounded-md transition-colors ${projectFilter === p ? 'bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20' : 'text-nexus-text-faint hover:text-nexus-text border border-transparent'}`}>
-                {p}
-              </button>
+              <Chip key={p} size="md" active={projectFilter === p} onClick={() => setProjectFilter(p)}>{p}</Chip>
             ))}
           </div>
         )}
@@ -300,9 +335,19 @@ export default function Log({ onNavigate }) {
       ) : tab === 'activity' ? (
         /* ── Activity stream ─── */
         filteredActivity.length === 0 ? (
+          /* v4.4.5 #384 — Status + Action empty state. Previously terse "No entries match."
+             without a next step. Now tells the user what's filtering and offers a clear. */
           <div className="text-center py-12 bg-nexus-surface border border-nexus-border rounded-xl">
             <ScrollText size={24} className="mx-auto text-nexus-text-faint mb-2 opacity-40" />
-            <p className="text-xs font-mono text-nexus-text-faint">No entries match.</p>
+            <p className="text-xs font-mono text-nexus-text-dim">No entries match your filters.</p>
+            {(search || typeFilter !== 'all' || timeRange !== 'all' || mutedTypes.size > 0) && (
+              <button
+                onClick={() => { setSearch(''); setTypeFilter('all'); setTimeRange('all'); setMutedTypes(new Set()); }}
+                className="mt-3 text-[10px] font-mono text-nexus-amber hover:text-nexus-text transition-colors"
+              >
+                Clear all filters
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-6">
@@ -362,15 +407,45 @@ export default function Log({ onNavigate }) {
       ) : (
         /* ── Sessions list ─── */
         filteredSessions.length === 0 ? (
+          /* v4.4.5 #384 — Status + Action pattern for sessions tab too. */
           <div className="text-center py-12 bg-nexus-surface border border-nexus-border rounded-xl">
             <BookOpen size={24} className="mx-auto text-nexus-text-faint mb-2 opacity-40" />
-            <p className="text-xs font-mono text-nexus-text-faint">No sessions match.</p>
+            <p className="text-xs font-mono text-nexus-text-dim">
+              {sessions.length === 0 ? 'No sessions logged yet.' : 'No sessions match your filters.'}
+            </p>
+            {sessions.length === 0 ? (
+              <p className="text-[10px] font-mono text-nexus-text-faint mt-2">
+                Sessions are recorded via <code className="text-nexus-amber">nexus_log_session</code> when you wrap up work.
+              </p>
+            ) : (search || projectFilter || blockersOnly) && (
+              <button
+                onClick={() => { setSearch(''); setProjectFilter(''); setBlockersOnly(false); }}
+                className="mt-3 text-[10px] font-mono text-nexus-amber hover:text-nexus-text transition-colors"
+              >
+                Clear all filters
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
             {filteredSessions.map(s => <SessionCard key={s.id} session={s} />)}
           </div>
         )
+      )}
+
+      {/* v4.4.5 #382 — floating scroll-to-top anchor. Shows only when user has
+          scrolled past the top AND new events have arrived since they left the top.
+          Fixed-position at bottom-right of viewport so it's reachable regardless
+          of content depth. Stream is desc-sorted so "scroll to top" = "jump to latest". */}
+      {!topVisible && hasNewSinceScroll && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-6 z-40 flex items-center gap-1.5 px-3 py-2 rounded-full bg-nexus-amber/90 text-nexus-bg border border-nexus-amber shadow-lg text-[11px] font-mono hover:bg-nexus-amber transition-colors"
+          title="Scroll to latest events"
+        >
+          <ArrowUp size={12} />
+          New events
+        </button>
       )}
     </div>
   );
@@ -413,9 +488,11 @@ function TimelineView({ entries, sessions, search, rangeCutoffMs, mutedTypes }) 
   }, [timeline]);
 
   if (timeline.length === 0) return (
+    /* v4.4.5 #384 — Status + Action pattern; timeline cares about range + search. */
     <div className="text-center py-12 bg-nexus-surface border border-nexus-border rounded-xl">
       <Clock size={24} className="mx-auto text-nexus-text-faint mb-2 opacity-40" />
-      <p className="text-xs font-mono text-nexus-text-faint">No events match.</p>
+      <p className="text-xs font-mono text-nexus-text-dim">No events in this range.</p>
+      <p className="text-[10px] font-mono text-nexus-text-faint mt-2">Widen the time range above or clear your search.</p>
     </div>
   );
 

@@ -2,12 +2,12 @@
 
 Nexus — The Cartographer. Local-first metabrain plugin for Claude Code.
 
-The v4.3.5 → v4.4.4 arc kicked off after the initial "Audit Shakedown" (v4.3.5)
-released in mid-April 2026. What follows covers 12 versioned releases plus one
+The v4.3.5 → v4.4.6 arc kicked off after the initial "Audit Shakedown" (v4.3.5)
+released in mid-April 2026. What follows covers 13 versioned releases plus one
 major UI audit, one big `Memory Bridge` import feature, the ambient-telemetry
-hook layer (v4.4.0 alpha/beta/final), and five post-v4.4.0 patch releases
+hook layer (v4.4.0 alpha/beta/final), and six post-v4.4.0 patch releases
 closing UI-audit Tier 1 + the small/medium half of Tier 2 backlogs + doc-drift
-hardening.
+hardening + audit response.
 
 ## v4.4.5 — Doc-Drift Hardening
 
@@ -42,6 +42,47 @@ now actually holds for the free-text surfaces it originally missed.
 
 **Tests:** 189 → **201** (+12 drift specs).
 **MCPB:** rebuilt at v4.4.5, smoke-passes on all 26 tools.
+
+## v4.4.6 — Audit Response
+
+Response to the Overseer dashboard audit (advice #26) run immediately after
+v4.4.4. Six polish-pass findings shipped in one release. No breaking changes.
+(Version bumped to v4.4.6 after rebase — v4.4.5 was claimed by the doc-drift
+hardening patch below, which landed concurrently.)
+
+**Regression fix**
+- `#379` Fuel `TaskCostPanel` — memoize known-categories set and collapse
+  expand-state if the selected key falls off the set (e.g. after categorizer
+  output shifts mid-session). Prevents orphaned expand state.
+
+**UX improvements**
+- `#380` Fleet → Graph quick-jump — new Network icon on each project card
+  navigates to Graph/Visual with hiddenProjects seeded to everything except
+  the target project. Audit flagged multi-click drill-down as friction. Added
+  `navOptions` plumbing through App → ActiveComponent → Graph → VisualView
+  for cross-module hints.
+- `#381` Overseer Copy-as-Markdown — clipboard button on Strategic Analysis
+  block and every Overseer chat answer. Transient "Copied" confirmation.
+  Falls back to `document.execCommand('copy')` when `navigator.clipboard`
+  is blocked (insecure context).
+- `#382` Log scroll-to-top anchor — IntersectionObserver on a header sentinel
+  detects when user scrolls away from latest; badge shows only when NEW events
+  have arrived since leaving the top. Fixed-position bottom-right button
+  smooth-scrolls back.
+
+**Coherence**
+- `#383` Shared `<Chip>` primitive — `client/src/components/Chip.jsx`.
+  Two sizes (sm default / md), states (active / muted / default), renders as
+  `<button>` when interactive or `<span>` when display-only. Migrated: Log
+  time-range pills, Log sessions project chips, Overseer Q&A date-range pills,
+  Overseer Q&A project chips. Graph view tabs + Fuel PLAN_DETAILS left alone
+  (different visual role — tabs and rows, not chips).
+- `#384` Empty-state tone standardized on **Status + Action/Education**.
+  Log activity / sessions / timeline all gained actionable next-steps: "Clear
+  all filters" when filters are active, or an education line pointing at the
+  right mechanism (e.g. `nexus_log_session`) when genuinely empty.
+
+26 MCP tools. Tests 189/189.
 
 ## v4.4.4 — Tier 2 Finale
 

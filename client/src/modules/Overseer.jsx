@@ -1,6 +1,42 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../hooks/useApi.js';
-import { Brain, RefreshCw, AlertTriangle, Shield, Send, Loader2, Play, CheckCircle2, XCircle, Clock, Search, X } from 'lucide-react';
+import { Brain, RefreshCw, AlertTriangle, Shield, Send, Loader2, Play, CheckCircle2, XCircle, Clock, Search, X, Copy, Check } from 'lucide-react';
+import Chip from '../components/Chip.jsx';
+
+// v4.4.5 #381 — Copy-as-Markdown button. Audit flagged that Overseer answers
+// require manual highlight-and-copy. Wraps navigator.clipboard.writeText with
+// a transient "Copied" confirmation state so users get feedback.
+function CopyButton({ text, label = 'Copy', size = 10 }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text || '');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // clipboard API blocked (e.g. insecure context) — fall back to a DOM textarea copy
+      const ta = document.createElement('textarea');
+      ta.value = text || '';
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
+      document.body.removeChild(ta);
+    }
+  };
+  return (
+    <button
+      onClick={copy}
+      title={copied ? 'Copied to clipboard' : 'Copy as Markdown'}
+      aria-label={copied ? 'Copied' : label}
+      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors ${copied ? 'text-nexus-green' : 'text-nexus-text-faint hover:text-nexus-amber hover:bg-nexus-amber/10'}`}
+    >
+      {copied ? <Check size={size} /> : <Copy size={size} />}
+      {copied ? 'Copied' : label}
+    </button>
+  );
+}
 
 const RISK_ICONS = {
   critical: { color: 'text-nexus-red', bg: 'bg-nexus-red/10 border-nexus-red/20' },
@@ -414,18 +450,22 @@ export default function Overseer() {
                 <Brain size={14} className="text-nexus-amber" />
                 <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Strategic Analysis</span>
               </div>
-              <button
-                onClick={fetchAnalysis}
-                disabled={loading}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded-lg border border-nexus-border hover:border-nexus-amber/30 hover:text-nexus-amber text-nexus-text-dim transition-colors disabled:opacity-50"
-                // v4.4.2 #346 — hover tooltip previews cost + scope so users know what
-                // clicking this costs (local AI runs; no Anthropic fuel, but ~1 GB VRAM
-                // spike for 20-40s while the model generates).
-                title="Runs the Overseer on full fleet state: all projects, tasks, sessions, decisions, git. ~20-40s, ~1 GB VRAM spike on local AI. No Anthropic fuel."
-              >
-                {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                {loading ? 'Analyzing…' : 'Analyze Fleet'}
-              </button>
+              <div className="flex items-center gap-2">
+                {/* v4.4.5 #381 — Copy-as-Markdown on the analysis block */}
+                {analysis && !loading && <CopyButton text={analysis} />}
+                <button
+                  onClick={fetchAnalysis}
+                  disabled={loading}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded-lg border border-nexus-border hover:border-nexus-amber/30 hover:text-nexus-amber text-nexus-text-dim transition-colors disabled:opacity-50"
+                  // v4.4.2 #346 — hover tooltip previews cost + scope so users know what
+                  // clicking this costs (local AI runs; no Anthropic fuel, but ~1 GB VRAM
+                  // spike for 20-40s while the model generates).
+                  title="Runs the Overseer on full fleet state: all projects, tasks, sessions, decisions, git. ~20-40s, ~1 GB VRAM spike on local AI. No Anthropic fuel."
+                >
+                  {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                  {loading ? 'Analyzing…' : 'Analyze Fleet'}
+                </button>
+              </div>
             </div>
 
             {!analysis && !loading && (
@@ -491,17 +531,12 @@ export default function Overseer() {
                       className="w-full bg-nexus-bg border border-nexus-border rounded-lg pl-7 pr-3 py-1 text-[11px] text-nexus-text font-mono focus:border-nexus-amber focus:outline-none"
                     />
                   </div>
+                  {/* v4.4.5 #383 — migrated to shared Chip primitive. */}
                   <div className="flex gap-1">
                     {['all', 'today', '7d', '30d'].map(r => (
-                      <button
-                        key={r}
-                        onClick={() => setQaRange(r)}
-                        className={`px-2 py-0.5 rounded text-[10px] font-mono border transition-colors ${
-                          qaRange === r ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/20' : 'text-nexus-text-faint border-nexus-border hover:text-nexus-text'
-                        }`}
-                      >
+                      <Chip key={r} active={qaRange === r} onClick={() => setQaRange(r)}>
                         {r === 'all' ? 'All' : r === 'today' ? 'Today' : r === '7d' ? '7d' : '30d'}
-                      </button>
+                      </Chip>
                     ))}
                   </div>
                   {qaFilterActive && (
@@ -514,17 +549,12 @@ export default function Overseer() {
                   )}
                 </div>
                 {projectsPresent.length > 2 && (
+                  // v4.4.5 #383 — migrated to shared Chip primitive.
                   <div className="flex gap-1 flex-wrap">
                     {projectsPresent.map(p => (
-                      <button
-                        key={p}
-                        onClick={() => setQaProject(p)}
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-mono border transition-colors ${
-                          qaProject === p ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/20' : 'text-nexus-text-faint border-nexus-border hover:text-nexus-text'
-                        }`}
-                      >
+                      <Chip key={p} active={qaProject === p} onClick={() => setQaProject(p)}>
                         {p === 'all' ? 'All projects' : p}
-                      </button>
+                      </Chip>
                     ))}
                   </div>
                 )}
@@ -574,7 +604,13 @@ export default function Overseer() {
                     {msg.role === 'user' ? (
                       <p className="text-xs text-nexus-text">{msg.text}</p>
                     ) : (
-                      <AnalysisBlock text={msg.text} />
+                      <>
+                        <AnalysisBlock text={msg.text} />
+                        {/* v4.4.5 #381 — Copy-as-Markdown on each Overseer answer */}
+                        <div className="flex justify-end mt-2">
+                          <CopyButton text={msg.text} />
+                        </div>
+                      </>
                     )}
                   </div>
                 ))}
