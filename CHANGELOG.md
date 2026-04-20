@@ -2,12 +2,12 @@
 
 Nexus — The Cartographer. Local-first metabrain plugin for Claude Code.
 
-The v4.3.5 → v4.4.6 arc kicked off after the initial "Audit Shakedown" (v4.3.5)
-released in mid-April 2026. What follows covers 13 versioned releases plus one
+The v4.3.5 → v4.4.7 arc kicked off after the initial "Audit Shakedown" (v4.3.5)
+released in mid-April 2026. What follows covers 14 versioned releases plus one
 major UI audit, one big `Memory Bridge` import feature, the ambient-telemetry
-hook layer (v4.4.0 alpha/beta/final), and six post-v4.4.0 patch releases
-closing UI-audit Tier 1 + the small/medium half of Tier 2 backlogs + doc-drift
-hardening + audit response.
+hook layer (v4.4.0 alpha/beta/final), and seven post-v4.4.0 patch releases
+closing UI-audit Tier 1 + the small/medium half of Tier 2 + doc-drift hardening
++ audit response + Tier 2 BIG #343 Overseer refine mode.
 
 ## v4.4.5 — Doc-Drift Hardening
 
@@ -42,6 +42,51 @@ now actually holds for the free-text surfaces it originally missed.
 
 **Tests:** 189 → **201** (+12 drift specs).
 **MCPB:** rebuilt at v4.4.5, smoke-passes on all 26 tools.
+
+## v4.4.7 — Overseer Refine Mode
+
+First of the two Tier 2 BIG items shipped. Closes `#343`: the Overseer
+conversation now has two explicit modes instead of forcing the full
+SITUATION/PRIORITIES/RISKS/RECOMMENDATIONS scaffolding on every question.
+
+**Two modes**
+- **Strategic** (default for first question) — unchanged behavior. Full system
+  prompt, full workspace dump, 4-section structured output.
+- **Refine** (auto-selected for follow-ups) — slim conversational prompt,
+  prior turns included as `[You] / [Overseer]` transcript, reduced context
+  dump (just active-task-by-project + current fuel). No forced section
+  headers. Target response length ~150 words.
+
+**Auto-switching**
+- First question in an empty thread: Strategic.
+- Every question after: Refine (unless the user manually picks Strategic).
+- Manual override shows an `auto` pill that returns to automatic selection.
+
+**Server (`server/routes/overseer.ts`)**
+- `POST /overseer/ask` and `POST /overseer/ask/start` now accept
+  `mode: 'analysis' | 'refine'` and `history: Array<{role, text}>`.
+- New `OVERSEER_REFINE_SYSTEM` prompt and `formatHistory()` helper (caps at
+  last 8 turns, truncates each turn at 2000 chars to keep prompts lean).
+- New `buildSlimContext()` function — drops per-project task dump, session
+  history, and decisions list. Projects bucketed by open-task count, sorted
+  desc. Falls back to `(no state)` when empty.
+
+**Client (`client/src/modules/Overseer.jsx`)**
+- Mode toggle Chip pair above the ask input, with placeholder text adapting
+  to the active mode.
+- Chat history entries now carry a `mode` field; a small `strategic` /
+  `refine` badge renders beside each turn's role label. Absent on historic
+  entries loaded from the advice journal (pre-v4.4.7 data).
+- `askOverseer()` forwards `mode` + last 8 turns as history when refining.
+
+**Tests** (`tests/overseerRefine.test.ts`)
+- 11 new unit tests covering `formatHistory` (empty/short/long history, role
+  labels, turn-count cap at 8, per-turn text cap at 2000 chars, unknown-role
+  passthrough) and `buildSlimContext` (empty state, done-task filtering,
+  project bucketing + sort, default-to-Nexus fallback, fuel line, length
+  sanity).
+
+201 → **212 tests** (+11 refine specs). 26 MCP tools.
 
 ## v4.4.6 — Audit Response
 

@@ -277,6 +277,15 @@ export default function Overseer() {
   const [gpuInfo, setGpuInfo] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
   const [scans, setScans] = useState([]);
+  // v4.4.7 #343 — mode state for Ask flow. 'analysis' triggers the full strategic
+  // scaffolding (SITUATION / PRIORITIES / RISKS / RECOMMENDATIONS); 'refine' is
+  // a conversational follow-up mode that inherits prior turns as transcript and
+  // skips the formal structure. Defaults to 'analysis' on empty history,
+  // auto-switches to 'refine' once the thread has at least one Q/A pair.
+  const [askMode, setAskMode] = useState('analysis');
+  // Track whether the user has manually overridden mode for this thread so auto-
+  // switch doesn't clobber their choice. Reset only when they clear the thread.
+  const [askModeManual, setAskModeManual] = useState(false);
   // v4.4.4 #344 — search + filter past Q&A. As the conversation history grows
   // (20+ entries from the advice journal), power users need to find prior strategic
   // dialogs. Filters: free-text match against question/answer, project mention,
@@ -345,12 +354,23 @@ export default function Overseer() {
 
     setAsking(true);
     setQuestion('');
-    // Add question to history immediately
-    setChatHistory(prev => [...prev, { role: 'user', text: q, time: new Date().toISOString() }]);
+    // v4.4.7 #343 — send current mode + last 4 Q/A pairs as history when in refine.
+    // Server uses this to skip re-running full strategic scaffolding on follow-ups.
+    const historyPayload = askMode === 'refine'
+      ? chatHistory.slice(-8).map(m => ({ role: m.role, text: m.text }))
+      : [];
+    // Tag the turn with its mode so the chat UI can show a small badge.
+    setChatHistory(prev => [...prev, { role: 'user', text: q, time: new Date().toISOString(), mode: askMode }]);
     try {
-      const data = await api.askOverseer({ question: q });
+      const data = await api.askOverseer({ question: q, mode: askMode, history: historyPayload });
       const answer = data.answer || data.error || 'No response';
-      setChatHistory(prev => [...prev, { role: 'overseer', text: answer, time: new Date().toISOString(), adviceId: data.adviceId }]);
+      setChatHistory(prev => [...prev, { role: 'overseer', text: answer, time: new Date().toISOString(), adviceId: data.adviceId, mode: askMode }]);
+      // Auto-switch to refine after the first exchange unless the user has manually
+      // overridden. Makes the common "one big question then a few follow-ups" flow
+      // one-shot: first question is strategic, everything after is lean.
+      if (!askModeManual && askMode === 'analysis') {
+        setAskMode('refine');
+      }
     } catch (err) {
       setChatHistory(prev => [...prev, { role: 'overseer', text: `Error: ${err.message}`, time: new Date().toISOString() }]);
     } finally {
@@ -584,6 +604,19 @@ export default function Overseer() {
                           'bg-nexus-red/10 text-nexus-red'
                         }`}>{msg.outcome}</span>
                       )}
+                      {/* v4.4.7 #343 — mode badge (Strategic / Refine). Absent on
+                          historic entries loaded from the advice journal since the
+                          journal doesn't track per-turn mode yet. */}
+                      {msg.mode && (
+                        <span
+                          className={`text-[8px] font-mono px-1 rounded ${
+                            msg.mode === 'refine' ? 'bg-nexus-blue/10 text-nexus-blue' : 'bg-nexus-amber/10 text-nexus-amber'
+                          }`}
+                          title={msg.mode === 'refine' ? 'Conversational follow-up mode' : 'Full strategic analysis'}
+                        >
+                          {msg.mode === 'refine' ? 'refine' : 'strategic'}
+                        </span>
+                      )}
                       {/* v4.4.2 #345 — smart timestamp: "HH:MM" for today, "Nd · HH:MM"
                           for recent days, full date for older. Audit flagged that just
                           "22:52" was ambiguous across days. */}
@@ -653,6 +686,40 @@ export default function Overseer() {
               </div>
             )}
 
+            {/* v4.4.7 #343 — mode toggle above input. Strategic = full SITUATION/
+                PRIORITIES/RISKS/RECOMMENDATIONS scaffolding + full workspace dump.
+                Refine = conversational follow-up; transcript-aware, slim context,
+                no forced section headers. Auto-switches to Refine after first ask
+                unless user has manually picked a mode for this thread. */}
+            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-mono text-nexus-text-faint">Mode:</span>
+                <Chip
+                  active={askMode === 'analysis'}
+                  onClick={() => { setAskMode('analysis'); setAskModeManual(true); }}
+                  title="Full strategic analysis: SITUATION / PRIORITIES / RISKS / RECOMMENDATIONS scaffolding + full workspace context"
+                >
+                  Strategic
+                </Chip>
+                <Chip
+                  active={askMode === 'refine'}
+                  onClick={() => { setAskMode('refine'); setAskModeManual(true); }}
+                  title="Conversational follow-up: inherits prior turns, skips formal section headers, slim context"
+                >
+                  Refine
+                </Chip>
+              </div>
+              {askModeManual && (
+                <button
+                  onClick={() => { setAskModeManual(false); setAskMode(chatHistory.some(m => m.role === 'user') ? 'refine' : 'analysis'); }}
+                  className="text-[10px] font-mono text-nexus-text-faint hover:text-nexus-amber transition-colors"
+                  title="Return to automatic mode selection"
+                >
+                  auto
+                </button>
+              )}
+            </div>
+
             {/* Input */}
             <div className="flex gap-2">
               <input
@@ -660,7 +727,7 @@ export default function Overseer() {
                 onChange={(e) => setQuestion(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !asking && askOverseer()}
                 maxLength={5000}
-                placeholder="What should I prioritize? / Is Firewall at risk? / ..."
+                placeholder={askMode === 'refine' ? 'Follow up on the previous answer...' : 'What should I prioritize? / Is Firewall at risk? / ...'}
                 className="flex-1 bg-nexus-bg border border-nexus-border rounded-lg px-3 py-2 text-sm text-nexus-text placeholder:text-nexus-text-faint focus:border-nexus-amber focus:outline-none"
               />
               <button

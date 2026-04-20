@@ -252,6 +252,34 @@ function buildContextPrompt(ctx: GatherContext) {
   return lines.join('\n');
 }
 
+// v4.4.7 #343 — slim context for refine/follow-up mode. Drops the per-project
+// task dump, session history, and decisions list. Retains only: project names
+// with open-task counts, top blocker if any, current fuel. The model already
+// has the full strategic analysis from the prior turn in the transcript, so
+// repeating the full workspace dump in refine mode is token waste.
+// Exported for unit testing. Accepts the subset of GatherContext fields it reads.
+interface SlimContextInput {
+  tasks: Array<{ status?: string; project?: string }>;
+  usage?: { session_percent?: number | null; weekly_percent?: number | null } | null;
+}
+export function buildSlimContext(ctx: SlimContextInput): string {
+  const lines: string[] = [];
+  const projectCounts: Record<string, number> = {};
+  for (const t of ctx.tasks) {
+    if (t.status === 'done') continue;
+    const p = t.project || 'Nexus';
+    projectCounts[p] = (projectCounts[p] || 0) + 1;
+  }
+  const projects = Object.entries(projectCounts).sort((a, b) => b[1] - a[1]);
+  if (projects.length > 0) {
+    lines.push(`Active: ${projects.map(([p, n]) => `${p} (${n})`).join(', ')}`);
+  }
+  if (ctx.usage) {
+    lines.push(`Fuel: session ${ctx.usage.session_percent}%, weekly ${ctx.usage.weekly_percent}%`);
+  }
+  return lines.join('\n') || '(no state)';
+}
+
 const OVERSEER_SYSTEM = `You are the Overseer of Nexus, an AI workspace management system. You analyze the full state of a developer's project fleet and provide strategic project management guidance.
 
 Your analysis should cover:
@@ -263,6 +291,35 @@ Your analysis should cover:
 Be direct, concise, and actionable. Use the developer's project names. If Claude usage is low, factor that into your recommendations (suggest smaller tasks or deferring work).
 
 Format your response with clear section headers. Keep total response under 300 words.`;
+
+// v4.4.7 #343 — refine/follow-up mode system prompt. The default OVERSEER_SYSTEM
+// forces the full S/P/R/R scaffolding for every question, which is overkill for
+// short factual questions ("what is Nexus?") or conversational follow-ups
+// ("expand on #2"). This prompt drops the structure and prioritizes conversational
+// fidelity — prior turns in the thread are included in the user message as
+// [You] / [Overseer] transcript so the model picks up context without rebuilding
+// SITUATION from scratch.
+const OVERSEER_REFINE_SYSTEM = `You are the Overseer of Nexus. The user has already seen your strategic analysis and is now asking a follow-up or refining the conversation.
+
+Answer directly and concisely. Build on prior turns in the transcript — don't restate what was already said. Skip formal section headers (SITUATION / PRIORITIES / RISKS / RECOMMENDATIONS) unless the user asks for a fresh strategic read.
+
+If the user asks a simple factual question, give a simple factual answer. If they ask "expand on X" or "why", focus your response on that specific thread. If they pivot to a new broad strategic question, you may use the structured format again — but default to conversational prose.
+
+Keep responses tight (aim under 150 words unless the refinement genuinely requires more). Use the developer's project names. Factor Claude usage into pacing suggestions when relevant.`;
+
+// v4.4.7 #343 — helper for rendering prior chat turns as a transcript block.
+// Called by /ask/start and /ask when mode === 'refine' and history is non-empty.
+// Exported for unit testing.
+export function formatHistory(history: Array<{ role: string; text: string }>): string {
+  if (!Array.isArray(history) || history.length === 0) return '';
+  const lines: string[] = ['Prior conversation:'];
+  for (const turn of history.slice(-8)) { // cap at last 4 Q/A pairs to keep prompt lean
+    const role = turn.role === 'user' ? 'You' : turn.role === 'overseer' ? 'Overseer' : turn.role;
+    const text = String(turn.text || '').slice(0, 2000);
+    lines.push(`[${role}]: ${text}`);
+  }
+  return lines.join('\n\n') + '\n\n';
+}
 
 export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) {
   const router = Router();
@@ -315,18 +372,32 @@ export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) 
   });
 
   // Ask overseer a specific question about the workspace
+  // v4.4.7 #343 — accepts optional `mode: 'analysis' | 'refine'` and `history`
+  // (prior turns). Refine mode uses a conversational system prompt and includes
+  // the transcript in the user message, so follow-ups don't re-run the full
+  // SITUATION/PRIORITIES/RISKS/RECOMMENDATIONS scaffolding.
   router.post('/ask', async (req: Request, res: Response) => {
-    const { question } = req.body;
+    const { question, mode = 'analysis', history = [] } = req.body;
     if (!question) return res.status(400).json({ error: 'Question required.' });
 
     const ai = await detectAI();
     if (!ai.available) return res.json({ available: false, error: 'No local AI.' });
 
+    const isRefine = mode === 'refine';
     const ctx = gatherContext(store);
-    const contextPrompt = buildContextPrompt(ctx);
+    // Refine mode uses a slimmer context block: latest fuel + open-task count only.
+    // Analysis mode keeps the full workspace dump.
+    const contextPrompt = isRefine
+      ? buildSlimContext(ctx)
+      : buildContextPrompt(ctx);
+    const systemMsg = isRefine ? OVERSEER_REFINE_SYSTEM : OVERSEER_SYSTEM;
+    const historyBlock = isRefine ? formatHistory(history) : '';
+    const userMsg = isRefine
+      ? `${historyBlock}Workspace snapshot:\n${contextPrompt}\n\n[You]: ${question}\n\n[Overseer]:`
+      : `Given this workspace state:\n\n${contextPrompt}\n\nQuestion: ${question}`;
 
     try {
-      const answer = await ask(ai, OVERSEER_SYSTEM, `Given this workspace state:\n\n${contextPrompt}\n\nQuestion: ${question}`);
+      const answer = await ask(ai, systemMsg, userMsg);
 
       // Auto-log advice
       const advice = store.recordAdvice({
@@ -335,7 +406,7 @@ export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) 
         recommendation: answer,
       });
 
-      res.json({ answer, adviceId: advice?.id ?? null, model: ai.model });
+      res.json({ answer, adviceId: advice?.id ?? null, model: ai.model, mode });
     } catch (err) {
       res.json({ error: err.message });
     }
@@ -472,7 +543,10 @@ Group by severity. Be terse. Maximum 30 findings.`;
   }, 60_000);
 
   router.post('/ask/start', async (req: Request, res: Response) => {
-    const { question, system_prompt, skip_context } = req.body;
+    // v4.4.7 #343 — `mode` + `history` params added alongside existing
+    // system_prompt/skip_context overrides. mode='refine' swaps the system prompt,
+    // shrinks the context dump, and prepends the conversation transcript.
+    const { question, system_prompt, skip_context, mode = 'analysis', history = [] } = req.body;
     if (!question) return res.status(400).json({ error: 'Question required.' });
 
     const ai = await detectAI();
@@ -489,12 +563,18 @@ Group by severity. Be terse. Maximum 30 findings.`;
     // Callers can override the system prompt for task-specific outputs
     // (e.g., code audit, auto-link proposals, structured JSON output)
     // and skip context injection when the question already contains all needed data.
-    const systemMsg = system_prompt || OVERSEER_SYSTEM;
+    const isRefine = mode === 'refine';
+    const systemMsg = system_prompt || (isRefine ? OVERSEER_REFINE_SYSTEM : OVERSEER_SYSTEM);
     let userMsg = question;
     if (!skip_context) {
       const ctx = gatherContext(store);
-      const contextPrompt = buildContextPrompt(ctx);
-      userMsg = `Given this workspace state:\n\n${contextPrompt}\n\nQuestion: ${question}`;
+      const contextPrompt = isRefine ? buildSlimContext(ctx) : buildContextPrompt(ctx);
+      if (isRefine) {
+        const historyBlock = formatHistory(history);
+        userMsg = `${historyBlock}Workspace snapshot:\n${contextPrompt}\n\n[You]: ${question}\n\n[Overseer]:`;
+      } else {
+        userMsg = `Given this workspace state:\n\n${contextPrompt}\n\nQuestion: ${question}`;
+      }
     }
     ask(ai, systemMsg, userMsg)
       .then((answer) => {

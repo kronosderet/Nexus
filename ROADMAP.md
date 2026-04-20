@@ -96,11 +96,11 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.4.6 (Audit Response · shipped 2026-04-20)
+## Current — v4.4.7 (Overseer Refine Mode · shipped 2026-04-20)
 
-The v4.3 → v4.4 arc is **shipped**. 26 MCP tools, 201 tests. Latest release:
-`v4.4.6 — Audit Response`. See **`CHANGELOG.md`** for full per-release
-detail from v4.3.5 through v4.4.6.
+The v4.3 → v4.4 arc is **shipped**. 26 MCP tools, 212 tests. Latest release:
+`v4.4.7 — Overseer Refine Mode` (#343, the first Tier 2 BIG item). See
+**`CHANGELOG.md`** for full per-release detail from v4.3.5 through v4.4.7.
 
 ### The arc in one paragraph
 v4.3.5 kicked off with an audit shakedown (data/code/dashboard). v4.3.6
@@ -112,9 +112,8 @@ Tier 1 + Tier 2 small/medium backlogs across Fuel, Dashboard, Fleet,
 Graph (Visual/Centrality/Holes/Conflicts), Overseer, Log.
 
 ### Remaining from the audit
-- **Tier 2 BIG (2 items)** — `#343` Overseer refine/follow-up mode (system
-  prompt work), `#307` Overseer-powered contradiction detection (LLM scan).
-  Both deferred to their own focused releases.
+- **Tier 2 BIG (1 item remaining)** — `#307` Overseer-powered contradiction
+  detection (LLM scan). `#343` shipped in v4.4.7.
 - **Tier 3/4** — longtail polish. Not urgent. `nexus_search "Tier 3"` for list.
 
 ### Non-audit backlog
