@@ -43,6 +43,35 @@ now actually holds for the free-text surfaces it originally missed.
 **Tests:** 189 → **201** (+12 drift specs).
 **MCPB:** rebuilt at v4.4.5, smoke-passes on all 26 tools.
 
+## v4.5.1 — Hotfix: Rules of Hooks
+
+Two `useTweenedNumber` calls landed *after* early-return guards in v4.5.0,
+which violated the Rules of Hooks and crashed the Dashboard (Pulse) module
+and the Fuel module whenever data was loaded.
+
+**Root cause**: on the first render, early-return paths skip the hook calls;
+on subsequent renders when data arrives, the hooks execute — React detects
+the hook-call-order change and throws, breaking the component tree.
+
+**Affected components**
+- `client/src/components/ClockWidget.jsx`: `useTweenedNumber(fuel?.session)`
+  and `useTweenedNumber(fuel?.weekly)` were placed after `if (!serverData)
+  return null`. Moved above the guard; hook now reads `serverData?.fuel?.session`
+  with optional chaining so null pre-load state is safe.
+- `client/src/modules/Fuel.jsx`: same pattern with
+  `useTweenedNumber(session)` / `useTweenedNumber(weekly)` after the
+  `if (!fuel?.tracked) return <empty state>` guard. Moved above; hook reads
+  `fuel?.estimated?.session ?? 0`.
+
+**Why tests didn't catch it**: the component-render tests exercise mount with
+data already present. They don't flip between null-data and present-data
+mid-lifecycle, which is exactly when hook-order violations surface in React.
+A future test-quality improvement would mount with null data first, then
+update the slice to populate it — but that's a harness change beyond the
+scope of this hotfix.
+
+Dashboard tab now renders. Fuel tab now renders. 228 tests.
+
 ## v4.5.0 — Animated Instruments
 
 First minor-version bump since v4.4.0. Theme-wide microanimation pass across

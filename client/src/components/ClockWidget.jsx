@@ -58,6 +58,15 @@ export default function ClockWidget({ ws }) {
     });
   }, [ws]);
 
+  // v4.5.0 — tween the widget's fuel percentages. HOOK CALLS MUST PRECEDE ANY
+  // EARLY RETURN. Previously placed after the `if (!serverData) return null`
+  // guard, which violated the Rules of Hooks — on first render serverData is
+  // null (hooks skipped), next render they get called, React sees hook-call-
+  // order change and throws, crashing the entire Pulse module. Don't move
+  // these below the early-return.
+  const sessionTween = useTweenedNumber(serverData?.fuel?.session ?? 0);
+  const weeklyTween = useTweenedNumber(serverData?.fuel?.weekly ?? 0);
+
   if (!serverData) return null;
 
   const { clock, calendar, fuel } = serverData;
@@ -74,11 +83,6 @@ export default function ClockWidget({ ws }) {
 
   // Burn rate projection
   const proj = fuel?.projection;
-
-  // v4.5.0 — tween the widget's fuel percentages too so dashboard + fuel page
-  // stay consistent when a new reading lands.
-  const sessionTween = useTweenedNumber(fuel?.session ?? 0);
-  const weeklyTween = useTweenedNumber(fuel?.weekly ?? 0);
 
   return (
     <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">

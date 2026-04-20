@@ -185,6 +185,14 @@ export default function FuelModule() {
   const taskCosts = intel?.taskCosts;
   const weeklyPlan = intel?.weeklyPlan;
 
+  // v4.5.0 — tween the headline gauges so fuel log updates don't feel jarring.
+  // HOOKS MUST COME BEFORE THE EARLY RETURN below — prior order was a Rules-of-
+  // Hooks violation that crashed the Fuel module whenever fuel data was present
+  // (hook-call order changed between the tracked=false and tracked=true renders).
+  // Respects prefers-reduced-motion via PREFERS_REDUCED_MOTION inside the hook.
+  const sessionTween = useTweenedNumber(fuel?.estimated?.session ?? 0);
+  const weeklyTween = useTweenedNumber(fuel?.estimated?.weekly ?? 0);
+
   if (!fuel?.tracked) {
     return (
       <div className="text-center py-12">
@@ -197,10 +205,6 @@ export default function FuelModule() {
 
   const session = fuel.estimated?.session ?? 0;
   const weekly = fuel.estimated?.weekly ?? 0;
-  // v4.5.0 — tween the headline gauges so fuel log updates don't feel jarring.
-  // Respects prefers-reduced-motion via the hook's PREFERS_REDUCED_MOTION check.
-  const sessionTween = useTweenedNumber(session);
-  const weeklyTween = useTweenedNumber(weekly);
   const used = Math.round(100 - session);
   const intensity = usageIntensity(used);
   const cs = wl?.currentSession;
