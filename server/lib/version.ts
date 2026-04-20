@@ -9,4 +9,4 @@ export const SERVER_VERSION: string = pkg.version;
 // Expected MCP tool count. Update this when a tool is added or removed.
 // The drift test asserts this matches TOOLS.length in server/mcp/index.ts AND the tools array
 // in mcpb/manifest.json — so forgetting to update the manifest goes red in CI.
-export const TOOL_COUNT_EXPECTED = 26 as const;
+export const TOOL_COUNT_EXPECTED = 27 as const;

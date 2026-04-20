@@ -43,6 +43,45 @@ now actually holds for the free-text surfaces it originally missed.
 **Tests:** 189 → **201** (+12 drift specs).
 **MCPB:** rebuilt at v4.4.5, smoke-passes on all 26 tools.
 
+## v4.5.2 — Smoke-Test Self-Cleaning + `nexus_delete_task`
+
+User reported: "smoke test task reappearing... hanging and reloading into
+Command and Log." The release smoke test was creating a `SMOKE TEST TASK`
+and a `smoke test activity` entry on every `npm run mcpb:test`, then only
+marking the task done. Over many releases these piled up in the Command
+Done column and the Log activity timeline.
+
+**New MCP tool — `nexus_delete_task`**
+- Permanently deletes a task by id (existing `store.deleteTask` was only
+  reachable via HTTP). Complement to `nexus_complete_task`. Tool count
+  26 → **27**.
+- Added to `server/mcp/index.ts` (schema + handler), `mcpb/manifest.json`
+  tools array, and `server/lib/version.ts` `TOOL_COUNT_EXPECTED`.
+
+**Drift-guarded surfaces refreshed (26 → 27)**
+- `README.md` (hero tagline · section heading · architecture table)
+- `CONCEPT.md` (intro bullet · architecture table)
+- `mcpb/README.md` (section heading · tool list adds `nexus_delete_task` under Write)
+- `plugin/README.md` (tool-list header · tool list)
+- `mcpb/manifest.json` (`long_description`)
+- `cli/nexus.js` (two splash strings)
+- `.claude-plugin/marketplace.json` · `plugin/.claude-plugin/plugin.json`
+- `client/src/components/WelcomeScreen.jsx` (`TOOL_COUNT` constant)
+
+**Self-cleaning smoke test — `mcpb/smoke-test-bundle.mjs`**
+- After the MCP subprocess exits, `cleanupSmokeTraces()` post-processes
+  `~/.nexus/nexus.json` to remove any activity entries from this run
+  (matches on "smoke test activity" exact, "safe to delete" in message,
+  or task-id match in meta) and usage entries with note=`smoke test`.
+- Calls `nexus_delete_task` on the created task right after
+  `nexus_complete_task` — exercises both, leaves zero trace.
+- Existing orphan (task #110 + related entries) cleaned manually during
+  this release via `DELETE /api/tasks/110`.
+
+**Tests** 228/228 (unchanged — the drift guard already re-runs against the
+new TOOL_COUNT_EXPECTED = 27 and passes because every surface was updated
+in lockstep).
+
 ## v4.5.1 — Hotfix: Rules of Hooks
 
 Two `useTweenedNumber` calls landed *after* early-return guards in v4.5.0,

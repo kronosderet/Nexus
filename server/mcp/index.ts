@@ -557,6 +557,23 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: 'nexus_delete_task',
+    description:
+      'Permanently delete a task by id. Unlike nexus_complete_task (which marks done but keeps the ' +
+      'task in the ledger), this removes the task entirely. Use for throwaway / smoke-test / ' +
+      'duplicate tasks that shouldn\'t live in the metabrain. Prefer nexus_complete_task for real work.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'number',
+          description: 'Task id to delete.',
+        },
+      },
+      required: ['id'],
+    },
+  },
+  {
     name: 'nexus_log_activity',
     description:
       'Log an activity entry into the live activity stream. Use for notable events that aren\'t full-fledged tasks ' +
@@ -1209,6 +1226,12 @@ async function handleTool(name: string, args: any): Promise<string> {
         lines.push(`  ◈ Auto-resolved ${result.resolvedThoughts} linked thought${result.resolvedThoughts > 1 ? 's' : ''}`);
       }
       return lines.join('\n');
+    }
+
+    case 'nexus_delete_task': {
+      if (args?.id == null) throw new Error('id is required');
+      await nexusFetch(`/api/tasks/${Number(args.id)}`, { method: 'DELETE' });
+      return `◈ Task #${Number(args.id)} removed from charts`;
     }
 
     case 'nexus_log_activity': {

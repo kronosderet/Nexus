@@ -122,7 +122,10 @@ async function main() {
   const idMatch = createdText.match(/#(\d+)/);
   const createdId = idMatch ? parseInt(idMatch[1]) : null;
 
-  // Clean up: mark the smoke-test task done so the backlog stays clean
+  // Clean up: mark the smoke-test task done first (exercises nexus_complete_task),
+  // then delete it so it doesn't linger in the user's ledger + activity stream.
+  // Previously only completed it — users saw "SMOKE TEST TASK" pile up in the
+  // Command Done column and the Log activity timeline on every release.
   if (createdId) {
     const complete = await send('tools/call', {
       name: 'nexus_complete_task',
@@ -130,6 +133,13 @@ async function main() {
     });
     if (!complete.result.isError) {
       console.log(`✓ nexus_complete_task works (closed smoke-test #${createdId})`);
+    }
+    const del = await send('tools/call', {
+      name: 'nexus_delete_task',
+      arguments: { id: createdId },
+    });
+    if (!del.result.isError) {
+      console.log(`✓ nexus_delete_task works (purged smoke-test #${createdId})`);
     }
   }
 
@@ -223,7 +233,47 @@ async function main() {
   console.log('\n=== BUNDLED SERVER WORKS AS STANDALONE NODE PROCESS ===');
   console.log(`  ${list.result.tools.length} tools total`);
   child.kill();
+
+  // v4.5.2 — post-run cleanup. The smoke test fires several write-tool calls
+  // (log_usage, create_task, complete_task, delete_task, log_activity) that
+  // leave traces in the user's store. Users were reporting the smoke-test
+  // task and its activity entries "reappearing" in Command and Log. The
+  // delete_task call (just above) purges the task itself; this block scrubs
+  // the remaining activity + usage noise. Runs after child.kill() so there's
+  // no contention on the JSON file.
+  await cleanupSmokeTraces(createdId).catch(err => {
+    console.warn('  (cleanup skipped:', err.message + ')');
+  });
+
   process.exit(0);
+}
+
+async function cleanupSmokeTraces(createdId) {
+  const fs = await import('fs');
+  const { readFileSync, writeFileSync, existsSync } = fs;
+  const os = await import('os');
+  const storePath = process.env.NEXUS_STORE_PATH || join(os.homedir(), '.nexus', 'nexus.json');
+  if (!existsSync(storePath)) return;
+  const raw = readFileSync(storePath, 'utf-8');
+  const data = JSON.parse(raw);
+  const before = {
+    activity: (data.activity || []).length,
+    usage: (data.usage || []).length,
+  };
+  const smokeIdRe = createdId ? new RegExp(`"id":${createdId}\\b`) : null;
+  data.activity = (data.activity || []).filter((a) => {
+    const msg = (a.message || '').toLowerCase();
+    if (msg === 'smoke test activity') return false;                  // nexus_log_activity trace
+    if (/safe to delete/i.test(a.message || '')) return false;        // task_created/task_done/task_deleted referencing our SMOKE TEST title
+    if (smokeIdRe && smokeIdRe.test(a.meta || '')) return false;      // meta points at the smoke task id
+    return true;
+  });
+  data.usage = (data.usage || []).filter((u) => (u.note || '').toLowerCase() !== 'smoke test');
+  const after = { activity: data.activity.length, usage: data.usage.length };
+  if (before.activity !== after.activity || before.usage !== after.usage) {
+    writeFileSync(storePath, JSON.stringify(data, null, 2));
+    console.log(`  ◈ Cleaned smoke traces: activity ${before.activity} → ${after.activity}, usage ${before.usage} → ${after.usage}`);
+  }
 }
 
 main().catch((err) => {
