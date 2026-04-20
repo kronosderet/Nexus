@@ -178,6 +178,17 @@ export function createImpactRoutes(store: NexusStore) {
     // the headline reflects visible conflicts across both strategies.
     historicalTotal += contradictions.filter(c => c.type === 'potential_conflict').length;
 
+    // v4.4.8 #307 — include active Overseer-scan suggestions inline so the Conflicts
+    // tab can render the "Suggested" section without a second round-trip. Hydrated
+    // with decision text so the card can stand alone.
+    const suggestions = store.getActiveSuggestedContradictions()
+      .map(s => ({
+        ...s,
+        from_decision: store.getDecisionById(s.from_id),
+        to_decision: store.getDecisionById(s.to_id),
+      }))
+      .filter(s => s.from_decision && s.to_decision);
+
     res.json({
       contradictions,
       total: contradictions.length,
@@ -185,6 +196,8 @@ export function createImpactRoutes(store: NexusStore) {
         total: historicalTotal,
         resolved: historicalResolved,
       },
+      suggestions,
+      suggestedCount: suggestions.length,
     });
   });
 

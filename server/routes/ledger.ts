@@ -219,5 +219,49 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
     res.json(store.getGraph());
   });
 
+  // ── v4.4.8 #307 — Suggested contradictions (Overseer scan output) ─────
+  // GET lists active suggestions with both decisions resolved so the UI card
+  // can render text without a second round-trip. Includes history totals for
+  // the counter row.
+  router.get('/suggested-contradictions', (_req: Request, res: Response) => {
+    const all = store.getSuggestedContradictions();
+    const active = all.filter(s => s.status === 'suggested');
+    const hydrated = active.map(s => ({
+      ...s,
+      from_decision: store.getDecisionById(s.from_id),
+      to_decision: store.getDecisionById(s.to_id),
+    })).filter(s => s.from_decision && s.to_decision); // drop if a decision was deleted
+    res.json({
+      suggestions: hydrated,
+      total_scanned: all.length,
+      dismissed: all.filter(s => s.status === 'dismissed').length,
+      accepted: all.filter(s => s.status === 'accepted').length,
+    });
+  });
+
+  // Accept a suggestion: promote it to a real contradicts edge, mark accepted.
+  router.post('/suggested-contradictions/:id/accept', (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    const suggestion = store.getSuggestedContradictions().find(s => s.id === id);
+    if (!suggestion) return res.status(404).json({ error: 'Suggestion not found.' });
+    if (suggestion.status !== 'suggested') return res.status(409).json({ error: `Suggestion already ${suggestion.status}.` });
+    // Guard: decisions must still exist
+    if (!store.getDecisionById(suggestion.from_id) || !store.getDecisionById(suggestion.to_id)) {
+      return res.status(410).json({ error: 'One or both decisions no longer exist.' });
+    }
+    const note = `Accepted from Overseer scan (scan_id=${suggestion.scan_id}, confidence=${suggestion.confidence.toFixed(2)}): ${suggestion.reason}`;
+    const edge = store.addEdge(suggestion.from_id, suggestion.to_id, 'contradicts', note.slice(0, 400));
+    store.updateSuggestedContradiction(id, 'accepted');
+    res.json({ edge, suggestion: { ...suggestion, status: 'accepted' } });
+  });
+
+  // Dismiss a suggestion: hide from Conflicts tab, won't re-surface in future scans.
+  router.post('/suggested-contradictions/:id/dismiss', (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    const updated = store.updateSuggestedContradiction(id, 'dismissed');
+    if (!updated) return res.status(404).json({ error: 'Suggestion not found.' });
+    res.json({ suggestion: updated });
+  });
+
   return router;
 }

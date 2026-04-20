@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { GitBranch, Target, AlertTriangle, BarChart3, Link2, RefreshCw, Search, ChevronRight, Network } from 'lucide-react';
+import { GitBranch, Target, AlertTriangle, BarChart3, Link2, RefreshCw, Search, ChevronRight, Network, Check, X, Loader2, Sparkles } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
 import { useNexusFleet } from '../context/useNexus.js';
 import { THEME, PROJECT_PALETTE, EDGE_STYLES, LIFECYCLE_COLORS } from '../lib/theme.js';
@@ -576,8 +576,30 @@ function ContradictionsView({ data, onRefresh }) {
   // have ever been flagged and how many resolved (one side marked deprecated) so the
   // tab communicates state instead of looking dead. `historical` is computed server-side.
   const hist = data?.historical;
+  const suggestions = data?.suggestions || [];
   return (
     <div className="space-y-4">
+      {/* v4.4.8 #307 — Overseer scan panel. Async runs the LLM contradiction scan,
+          polls for completion, then refreshes the graph slice so suggestions appear
+          inline. Lives at the top of the view because it's the primary "act on this
+          tab" affordance now. */}
+      <ScanContradictionsPanel onComplete={onRefresh} />
+
+      {/* v4.4.8 #307 — suggestions section. Shows Overseer-proposed contradictions
+          with accept/dismiss. Only renders when there are active suggestions. */}
+      {suggestions.length > 0 && (
+        <div className="bg-nexus-surface border border-nexus-blue/30 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles size={14} className="text-nexus-blue" />
+            <h3 className="text-xs font-mono text-nexus-blue uppercase tracking-wider">Suggested by Overseer</h3>
+            <span className="text-[10px] font-mono text-nexus-text-faint ml-auto">{suggestions.length} pending review</span>
+          </div>
+          <div className="space-y-2">
+            {suggestions.map(s => <SuggestedContradictionCard key={s.id} suggestion={s} onDecision={onRefresh} />)}
+          </div>
+        </div>
+      )}
+
       {/* v4.4.4 #309 — always-visible historical counter row */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-nexus-surface border border-nexus-border rounded-xl p-3 text-center">
@@ -643,6 +665,175 @@ function ContradictionsView({ data, onRefresh }) {
           {c.trigger && <span className="text-[10px] font-mono text-nexus-red mt-1 inline-block">Trigger: {c.trigger}</span>}
         </div>
       ))}
+    </div>
+  );
+}
+
+// v4.4.8 #307 — Overseer scan panel. Kicks off the async contradiction scan
+// and polls until the Overseer returns, then calls onComplete so the parent
+// ContradictionsView refetches and renders the new suggestions. The scan itself
+// persists results server-side (via _suggestedContradictions), so the client
+// only needs to poll for completion and trigger a refresh.
+function ScanContradictionsPanel({ onComplete }) {
+  const [status, setStatus] = useState('idle'); // idle | running | done | error
+  const [elapsed, setElapsed] = useState(0);
+  const [taskId, setTaskId] = useState(null);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+
+  async function startScan() {
+    setStatus('running');
+    setError(null);
+    setResult(null);
+    setElapsed(0);
+    try {
+      const start = await api.scanContradictions({
+        max_pairs: 20,
+        similarity_threshold: 0.65,
+        confidence_threshold: 0.55,
+      });
+      if (start.error) {
+        setStatus('error'); setError(start.error); return;
+      }
+      setTaskId(start.taskId);
+    } catch (e) {
+      setStatus('error');
+      setError(e.message || 'Failed to start scan');
+    }
+  }
+
+  // Poll every 3s while running. Stop when done/error or taskId cleared.
+  useEffect(() => {
+    if (!taskId || status !== 'running') return;
+    const started = Date.now();
+    const tick = setInterval(async () => {
+      setElapsed(Math.round((Date.now() - started) / 1000));
+      try {
+        const poll = await api.getScanContradictionsResult(taskId);
+        if (poll.status === 'done') {
+          clearInterval(tick);
+          setStatus('done');
+          try { setResult(JSON.parse(poll.answer || '{}')); } catch { setResult({}); }
+          // Refresh parent so the hydrated /impact/contradictions response with
+          // fresh suggestions lands in the Graph slice.
+          if (onComplete) onComplete();
+        } else if (poll.status === 'error') {
+          clearInterval(tick);
+          setStatus('error');
+          setError(poll.error || 'Overseer error');
+        }
+      } catch (e) {
+        clearInterval(tick);
+        setStatus('error');
+        setError(e.message);
+      }
+    }, 3000);
+    return () => clearInterval(tick);
+  }, [taskId, status, onComplete]);
+
+  return (
+    <div className="bg-nexus-surface border border-nexus-border rounded-xl p-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Sparkles size={14} className="text-nexus-blue" />
+          <span className="text-xs font-mono text-nexus-blue uppercase tracking-wider">Overseer Scan</span>
+          <span className="text-[10px] font-mono text-nexus-text-faint hidden sm:inline">
+            Find contradictions via embedding pairing + LLM classification
+          </span>
+        </div>
+        <button
+          onClick={startScan}
+          disabled={status === 'running'}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded-lg border border-nexus-blue/30 text-nexus-blue hover:bg-nexus-blue/10 transition-colors disabled:opacity-50"
+          title="Scans same-project decision pairs with cosine similarity ≥0.65; asks the Overseer to classify each. Stores accepted/dismissed decisions so pairs don't re-surface."
+        >
+          {status === 'running' ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+          {status === 'running' ? `Scanning… (${elapsed}s)` : 'Scan for contradictions'}
+        </button>
+      </div>
+      {status === 'done' && result && (
+        <p className="text-[10px] font-mono text-nexus-text-faint mt-2">
+          {result.suggestions?.length > 0
+            ? `◈ ${result.suggestions.length} new suggestion${result.suggestions.length === 1 ? '' : 's'} · evaluated ${result.pairs_evaluated ?? '?'} pairs.`
+            : result.note || `No new contradictions found${result.pairs_evaluated ? ` (evaluated ${result.pairs_evaluated} pairs)` : ''}.`}
+        </p>
+      )}
+      {status === 'error' && (
+        <p className="text-[10px] font-mono text-nexus-red mt-2">◈ {error}</p>
+      )}
+    </div>
+  );
+}
+
+// v4.4.8 #307 — card rendering for a single Overseer-proposed contradiction.
+// Accept promotes to a real `rel='contradicts'` edge; dismiss marks as handled
+// so the same pair doesn't re-surface on the next scan.
+function SuggestedContradictionCard({ suggestion, onDecision }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const confPct = Math.round((suggestion.confidence || 0) * 100);
+  const simPct = Math.round((suggestion.similarity || 0) * 100);
+
+  async function act(action) {
+    setBusy(true); setError(null);
+    try {
+      if (action === 'accept') await api.acceptSuggestedContradiction(suggestion.id);
+      else await api.dismissSuggestedContradiction(suggestion.id);
+      if (onDecision) onDecision();
+    } catch (e) {
+      setError(e.message || 'Failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="bg-nexus-bg border border-nexus-blue/20 rounded-lg p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-nexus-blue/10 text-nexus-blue border border-nexus-blue/20" title="Overseer confidence × cosine similarity at pairing time">
+          {confPct}% · sim {simPct}%
+        </span>
+        <span className="text-[10px] font-mono text-nexus-text-faint">
+          #{suggestion.from_id} ↔ #{suggestion.to_id}
+        </span>
+      </div>
+      <p className="text-xs text-nexus-text-dim italic mb-2 leading-relaxed">&ldquo;{suggestion.reason}&rdquo;</p>
+      <div className="space-y-1 mb-3">
+        <p className="text-[11px] text-nexus-text">
+          <span className="font-mono text-nexus-text-faint">A </span>
+          {suggestion.from_decision?.decision?.slice(0, 160)}
+          {suggestion.from_decision?.lifecycle && (
+            <span className="ml-1 text-[9px] font-mono text-nexus-text-faint">· {suggestion.from_decision.lifecycle}</span>
+          )}
+        </p>
+        <p className="text-[11px] text-nexus-text">
+          <span className="font-mono text-nexus-text-faint">B </span>
+          {suggestion.to_decision?.decision?.slice(0, 160)}
+          {suggestion.to_decision?.lifecycle && (
+            <span className="ml-1 text-[9px] font-mono text-nexus-text-faint">· {suggestion.to_decision.lifecycle}</span>
+          )}
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => act('accept')}
+          disabled={busy}
+          className="flex items-center gap-1 px-2.5 py-1 rounded border border-nexus-red/30 text-nexus-red text-[10px] font-mono hover:bg-nexus-red/10 transition-colors disabled:opacity-50"
+          title="Promote to a rel='contradicts' edge in the Ledger"
+        >
+          <Check size={10} /> Flag as conflict
+        </button>
+        <button
+          onClick={() => act('dismiss')}
+          disabled={busy}
+          className="flex items-center gap-1 px-2.5 py-1 rounded border border-nexus-border text-nexus-text-faint text-[10px] font-mono hover:text-nexus-text hover:border-nexus-text-faint transition-colors disabled:opacity-50"
+          title="Hide this suggestion. The same pair won't re-surface in future scans."
+        >
+          <X size={10} /> Dismiss
+        </button>
+        {busy && <Loader2 size={10} className="animate-spin text-nexus-blue" />}
+        {error && <span className="text-[10px] font-mono text-nexus-red">{error}</span>}
+      </div>
     </div>
   );
 }

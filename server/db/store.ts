@@ -946,6 +946,51 @@ export class NexusStore {
   getEdgesTo(id: number): GraphEdge[] { return this.data.graph_edges.filter(e => e.to === id); }
   getEdgesFor(id: number): GraphEdge[] { return this.data.graph_edges.filter(e => e.from === id || e.to === id); }
 
+  // ── v4.4.8 #307 — Suggested contradictions (Overseer scan output) ─────
+  getSuggestedContradictions(): import('../types.js').SuggestedContradiction[] {
+    return this.data._suggestedContradictions || [];
+  }
+  // Only suggestions in 'suggested' state render in the Conflicts tab.
+  // Dismissed/accepted are kept for audit + dedup against future scans.
+  getActiveSuggestedContradictions(): import('../types.js').SuggestedContradiction[] {
+    return (this.data._suggestedContradictions || []).filter(s => s.status === 'suggested');
+  }
+  // Build a fast-lookup set of "pair keys" (sorted-id tuples) that are already
+  // on-record as suggested OR dismissed. The contradiction-scan router uses this
+  // to skip re-asking about pairs the user has already weighed in on.
+  getSuggestionPairKeys(): Set<string> {
+    const keys = new Set<string>();
+    for (const s of this.data._suggestedContradictions || []) {
+      if (s.status === 'suggested' || s.status === 'dismissed') {
+        const [a, b] = [s.from_id, s.to_id].sort((x, y) => x - y);
+        keys.add(`${a}-${b}`);
+      }
+    }
+    return keys;
+  }
+  addSuggestedContradiction(entry: Omit<import('../types.js').SuggestedContradiction, 'id' | 'status' | 'created_at'>): import('../types.js').SuggestedContradiction {
+    if (!this.data._suggestedContradictions) this.data._suggestedContradictions = [];
+    const nextId = this.data._suggestedContradictions.reduce((m, s) => Math.max(m, s.id), 0) + 1;
+    const record: import('../types.js').SuggestedContradiction = {
+      ...entry,
+      id: nextId,
+      status: 'suggested',
+      created_at: new Date().toISOString(),
+    };
+    this.data._suggestedContradictions.push(record);
+    this._flush();
+    return record;
+  }
+  updateSuggestedContradiction(id: number, status: 'dismissed' | 'accepted'): import('../types.js').SuggestedContradiction | null {
+    const list = this.data._suggestedContradictions || [];
+    const idx = list.findIndex(s => s.id === id);
+    if (idx === -1) return null;
+    list[idx].status = status;
+    list[idx].decided_at = new Date().toISOString();
+    this._flush();
+    return list[idx];
+  }
+
   traverse(startId: number, maxDepth = 3): (Decision & { depth: number; path: TraversePathSegment[] })[] {
     const visited = new Set<number>();
     const result: (Decision & { depth: number; path: TraversePathSegment[] })[] = [];

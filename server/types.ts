@@ -171,6 +171,25 @@ export interface NexusData {
   // Key = absolute file path, value = {decisionId, mtime at time of import}.
   // Lets nexus_import_cc_memories skip already-imported memories and detect content drift.
   _memoryImports?: Record<string, { decisionId: number; mtime: string }>;
+  // v4.4.8 #307 — Overseer-scanned contradiction suggestions. An append-only log
+  // of LLM-proposed pairings that haven't been accepted (→ promoted to a real
+  // `rel='contradicts'` edge) or dismissed (→ hidden from the Conflicts tab).
+  // Dismissal is sticky: the same pair won't re-surface in subsequent scans.
+  _suggestedContradictions?: SuggestedContradiction[];
+}
+
+export interface SuggestedContradiction {
+  id: number;                          // local monotonic id
+  from_id: number;                     // decision A
+  to_id: number;                       // decision B
+  similarity: number;                  // cosine sim at time of pairing (0–1)
+  confidence: number;                  // Overseer's confidence (0–1)
+  reason: string;                      // Overseer's one-sentence explanation
+  status: 'suggested' | 'dismissed' | 'accepted';
+  created_at: string;                  // ISO timestamp when scan produced it
+  decided_at?: string;                 // ISO when user accepted/dismissed
+  scan_id: string;                     // links suggestions from the same scan batch
+  model?: string;                      // which LLM produced this
 }
 
 export interface ScheduledScan {

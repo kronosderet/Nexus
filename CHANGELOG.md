@@ -2,12 +2,12 @@
 
 Nexus — The Cartographer. Local-first metabrain plugin for Claude Code.
 
-The v4.3.5 → v4.4.7 arc kicked off after the initial "Audit Shakedown" (v4.3.5)
-released in mid-April 2026. What follows covers 14 versioned releases plus one
+The v4.3.5 → v4.4.8 arc kicked off after the initial "Audit Shakedown" (v4.3.5)
+released in mid-April 2026. What follows covers 15 versioned releases plus one
 major UI audit, one big `Memory Bridge` import feature, the ambient-telemetry
-hook layer (v4.4.0 alpha/beta/final), and seven post-v4.4.0 patch releases
-closing UI-audit Tier 1 + the small/medium half of Tier 2 + doc-drift hardening
-+ audit response + Tier 2 BIG #343 Overseer refine mode.
+hook layer (v4.4.0 alpha/beta/final), and eight post-v4.4.0 patch releases
+closing the **entire** UI-audit backlog: Tier 1 + all of Tier 2 (small/medium
++ both BIG items), doc-drift hardening, and audit response.
 
 ## v4.4.5 — Doc-Drift Hardening
 
@@ -42,6 +42,69 @@ now actually holds for the free-text surfaces it originally missed.
 
 **Tests:** 189 → **201** (+12 drift specs).
 **MCPB:** rebuilt at v4.4.5, smoke-passes on all 26 tools.
+
+## v4.4.8 — Contradiction Scan Engine
+
+Closes **#307** — the last Tier 2 BIG item. The Conflicts tab transitions from
+a reactive logbook (only shows contradictions the user manually flagged) to a
+proactive signal surface (Overseer scans decision pairs and proposes candidates
+for review). The entire UI-audit backlog is now resolved.
+
+**Two-stage scan pipeline**
+1. **Embedding shortlist** — cosine similarity over decision text + context
+   prunes ~O(n²) pairs to a manageable shortlist (default 20). Filters out
+   pairs already linked (any rel), already-suggested pairs, already-dismissed
+   pairs (sticky), and cross-project pairs. Lifecycle-divergent pairs
+   (one active, one deprecated in the same project) get a +0.08 similarity
+   boost since lifecycle tension is a primary contradiction signal.
+2. **Overseer classification** — the shortlist is packaged into a single
+   structured prompt with a tight JSON output schema. The Overseer decides
+   `is_contradiction` per pair + confidence + one-sentence reason. Only
+   pairs with `is_contradiction=true` AND confidence ≥ 0.55 are stored.
+
+**Data model**
+- New `SuggestedContradiction` type in `server/types.ts` — `{from_id, to_id,
+  similarity, confidence, reason, status: suggested|dismissed|accepted,
+  scan_id, model, timestamps}`.
+- `NexusData._suggestedContradictions[]` — append-only log, preserved across
+  scans for dedup + audit.
+- Four store methods: `getSuggestedContradictions`, `getActiveSuggestedContradictions`,
+  `getSuggestionPairKeys` (sorted-tuple dedup set), `addSuggestedContradiction`,
+  `updateSuggestedContradiction`.
+
+**Routes**
+- `POST /overseer/scan-contradictions` — async scan; returns taskId.
+  Accepts `max_pairs`, `similarity_threshold`, `confidence_threshold`,
+  `project_scope`. Polls via `/overseer/ask/result/:taskId` (reuses existing
+  async task map).
+- `GET /ledger/suggested-contradictions` — lists active suggestions hydrated
+  with both decision records inline (no second round-trip needed).
+- `POST /ledger/suggested-contradictions/:id/accept` — promotes to a real
+  `rel='contradicts'` edge with a note citing scan_id + confidence + reason;
+  marks suggestion `accepted`.
+- `POST /ledger/suggested-contradictions/:id/dismiss` — marks `dismissed`
+  so the pair won't re-surface in future scans.
+- `GET /impact/contradictions` extended to include `suggestions` + `suggestedCount`.
+
+**Client**
+- New `ScanContradictionsPanel` component — fires the async scan, polls every
+  3s, refreshes the Graph slice on completion so hydrated suggestions appear
+  inline.
+- New `SuggestedContradictionCard` component — displays both decisions with
+  lifecycle tags, Overseer's reason in quotes, confidence + similarity badges,
+  Accept/Dismiss buttons.
+- Section renders in `ContradictionsView` above the historical counter row
+  whenever active suggestions exist.
+
+**Tests** (`tests/contradictionScan.test.ts`)
+- 15 new unit tests: `shortlistContradictionPairs` (skip already-linked, skip
+  past suggestions, skip cross-project, threshold filter, highly-similar
+  same-project pair inclusion, lifecycle-divergent boost, sort + cap); `buildContradictionPrompt`
+  (field rendering, lifecycle-tag suppression); `parseContradictionResponse`
+  (empty input, clean JSON, code-fence stripping, prose-prefix tolerance,
+  malformed input handling, missing field handling).
+
+212 → **227 tests** (+15 contradiction-scan specs). 26 MCP tools.
 
 ## v4.4.7 — Overseer Refine Mode
 

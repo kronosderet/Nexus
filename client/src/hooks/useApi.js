@@ -95,6 +95,16 @@ export const api = {
   // v4.4.1 #306 — manual edge creation (contradiction flag + future general use).
   linkDecisions: ({ from, to, rel = 'related', note = '' }) =>
     request('/ledger/link', { method: 'POST', body: JSON.stringify({ from, to, rel, note }) }),
+  // v4.4.8 #307 — Overseer contradiction scan + accept/dismiss endpoints.
+  scanContradictions: (opts = {}) => request('/overseer/scan-contradictions', {
+    method: 'POST', body: JSON.stringify(opts),
+  }),
+  getScanContradictionsResult: (taskId) => request(`/overseer/ask/result/${encodeURIComponent(taskId)}`),
+  getSuggestedContradictions: () => request('/ledger/suggested-contradictions'),
+  acceptSuggestedContradiction: (id) =>
+    request(`/ledger/suggested-contradictions/${id}/accept`, { method: 'POST' }),
+  dismissSuggestedContradiction: (id) =>
+    request(`/ledger/suggested-contradictions/${id}/dismiss`, { method: 'POST' }),
 
   // ── Impact ─────────────────────────────────────────────
   getImpactBlast: (id, opts = {}) => {

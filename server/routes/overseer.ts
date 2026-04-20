@@ -13,6 +13,7 @@ import { scanCCMemories } from '../lib/memoryIndex.ts';
 import type { Decision, GraphEdge, Task, RiskItem } from '../types.ts';
 import type { PlanEntry } from '../lib/planIndex.ts';
 import type { MemoryEntry } from '../lib/memoryIndex.ts';
+import { getEmbedding, cosineSim } from '../lib/embeddings.ts';
 
 // v4.3.5 P1 — typed repo info + centrality entry + AI config
 interface RepoInfo {
@@ -319,6 +320,150 @@ export function formatHistory(history: Array<{ role: string; text: string }>): s
     lines.push(`[${role}]: ${text}`);
   }
   return lines.join('\n\n') + '\n\n';
+}
+
+// v4.4.8 #307 — Contradiction-scan system prompt. Constrained JSON output so
+// the client-side parser has a stable schema. Accepts/rejects each pair with
+// confidence + one-sentence reason; model must NOT invent new pairs.
+export const CONTRADICTION_SYSTEM = `You are Nexus's contradiction detector. You receive PAIRS of decisions from the same knowledge graph that the embedding layer has flagged as semantically similar. Your job: for EACH pair, decide whether the two decisions genuinely contradict each other — not just overlap in topic.
+
+A contradiction means:
+- Both active, but they prescribe opposite directions ("use cloud" vs "run local")
+- One active, one deprecated in the same project, but nothing has explicitly replaced the deprecated one
+- Language that opposes: "always X" vs "never X" in the same scope
+
+NOT a contradiction:
+- Two decisions that just mention the same topic
+- A decision and its explicit replacement (those are 'replaced' edges, not contradictions)
+- Decisions in different projects that happen to use similar words
+- Proposals that explore alternatives to a single active decision
+
+Rules:
+- Output VALID JSON ONLY. No prose, no markdown fences, no code blocks.
+- Schema: { "suggestions": [ { "from_id": N, "to_id": N, "is_contradiction": true|false, "confidence": 0.0-1.0, "reason": "one short sentence" } ] }
+- Evaluate every pair you're given — each pair must appear in the output.
+- Be CONSERVATIVE. Set is_contradiction=false when in doubt. Confidence reflects your certainty in that verdict.
+- Reason is ONE sentence. No section headers. No lists.`;
+
+// Shortlist a set of decision pairs worth sending to the LLM. Uses embeddings
+// to compute cosine similarity over short decision text, filters:
+//   - pairs already linked (any rel) — out
+//   - pairs previously suggested or dismissed — out (sticky)
+//   - pairs below similarity_threshold — out
+// Sorts by similarity desc and caps at maxPairs. Exported for unit tests.
+export interface ShortlistedPair {
+  a: Decision;
+  b: Decision;
+  similarity: number;
+  // Soft signal that nudges a pair toward inclusion even if similarity is a hair
+  // under threshold: one side deprecated and one active in the same project is
+  // a primary contradiction signal per the audit description.
+  lifecycleDivergent: boolean;
+}
+interface ShortlistOptions {
+  existingPairs: Set<string>;
+  pastSuggestions: Set<string>;
+  similarityThreshold: number;
+  maxPairs: number;
+  // Allow embedding lookup injection for tests that don't want to touch LM Studio.
+  getEmbeddingImpl?: (text: string) => Promise<number[] | null>;
+}
+export async function shortlistContradictionPairs(
+  decisions: Decision[],
+  opts: ShortlistOptions,
+): Promise<ShortlistedPair[]> {
+  const embed = opts.getEmbeddingImpl || getEmbedding;
+  // Prefetch embeddings sequentially. The embedding layer has its own cache so
+  // repeats on subsequent scans are free. Bail on any decision whose embed fails.
+  const vectors: Array<{ id: number; vec: number[] | null }> = [];
+  for (const d of decisions) {
+    const text = `${d.decision}\n${(d.context || '').slice(0, 200)}`;
+    const vec = await embed(text);
+    vectors.push({ id: d.id, vec });
+  }
+  const byId = new Map(decisions.map(d => [d.id, d] as const));
+  const candidates: ShortlistedPair[] = [];
+  for (let i = 0; i < vectors.length; i++) {
+    const vi = vectors[i];
+    if (!vi.vec) continue;
+    for (let j = i + 1; j < vectors.length; j++) {
+      const vj = vectors[j];
+      if (!vj.vec) continue;
+      const [a, b] = [vi.id, vj.id].sort((x, y) => x - y);
+      const key = `${a}-${b}`;
+      if (opts.existingPairs.has(key)) continue;
+      if (opts.pastSuggestions.has(key)) continue;
+      const decA = byId.get(vi.id)!;
+      const decB = byId.get(vj.id)!;
+      // Only pair within a project — cross-project similarity is usually
+      // terminology overlap, not a true conflict.
+      if ((decA.project || '').toLowerCase() !== (decB.project || '').toLowerCase()) continue;
+      const sim = cosineSim(vi.vec, vj.vec);
+      const lifecycleDivergent =
+        (decA.lifecycle === 'deprecated' && decB.lifecycle !== 'deprecated') ||
+        (decB.lifecycle === 'deprecated' && decA.lifecycle !== 'deprecated');
+      // Lifecycle-divergent pairs get a similarity boost so genuine "old vs new"
+      // tensions make it into the shortlist even if the wording drifted.
+      const effectiveSim = lifecycleDivergent ? sim + 0.08 : sim;
+      if (effectiveSim < opts.similarityThreshold) continue;
+      candidates.push({ a: decA, b: decB, similarity: sim, lifecycleDivergent });
+    }
+  }
+  candidates.sort((x, y) => y.similarity - x.similarity);
+  return candidates.slice(0, opts.maxPairs);
+}
+
+// Build the user-message prompt fed to the Overseer from a shortlist.
+// Exported for tests.
+export function buildContradictionPrompt(shortlist: ShortlistedPair[]): string {
+  const lines: string[] = ['Pairs to evaluate:'];
+  for (const p of shortlist) {
+    const lifecycleTag = p.lifecycleDivergent ? ' · LIFECYCLE-DIVERGENT' : '';
+    lines.push('');
+    lines.push(`PAIR similarity=${p.similarity.toFixed(2)}${lifecycleTag}`);
+    lines.push(`  A #${p.a.id} [${p.a.project}${p.a.lifecycle ? ` · ${p.a.lifecycle}` : ''}] ${p.a.decision.slice(0, 220)}`);
+    lines.push(`  B #${p.b.id} [${p.b.project}${p.b.lifecycle ? ` · ${p.b.lifecycle}` : ''}] ${p.b.decision.slice(0, 220)}`);
+  }
+  lines.push('');
+  lines.push('Return ONE entry per pair in the JSON suggestions array. JSON only.');
+  return lines.join('\n');
+}
+
+// Parse Overseer JSON response tolerantly. Strips markdown code fences if the
+// model produced them anyway (the prompt says not to, but Gemma sometimes does).
+// Exported for tests.
+export interface ParsedContradictionResult {
+  suggestions?: Array<{
+    from_id: number;
+    to_id: number;
+    is_contradiction?: boolean;
+    confidence?: number;
+    reason?: string;
+  }>;
+}
+export function parseContradictionResponse(raw: string): ParsedContradictionResult {
+  if (!raw) return { suggestions: [] };
+  // Strip optional markdown fences
+  let cleaned = raw.trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '');
+  }
+  // Some models prepend "Here's the JSON:" or similar. Find the first { that
+  // opens a valid object and take from there to the matching end.
+  const firstBrace = cleaned.indexOf('{');
+  if (firstBrace > 0) cleaned = cleaned.slice(firstBrace);
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (lastBrace >= 0 && lastBrace < cleaned.length - 1) cleaned = cleaned.slice(0, lastBrace + 1);
+  try {
+    const parsed = JSON.parse(cleaned);
+    // Coerce into the expected shape defensively
+    if (parsed && Array.isArray(parsed.suggestions)) {
+      return { suggestions: parsed.suggestions };
+    }
+    return { suggestions: [] };
+  } catch {
+    return { suggestions: [] };
+  }
 }
 
 export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) {
@@ -704,6 +849,134 @@ Propose edges from the SUBJECT to one or more CANDIDATES. Remember: JSON only, m
       subject: { id: subject.id, decision: subject.decision, project: subject.project },
       candidates: pool.length,
       message: `Overseer is proposing edges. Poll /overseer/ask/result/${taskId}`,
+    });
+  });
+
+  // ── v4.4.8 #307 — Overseer-powered contradiction scan ───────────────
+  // Two-stage: (1) embedding-based pair pruning, (2) LLM classification.
+  // Stage 1 narrows ~O(n²) pairs to a manageable shortlist (default ~20)
+  // using cosine similarity over decision text. Stage 2 asks the Overseer
+  // to classify each shortlisted pair as contradiction (bool) + confidence
+  // + one-sentence reason. Persisted as `_suggestedContradictions` so the
+  // Conflicts tab can render accept/dismiss cards.
+  //
+  // Exported via the module (not just router) for unit tests. See the
+  // exports at the bottom of this file.
+  router.post('/scan-contradictions', async (req: Request, res: Response) => {
+    const {
+      max_pairs = 20,
+      similarity_threshold = 0.65,
+      confidence_threshold = 0.55,
+      project_scope,
+    } = req.body || {};
+
+    const ai = await detectAI();
+    if (!ai.available) return res.json({ error: 'No local AI available. Install LM Studio and load a model.' });
+
+    const decisions = store.getAllDecisions();
+    const eligible = decisions.filter((d: Decision) => {
+      // Skip reference imports — they're not real workspace decisions
+      if (d.lifecycle === 'reference') return false;
+      // Deprecated decisions are IN scope: lifecycle divergence is a primary signal
+      if (project_scope && (d.project || '').toLowerCase() !== String(project_scope).toLowerCase()) return false;
+      return true;
+    });
+
+    if (eligible.length < 2) {
+      return res.json({ error: 'Need at least 2 decisions in scope to scan for contradictions.' });
+    }
+
+    // Build exclusion set: already-linked pairs (any rel), plus past suggestions
+    // (accepted or dismissed) so we don't badger the user about the same pair twice.
+    const existingPairs = new Set<string>();
+    for (const e of store.getAllEdges()) {
+      const [a, b] = [e.from, e.to].sort((x, y) => x - y);
+      existingPairs.add(`${a}-${b}`);
+    }
+    const pastSuggestions = store.getSuggestionPairKeys();
+
+    const taskId = `scan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    asyncTasks.set(taskId, {
+      status: 'pending',
+      question: `Contradiction scan across ${eligible.length} decisions`,
+      startedAt: Date.now(),
+    });
+
+    // Stage 1 + Stage 2 run in a background promise chain — the response returns
+    // immediately with taskId so the HTTP call doesn't block on embeddings + LLM.
+    (async () => {
+      try {
+        const shortlist = await shortlistContradictionPairs(
+          eligible,
+          {
+            existingPairs,
+            pastSuggestions,
+            similarityThreshold: Number(similarity_threshold) || 0.65,
+            maxPairs: Math.max(3, Math.min(50, Number(max_pairs) || 20)),
+          },
+        );
+
+        if (shortlist.length === 0) {
+          const task = asyncTasks.get(taskId);
+          if (task) {
+            task.status = 'done';
+            task.answer = JSON.stringify({ suggestions: [], note: 'No candidate pairs passed the similarity threshold.' });
+            task.model = ai.model;
+          }
+          return;
+        }
+
+        const systemMsg = CONTRADICTION_SYSTEM;
+        const userMsg = buildContradictionPrompt(shortlist);
+        const answer = await ask(ai, systemMsg, userMsg, 1200);
+
+        // Parse + persist
+        const parsed = parseContradictionResponse(answer);
+        const saved: Array<ReturnType<NexusStore['addSuggestedContradiction']>> = [];
+        for (const p of parsed.suggestions || []) {
+          if (!p.is_contradiction) continue;
+          if ((p.confidence ?? 0) < confidence_threshold) continue;
+          const pair = shortlist.find(s =>
+            (s.a.id === p.from_id && s.b.id === p.to_id) ||
+            (s.a.id === p.to_id && s.b.id === p.from_id),
+          );
+          if (!pair) continue;
+          const record = store.addSuggestedContradiction({
+            from_id: pair.a.id,
+            to_id: pair.b.id,
+            similarity: pair.similarity,
+            confidence: p.confidence ?? 0.5,
+            reason: (p.reason || '').slice(0, 300),
+            scan_id: taskId,
+            model: ai.model,
+          });
+          saved.push(record);
+        }
+
+        const task = asyncTasks.get(taskId);
+        if (task) {
+          task.status = 'done';
+          task.answer = JSON.stringify({
+            suggestions: saved,
+            pairs_evaluated: shortlist.length,
+            raw_llm_output: answer.slice(0, 500),
+          });
+          task.model = ai.model;
+        }
+      } catch (err) {
+        const task = asyncTasks.get(taskId);
+        if (task) {
+          task.status = 'error';
+          task.error = (err as Error).message;
+        }
+      }
+    })();
+
+    res.json({
+      taskId,
+      status: 'pending',
+      eligible: eligible.length,
+      message: `Overseer is scanning for contradictions. Poll /overseer/ask/result/${taskId}`,
     });
   });
 
