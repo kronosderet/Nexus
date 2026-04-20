@@ -111,6 +111,10 @@ const TOOL_COUNT_DRIFT_CHECKS: DriftCheck[] = [
   { file: 'cli/nexus.js',                      regex: /metabrain as (\d+)\s+native MCP tools/, label: 'cli/nexus.js MCP server splash' },
   { file: '.claude-plugin/marketplace.json',   regex: /(\d+)\s+native MCP tools/,             label: 'marketplace.json plugin description' },
   { file: 'plugin/.claude-plugin/plugin.json', regex: /(\d+)\s+native MCP tools/,             label: 'plugin.json description' },
+  // v4.4.9 — WelcomeScreen was drifting unnoticed (said "22 MCP tools" at v4.4.8,
+  // four counts behind). Guarded via the TOOL_COUNT constant so any future
+  // bump of the MCP TOOLS[] array fails the test until the constant is updated.
+  { file: 'client/src/components/WelcomeScreen.jsx', regex: /TOOL_COUNT\s*=\s*(\d+)/,         label: 'WelcomeScreen TOOL_COUNT constant' },
 ];
 
 describe('tool-count drift across current-state docs (v4.4.5)', () => {

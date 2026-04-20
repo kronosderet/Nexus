@@ -105,10 +105,17 @@ export default function Log({ onNavigate }) {
   // across the session only — no storage, matches the audit ask ("hide for this session").
   const [mutedTypes, setMutedTypes] = useState(() => new Set());
 
+  const entries = activitySlice.data || [];
+  const sessions = sessionsSlice.data || [];
+  const loadingA = activitySlice.loading;
+  const loadingS = sessionsSlice.loading;
+
   // v4.4.5 #382 — scroll-to-top anchor. Desc sort means newest-at-top; when user
   // scrolls down and new events arrive, a floating button offers quick return.
   // Sentinel element at the top of the Log module reports intersection; when it
   // leaves viewport, we track any entry with a newer ID than the last-seen.
+  // v4.4.9 — moved below `entries`/`sessions` declarations to fix TDZ crash
+  // (useEffect dep array was evaluated before `entries` existed in scope).
   const headerSentinelRef = useRef(null);
   const [topVisible, setTopVisible] = useState(true);
   const [hasNewSinceScroll, setHasNewSinceScroll] = useState(false);
@@ -138,11 +145,6 @@ export default function Log({ onNavigate }) {
   const scrollToTop = () => {
     headerSentinelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-
-  const entries = activitySlice.data || [];
-  const sessions = sessionsSlice.data || [];
-  const loadingA = activitySlice.loading;
-  const loadingS = sessionsSlice.loading;
 
   // Filtered activity
   const typesPresent = useMemo(() => ['all', ...new Set(entries.map(e => e.type)).values()].sort(), [entries]);

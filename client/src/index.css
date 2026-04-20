@@ -62,6 +62,54 @@
   animation: nexus-pulse 2s ease-in-out infinite;
 }
 
+/* v4.4.9 — Welcome screen: radar-sweep ring behind the compass rose.
+   A conic gradient rotates around the center, giving a nautical "chart-being-
+   drawn" feel. Paired with `animate-compass` on the rose glyph itself for the
+   centerpiece spin. */
+@keyframes radar-sweep {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-radar-sweep {
+  animation: radar-sweep 4s linear infinite;
+}
+
+/* Welcome screen: compass-needle swing. Damped oscillation settling at 0°.
+   Used for elements that should FEEL like they're locking on to a bearing
+   instead of spinning indefinitely. */
+@keyframes needle-settle {
+  0%   { transform: rotate(-18deg); }
+  30%  { transform: rotate(14deg); }
+  55%  { transform: rotate(-8deg); }
+  75%  { transform: rotate(4deg); }
+  90%  { transform: rotate(-2deg); }
+  100% { transform: rotate(0deg); }
+}
+.animate-needle-settle {
+  animation: needle-settle 1.6s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+/* Welcome screen: expanding rings, like a pulse echo from sonar */
+@keyframes sonar-pulse {
+  0%   { transform: scale(0.8); opacity: 0.6; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+.animate-sonar-pulse {
+  animation: sonar-pulse 2.8s ease-out infinite;
+}
+.animate-sonar-pulse.delay-1 { animation-delay: 0.7s; }
+.animate-sonar-pulse.delay-2 { animation-delay: 1.4s; }
+
+/* Welcome screen: letter-by-letter reveal for the NEXUS wordmark */
+@keyframes letter-reveal {
+  from { opacity: 0; transform: translateY(4px); letter-spacing: 0.1em; }
+  to   { opacity: 1; transform: translateY(0);    letter-spacing: 0.3em; }
+}
+.animate-letter-reveal {
+  animation: letter-reveal 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  opacity: 0; /* keep hidden until the stagger delay kicks in */
+}
+
 /* Toast slide-in */
 @keyframes slideIn {
   from { transform: translateX(100%); opacity: 0; }

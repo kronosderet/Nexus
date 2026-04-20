@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../hooks/useApi.js';
 
+// v4.4.9 — tool count mirrored from the MCP TOOLS[] array. Guarded by
+// tests/versionDrift.test.ts so it can't silently drift behind the real count.
+const TOOL_COUNT = 26;
+const MODULE_COUNT = 7;
+
 const INIT_STEPS = [
   { key: 'system', label: 'System core', icon: '⚙' },
   { key: 'database', label: 'Chart room', icon: '◈' },
@@ -27,6 +32,7 @@ function getDetail(key, check) {
 
 export default function WelcomeScreen({ connected, onReady }) {
   const [checks, setChecks] = useState(null);
+  const [version, setVersion] = useState(null);
   const [visibleCount, setVisibleCount] = useState(0);
   const [done, setDone] = useState(false);
 
@@ -36,8 +42,13 @@ export default function WelcomeScreen({ connected, onReady }) {
 
   useEffect(() => {
     if (!connected) return;
+    // v4.4.9 — pull version from /api/init so the welcome screen never drifts
+    // behind the running server. Falls back silently; no broken UI on error.
     api.getInit()
-      .then(data => setChecks(data.checks))
+      .then(data => {
+        setChecks(data.checks);
+        if (data.version) setVersion(data.version);
+      })
       .catch(() => setChecks({}));
   }, [connected]);
 
@@ -61,18 +72,76 @@ export default function WelcomeScreen({ connected, onReady }) {
     return () => clearTimeout(fallback);
   }, [dismiss]);
 
+  // v4.4.9 — nautical boot animation. Layered:
+  //   - Background: faint chart-grid radial gradient
+  //   - Center: compass rose ◈ slowly spinning (existing animate-compass)
+  //   - Behind compass: conic-gradient radar sweep arc
+  //   - Behind compass: 3 sonar-pulse rings expanding outward (staggered)
+  //   - Title: NEXUS wordmark revealed letter-by-letter
+  // Each element runs independently so the composite feels alive without
+  // feeling busy. No new deps — pure CSS keyframes defined in index.css.
+  const title = 'NEXUS';
   return (
-    <div className="h-screen flex flex-col items-center justify-center bg-nexus-bg cursor-pointer" onClick={dismiss}>
-      <div className={`text-6xl mb-6 text-nexus-amber ${!done ? 'animate-compass' : ''}`}>◈</div>
+    <div
+      className="relative h-screen flex flex-col items-center justify-center bg-nexus-bg cursor-pointer overflow-hidden"
+      onClick={dismiss}
+    >
+      {/* Chart-grid backdrop (very faint) — two overlapping radial gradients */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 pointer-events-none opacity-[0.08]"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 50% 50%, #f59e0b 0%, transparent 45%), ' +
+            'radial-gradient(circle at 50% 50%, #3b82f6 0%, transparent 70%)',
+        }}
+      />
 
-      <h1 className="text-3xl font-light tracking-[0.3em] text-nexus-text mb-1">
-        N E X U S
+      {/* Compass + animation stack. The stack uses fixed dimensions so all
+          three layers (sonar rings, radar sweep, glyph) align concentrically. */}
+      <div className="relative w-40 h-40 mb-6 flex items-center justify-center">
+        {/* Sonar pulse rings */}
+        <div aria-hidden="true" className="absolute inset-0 rounded-full border border-nexus-amber/40 animate-sonar-pulse" />
+        <div aria-hidden="true" className="absolute inset-0 rounded-full border border-nexus-amber/40 animate-sonar-pulse delay-1" />
+        <div aria-hidden="true" className="absolute inset-0 rounded-full border border-nexus-amber/40 animate-sonar-pulse delay-2" />
+
+        {/* Radar sweep wedge — a conic gradient arc that rotates. Trimmed to
+            ~45° of visible sweep by the gradient stops; the rest is transparent. */}
+        <div
+          aria-hidden="true"
+          className={`absolute inset-0 rounded-full ${!done ? 'animate-radar-sweep' : ''}`}
+          style={{
+            background:
+              'conic-gradient(from 0deg, rgba(245,158,11,0.28) 0deg, rgba(245,158,11,0) 45deg, rgba(245,158,11,0) 360deg)',
+            maskImage: 'radial-gradient(circle, transparent 40%, black 45%, black 100%)',
+            WebkitMaskImage: 'radial-gradient(circle, transparent 40%, black 45%, black 100%)',
+          }}
+        />
+
+        {/* Static bearing ring (N/E/S/W ticks) */}
+        <div aria-hidden="true" className="absolute inset-2 rounded-full border border-nexus-border-bright" />
+
+        {/* Compass rose glyph — spinning centerpiece */}
+        <div className={`text-6xl text-nexus-amber relative z-10 ${!done ? 'animate-compass' : ''}`}>◈</div>
+      </div>
+
+      {/* NEXUS wordmark — letter-by-letter reveal with staggered delays */}
+      <h1 className="text-3xl font-light text-nexus-text mb-1 flex">
+        {title.split('').map((ch, i) => (
+          <span
+            key={i}
+            className="animate-letter-reveal inline-block"
+            style={{ animationDelay: `${0.15 + i * 0.12}s`, marginRight: i < title.length - 1 ? '0.3em' : 0 }}
+          >
+            {ch}
+          </span>
+        ))}
       </h1>
       <p className="text-[10px] font-mono text-nexus-text-faint tracking-[0.25em] mb-2">
-        THE CARTOGRAPHER — v4.2
+        THE CARTOGRAPHER{version ? ` — v${version}` : ''}
       </p>
       <p className="text-[9px] font-mono text-nexus-text-faint mb-8">
-        7 modules · 22 MCP tools · knowledge graph · local AI overseer
+        {MODULE_COUNT} modules · {TOOL_COUNT} MCP tools · knowledge graph · local AI overseer
       </p>
 
       <div className="w-72 space-y-1.5">
@@ -85,7 +154,7 @@ export default function WelcomeScreen({ connected, onReady }) {
             <div
               key={step.key}
               className={`flex items-center gap-3 px-3 py-1.5 rounded transition-all duration-300 ${
-                visible ? 'opacity-100' : 'opacity-20'
+                visible ? 'opacity-100 translate-x-0' : 'opacity-20 -translate-x-1'
               }`}
             >
               <span className={`text-xs w-4 text-center ${visible ? (isOk ? 'text-nexus-green' : isOk === false ? 'text-nexus-amber' : 'text-nexus-text-faint') : 'text-nexus-text-faint'}`}>

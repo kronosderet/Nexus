@@ -2,12 +2,13 @@
 
 Nexus — The Cartographer. Local-first metabrain plugin for Claude Code.
 
-The v4.3.5 → v4.4.8 arc kicked off after the initial "Audit Shakedown" (v4.3.5)
-released in mid-April 2026. What follows covers 15 versioned releases plus one
+The v4.3.5 → v4.4.9 arc kicked off after the initial "Audit Shakedown" (v4.3.5)
+released in mid-April 2026. What follows covers 16 versioned releases plus one
 major UI audit, one big `Memory Bridge` import feature, the ambient-telemetry
-hook layer (v4.4.0 alpha/beta/final), and eight post-v4.4.0 patch releases
+hook layer (v4.4.0 alpha/beta/final), and nine post-v4.4.0 patch releases
 closing the **entire** UI-audit backlog: Tier 1 + all of Tier 2 (small/medium
-+ both BIG items), doc-drift hardening, and audit response.
++ both BIG items), doc-drift hardening, audit response, welcome-screen refresh,
+and a Log-tab TDZ hotfix.
 
 ## v4.4.5 — Doc-Drift Hardening
 
@@ -42,6 +43,45 @@ now actually holds for the free-text surfaces it originally missed.
 
 **Tests:** 189 → **201** (+12 drift specs).
 **MCPB:** rebuilt at v4.4.5, smoke-passes on all 26 tools.
+
+## v4.4.9 — Hotfix + Welcome Polish
+
+Two-part patch in response to a user report from a live :5173 Vite session.
+
+**Hotfix (critical) — Log tab crash**
+- `client/src/modules/Log.jsx`: the v4.4.6 #382 scroll-to-top anchor introduced
+  a temporal dead zone crash. The `useEffect` that tracks "new events since
+  scroll" depended on `entries` in its dep array, but `entries` was declared
+  *after* the hook. Every render threw `ReferenceError: Cannot access 'entries'
+  before initialization` — the Log module failed to mount entirely on :5173.
+  Fix: moved the `entries` / `sessions` / `loadingA` / `loadingS` declarations
+  above the scroll-anchor hooks that consume them.
+
+**Welcome screen upgrade**
+- Nautical boot animation redesign. Layered composite (no new deps, pure CSS):
+  - Faint chart-grid radial backdrop (amber + blue).
+  - Three staggered **sonar pulse rings** expanding outward (`sonar-pulse`
+    keyframe, 0.7s stagger).
+  - Rotating **radar sweep** conic-gradient wedge (`radar-sweep` keyframe, 4s
+    per revolution) with radial mask so only a ~45° arc is visible.
+  - Static bearing ring (N/E/S/W inner border).
+  - Centerpiece compass rose ◈ continues to spin (existing `animate-compass`).
+  - **NEXUS** wordmark reveals letter-by-letter with staggered delays
+    (`letter-reveal` keyframe).
+- Version text now pulled from `/api/init` response (was hardcoded "v4.2" and
+  four releases behind).
+- Tool count + module count moved to a single `TOOL_COUNT` constant at the
+  top of the component.
+
+**Drift guard**
+- `tests/versionDrift.test.ts` gains an entry matching `TOOL_COUNT = N` in
+  `WelcomeScreen.jsx`. The welcome screen won't silently drift again as the
+  MCP tools[] array grows.
+
+**New animations** (`client/src/index.css`):
+- `@keyframes radar-sweep` · `@keyframes sonar-pulse` · `@keyframes needle-settle` · `@keyframes letter-reveal`
+
+227 → **228 tests** (+1 drift guard).
 
 ## v4.4.8 — Contradiction Scan Engine
 
