@@ -340,9 +340,26 @@ export async function localApiFetch(path: string, init: LocalApiInit = {}): Prom
   }
 
   // ── Search ────────────────────────────────────────
-  if (pathname === '/api/search' || pathname === '/api/smart-search') {
+  // v4.5.6 — two separate shapes:
+  //   /api/search       returns a flat array (what the dashboard SearchModal consumes)
+  //   /api/smart-search returns { query, method, results, stats } (what the MCP handler
+  //                     consumes via nexus_search). Prior to v4.5.6 both paths returned
+  //                     the flat array, which made `data.results` undefined on the MCP
+  //                     side and produced "No results" for every nexus_search call from
+  //                     Claude Desktop (the dashboard UI worked because it hit /api/search).
+  if (pathname === '/api/search') {
     const q = params.get('q') || '';
     return store.search(q);
+  }
+  if (pathname === '/api/smart-search') {
+    const q = params.get('q') || '';
+    const results = store.search(q);
+    return {
+      query: q,
+      method: 'keyword',                // standalone adapter has no embedder; full hybrid lives in the dashboard route
+      results,
+      stats: { total: Array.isArray(results) ? results.length : 0 },
+    };
   }
 
   // ── Bookmarks ─────────────────────────────────────

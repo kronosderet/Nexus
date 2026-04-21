@@ -43,6 +43,33 @@ now actually holds for the free-text surfaces it originally missed.
 **Tests:** 189 → **201** (+12 drift specs).
 **MCPB:** rebuilt at v4.4.5, smoke-passes on all 26 tools.
 
+## v4.5.6 — Hotfix: `nexus_search` in standalone mode
+
+**User-visible symptom**: `nexus_search` in Claude Desktop returned "No results"
+for every query, across every project. The dashboard SearchModal worked fine.
+
+**Root cause**: `/api/smart-search` on the full dashboard returns
+`{ query, method, results, stats }`. The MCP `nexus_search` handler reads
+`data.results`. But in **standalone mode** (how the MCPB runs inside Claude
+Desktop), `server/mcp/localApi.ts` was returning a flat array from
+`store.search(q)` for BOTH `/api/search` and `/api/smart-search` — so
+`data.results` was always `undefined` → `|| []` → zero hits. Regression
+dated back to when `/api/smart-search` was introduced alongside the plain
+`/api/search` (dashboard UI continued to work because it hits `/api/search`
+which correctly returns the flat array).
+
+**Fix**: split the two paths in `localApi.ts`:
+- `/api/search` → unchanged flat array (dashboard SearchModal contract)
+- `/api/smart-search` → `{ query, method: 'keyword', results, stats: { total } }`
+  (MCP `nexus_search` contract)
+
+**Regression guard** (`tests/localApiSearch.test.ts`): three new specs lock
+both shapes, including an empty-query edge case. Any future refactor that
+accidentally collapses them fails CI instead of silently producing the same
+"No results" issue.
+
+**Tests:** 228 → **231** (+3).
+
 ## v4.5.5 — Command Polish II
 
 Eight Tier 2/3/4 polish items from the long-queued Command-view audit batch.
