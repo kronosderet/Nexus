@@ -184,10 +184,24 @@ function analyzeSessionPatterns(store: NexusStore) {
   // Average burn rate across all sessions
   const avgBurnRate = sessions.reduce((s, x) => s + x.burnRate, 0) / sessions.length;
 
-  // Best/worst sessions by efficiency
-  const sorted = [...sessions].sort((a, b) => a.burnRate - b.burnRate);
-  const mostEfficient = sorted[0];
-  const leastEfficient = sorted[sorted.length - 1];
+  // v4.5.4 #257 — filter outliers before picking most/least efficient. Previously
+  // "Most efficient: 0%/h over 2.2h" (a session where fuel wasn't read during work)
+  // and "Least efficient: 487.5%/h over 0.2h" (a near-instant reading that divided
+  // by ~12 minutes) were leaking in. Require:
+  //   - duration ≥ 0.5h (enough work to be a real session)
+  //   - burnRate in (0, 200]%/h — anything outside is instrumentation noise
+  //   - dataPoints ≥ 2 (already guaranteed by detectSessions, belt-and-braces)
+  const validSessions = sessions.filter(s =>
+    s.durationHours >= 0.5 &&
+    s.burnRate > 0 &&
+    s.burnRate <= 200 &&
+    s.dataPoints >= 2,
+  );
+  const sorted = validSessions.length >= 2
+    ? [...validSessions].sort((a, b) => a.burnRate - b.burnRate)
+    : null;
+  const mostEfficient = sorted ? sorted[0] : null;
+  const leastEfficient = sorted ? sorted[sorted.length - 1] : null;
 
   // By time of day (morning/afternoon/evening/night)
   const timeSlots: Record<string, { sessions: number; avgBurn: number; totalBurned: number }> = {
@@ -249,16 +263,22 @@ function analyzeSessionPatterns(store: NexusStore) {
     avgSessionDuration: Math.round(sessions.reduce((s, x) => s + x.durationHours, 0) / sessions.length * 10) / 10,
     avgFuelPerSession: Math.round(sessions.reduce((s, x) => s + x.burned, 0) / sessions.length * 10) / 10,
     wow,
-    mostEfficient: {
+    // v4.5.4 #257 — null when no sessions pass the outlier filter (rare edge case
+    // for stores with very few real sessions logged). Client renders "not enough
+    // clean data" instead of garbage numbers.
+    mostEfficient: mostEfficient ? {
       burnRate: mostEfficient.burnRate,
       time: mostEfficient.startTime,
       duration: mostEfficient.durationHours,
-    },
-    leastEfficient: {
+    } : null,
+    leastEfficient: leastEfficient ? {
       burnRate: leastEfficient.burnRate,
       time: leastEfficient.startTime,
       duration: leastEfficient.durationHours,
-    },
+    } : null,
+    // v4.5.4 #257 — expose the filtered count so the client can footnote
+    // "based on N sessions that passed the outlier filter".
+    validSessionCount: validSessions.length,
     timeSlots,
     trend,
     sessions: sessions.map(s => ({
@@ -304,15 +324,40 @@ function buildWeeklyPlan(store: NexusStore) {
 
   const sessionsAffordable = weeklyPerSession > 0 ? Math.floor(weeklyRemaining / weeklyPerSession) : 10;
 
-  // Optimal session timing based on patterns
-  const bestSlot = Object.entries(patterns.timeSlots as Record<string, { sessions: number; avgBurn: number; totalBurned: number }>)
-    .filter(([, v]) => v.sessions > 0)
-    .sort((a, b) => a[1].avgBurn - b[1].avgBurn)[0];
+  // v4.5.4 #258 — suppress low-n timing claims. Previously "Best efficiency during
+  // night sessions (avg 11% burned per session)" could ride on n=1. Require ≥ 3
+  // sessions per slot before claiming optimal timing. Slots with n < 3 still render
+  // in the time-of-day chart (with sample size visible) but don't drive the headline
+  // recommendation.
+  const MIN_SLOT_N = 3;
+  const timingCandidates = Object.entries(patterns.timeSlots as Record<string, { sessions: number; avgBurn: number; totalBurned: number }>)
+    .filter(([, v]) => v.sessions >= MIN_SLOT_N);
+  const bestSlot = timingCandidates.sort((a, b) => a[1].avgBurn - b[1].avgBurn)[0];
+  const timingConfidence: 'none' | 'low' | 'normal' = !bestSlot
+    ? 'none'
+    : bestSlot[1].sessions < 5 ? 'low' : 'normal';
 
   // Task backlog sizing
   const tasks = store.getAllTasks().filter(t => t.status !== 'done');
   const backlogCount = tasks.filter(t => t.status === 'backlog').length;
   const inProgressCount = tasks.filter(t => t.status === 'in_progress').length;
+  const estimatedSessions = Math.ceil(backlogCount / 3); // ~3 tasks per session average
+
+  // v4.5.4 #260 — spell out the clear-time math users were doing in their heads.
+  // estimatedSessions / sessionsAffordable-per-week = weeks-to-clear. Render as
+  // plain language so "Est. sessions ~26" + "Sessions affordable 10 this week"
+  // doesn't leave the reader multiplying.
+  let clearTimePlain: string | null = null;
+  if (sessionsAffordable > 0 && backlogCount > 0) {
+    const weeksToClear = estimatedSessions / sessionsAffordable;
+    if (weeksToClear < 0.5) {
+      clearTimePlain = 'At current pace, backlog clears within this week.';
+    } else if (weeksToClear < 1.2) {
+      clearTimePlain = 'At current pace, backlog clears in ~1 week.';
+    } else {
+      clearTimePlain = `At current pace, backlog clears in ~${Math.round(weeksToClear)} weeks.`;
+    }
+  }
 
   return {
     weeklyRemaining,
@@ -324,13 +369,15 @@ function buildWeeklyPlan(store: NexusStore) {
       ? `Budget tightening: ${sessionsAffordable} sessions left. Prioritize high-impact work.`
       : `Low fuel: ${sessionsAffordable} sessions max. Focus on commits, handoffs, and small fixes.`,
     optimalTiming: bestSlot
-      ? `Best efficiency during ${bestSlot[0]} sessions (avg ${bestSlot[1].avgBurn}% burned per session).`
-      : 'Insufficient data for timing recommendation.',
+      ? `Best efficiency during ${bestSlot[0]} sessions (avg ${bestSlot[1].avgBurn}% burned, n=${bestSlot[1].sessions}).`
+      : `Insufficient data for timing recommendation (need ≥${MIN_SLOT_N} sessions per time slot).`,
+    timingConfidence,
     trend: patterns.trend,
     backlog: {
       total: backlogCount,
       inProgress: inProgressCount,
-      estimatedSessions: Math.ceil(backlogCount / 3), // ~3 tasks per session average
+      estimatedSessions,
+      clearTimePlain,
     },
   };
 }

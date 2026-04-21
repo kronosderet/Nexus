@@ -43,6 +43,51 @@ now actually holds for the free-text surfaces it originally missed.
 **Tests:** 189 → **201** (+12 drift specs).
 **MCPB:** rebuilt at v4.4.5, smoke-passes on all 26 tools.
 
+## v4.5.4 — Fuel Insights Correctness
+
+Three Tier-1-class correctness fixes to the Fuel Intelligence surface. Users
+were rightly mistrusting the numbers because they sometimes reflected noise.
+
+**`#257` — outlier filter for Most/Least efficient ranking**
+- Previously "Most efficient: 0%/h over 2.2h" (a session where the user
+  never re-read fuel mid-work) and "Least efficient: 487.5%/h over 0.2h"
+  (a near-instant reading dividing by ~12 minutes) could leak in.
+- New filter requires `durationHours ≥ 0.5`, `burnRate in (0, 200]%/h`,
+  `dataPoints ≥ 2`. Sessions that fail drop out of the ranking.
+- Server returns `null` for `mostEfficient` / `leastEfficient` when the
+  filtered set has fewer than 2 entries; client renders "Not enough clean
+  session data yet" instead of garbage numbers.
+- New `validSessionCount` field lets the UI footnote "based on N of M
+  sessions that passed the outlier filter".
+
+**`#258` — confidence gate on timing recommendation**
+- Previously "Best efficiency during night sessions (avg 11% burned per
+  session)" could ride on n=1. Now requires ≥3 sessions per time slot
+  before that slot is eligible for the headline "best" claim.
+- New `timingConfidence: 'none' | 'low' | 'normal'` field on the weekly
+  plan response. `low` when the winning slot has n < 5. Client renders
+  an inline "low confidence" tag so users don't act on noise.
+- The recommendation string itself now includes the sample size
+  (`"n=4"`) so readers can calibrate immediately.
+
+**`#260` — plain-language backlog clear-time**
+- Previously "Est. sessions ~26 to clear backlog" sat next to "Sessions
+  affordable 10 this week" and users had to divide in their head.
+- Server now computes `backlog.clearTimePlain` with graceful copy:
+  - `< 0.5 weeks` → "backlog clears within this week"
+  - `< 1.2 weeks` → "backlog clears in ~1 week"
+  - else → "backlog clears in ~N weeks"
+- Renders as a `◈`-prefixed dim line below the stat grid.
+
+**Side-cleanup: six stray task re-classifications**
+Tasks `#135`, `#138`, `#139` were Shadowrun sprint work miscategorized as
+Nexus; `#182`, `#183`, `#186` were Level Magazine parser work also
+miscategorized. All moved to their correct projects. No code change —
+store-level `PATCH /api/tasks/:id` with `{ project }`. Was possible because
+of the v4.5.3 project-config refactor that generalized the classifier.
+
+228 tests. 27 MCP tools. No breaking changes.
+
 ## v4.5.3 — Project Config + History Cleanup
 
 Maintenance release. No new features, no breaking changes for existing users.

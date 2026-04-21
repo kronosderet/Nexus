@@ -439,19 +439,34 @@ export default function FuelModule() {
             })()}
           </div>
 
-          {patterns.mostEfficient && patterns.leastEfficient && (
-            <div className="grid grid-cols-2 gap-4 pt-3 border-t border-nexus-border">
-              <div>
-                <p className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider mb-1">Most efficient</p>
-                <p className="text-sm font-medium text-nexus-green">{patterns.mostEfficient.burnRate}%/h</p>
-                <p className="text-[10px] font-mono text-nexus-text-faint">{patterns.mostEfficient.duration}h session</p>
+          {/* v4.5.4 #257 — Most/Least efficient now suppress cleanly when the outlier
+              filter rejects too many sessions (mostEfficient/leastEfficient are null
+              server-side). Previously "0%/h over 2.2h" would slip through as "most
+              efficient" — that's an instrumentation gap, not a real best session. */}
+          {patterns.mostEfficient && patterns.leastEfficient ? (
+            <div className="pt-3 border-t border-nexus-border">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider mb-1">Most efficient</p>
+                  <p className="text-sm font-medium text-nexus-green">{patterns.mostEfficient.burnRate}%/h</p>
+                  <p className="text-[10px] font-mono text-nexus-text-faint">{patterns.mostEfficient.duration}h session</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider mb-1">Least efficient</p>
+                  <p className="text-sm font-medium text-nexus-red">{patterns.leastEfficient.burnRate}%/h</p>
+                  <p className="text-[10px] font-mono text-nexus-text-faint">{patterns.leastEfficient.duration}h session</p>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider mb-1">Least efficient</p>
-                <p className="text-sm font-medium text-nexus-red">{patterns.leastEfficient.burnRate}%/h</p>
-                <p className="text-[10px] font-mono text-nexus-text-faint">{patterns.leastEfficient.duration}h session</p>
-              </div>
+              {patterns.validSessionCount != null && patterns.validSessionCount < patterns.totalSessions && (
+                <p className="text-[9px] font-mono text-nexus-text-faint mt-2">
+                  ◈ Based on {patterns.validSessionCount} of {patterns.totalSessions} sessions (≥0.5h duration, burn ≤200%/h).
+                </p>
+              )}
             </div>
+          ) : (
+            <p className="pt-3 border-t border-nexus-border text-[10px] font-mono text-nexus-text-faint">
+              Not enough clean session data for efficiency ranking yet (need ≥0.5h duration, burn in 0–200%/h).
+            </p>
           )}
         </div>
       )}
@@ -500,8 +515,28 @@ export default function FuelModule() {
               'text-nexus-red'
             }`}>{weeklyPlan.recommendation}</p>
           )}
+          {/* v4.5.4 #260 — plain-language clear-time below the headline stats, so
+              "Est. sessions ~26" and "Sessions affordable 10" don't leave the
+              reader multiplying. Server-computed; hidden when either number is
+              missing or meaningless. */}
+          {weeklyPlan.backlog?.clearTimePlain && (
+            <p className="text-[11px] font-mono text-nexus-text-dim mt-1">
+              ◈ {weeklyPlan.backlog.clearTimePlain}
+            </p>
+          )}
+          {/* v4.5.4 #258 — timing recommendation now carries a confidence tag.
+              'low' = based on a slot with fewer than 5 sessions; rendered in
+              faint color so users don't take it as gospel. 'none' suppresses
+              the claim entirely (already handled server-side by the string). */}
           {weeklyPlan.optimalTiming && (
-            <p className="text-[10px] font-mono text-nexus-text-faint mt-2">{weeklyPlan.optimalTiming}</p>
+            <p className={`text-[10px] font-mono mt-2 ${
+              weeklyPlan.timingConfidence === 'low' ? 'text-nexus-text-faint italic' : 'text-nexus-text-faint'
+            }`}>
+              {weeklyPlan.optimalTiming}
+              {weeklyPlan.timingConfidence === 'low' && (
+                <span className="ml-1 text-nexus-amber/70">· low confidence</span>
+              )}
+            </p>
           )}
         </div>
       )}
