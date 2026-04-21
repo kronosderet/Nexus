@@ -96,7 +96,7 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.5.4 (Fuel Insights Correctness · shipped 2026-04-21)
+## Current — v4.5.5 (Command Polish II · shipped 2026-04-21)
 
 v4.5.0 is a theme-wide microanimation pass: list reveals, page-mount fades,
 WS-driven row flashes, number tweening, success flashes, status-change

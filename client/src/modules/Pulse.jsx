@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../hooks/useApi.js';
-import { Activity, Cpu, HardDrive, GitBranch, FolderOpen, Clock, Flame, Thermometer, Zap, Gauge } from 'lucide-react';
+import { Activity, Cpu, HardDrive, GitBranch, FolderOpen, Clock, Flame, Thermometer, Zap, Gauge, ChevronDown, ChevronRight } from 'lucide-react';
 import { useNexusFleet } from '../context/useNexus.js';
 import DigestWidget from '../components/DigestWidget.jsx';
 import QuickActions from '../components/QuickActions.jsx';
@@ -157,34 +157,63 @@ function GpuPanel({ gpu }) {
         </div>
       </div>
 
-      {/* Bottom stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-nexus-border">
-        <div className="text-center">
-          <p className="text-xs font-mono text-nexus-text-faint">Power</p>
-          <p className="text-sm font-mono text-nexus-text">
-            <Zap size={10} className="inline text-nexus-amber mr-0.5" />
-            {gpu.power.draw.toFixed(0)}W
-          </p>
-          <p className="text-[10px] font-mono text-nexus-text-faint">/ {gpu.power.limit.toFixed(0)}W</p>
+      {/* v4.5.5 #244 — Bottom stats: Power stays visible (it's the at-a-glance signal);
+          Core / VRAM clocks / Fan collapse into a Details toggle. Power-user depth is
+          preserved one click away but the default view stays readable. */}
+      <div className="pt-3 border-t border-nexus-border">
+        <div className="grid grid-cols-1 gap-3">
+          <div className="text-center">
+            <p className="text-xs font-mono text-nexus-text-faint">Power</p>
+            <p className="text-sm font-mono text-nexus-text">
+              <Zap size={10} className="inline text-nexus-amber mr-0.5" />
+              {gpu.power.draw.toFixed(0)}W
+            </p>
+            <p className="text-[10px] font-mono text-nexus-text-faint">/ {gpu.power.limit.toFixed(0)}W</p>
+          </div>
         </div>
-        <div className="text-center">
-          <p className="text-xs font-mono text-nexus-text-faint">Core</p>
-          <p className="text-sm font-mono text-nexus-text">{gpu.clocks.graphics} MHz</p>
-          <p className="text-[10px] font-mono text-nexus-text-faint">/ {gpu.clocks.maxGraphics}</p>
-        </div>
-        <div className="text-center">
-          <p className="text-xs font-mono text-nexus-text-faint">VRAM Clk</p>
-          <p className="text-sm font-mono text-nexus-text">{gpu.clocks.memory} MHz</p>
-          <p className="text-[10px] font-mono text-nexus-text-faint">/ {gpu.clocks.maxMemory}</p>
-        </div>
-        <div className="text-center">
-          <p className="text-xs font-mono text-nexus-text-faint">Fan</p>
-          <p className="text-sm font-mono text-nexus-text">{gpu.fan}%</p>
-          <p className="text-[10px] font-mono text-nexus-text-faint">
-            {gpu.fan === 0 ? 'silent' : gpu.fan < 40 ? 'quiet' : 'active'}
-          </p>
-        </div>
+        <CudaDetails gpu={gpu} />
       </div>
+    </div>
+  );
+}
+
+// v4.5.5 #244 — expandable Details section for Core clock / VRAM clock / Fan.
+// Hidden by default so the panel reads cleanly; users who want the deep numbers
+// click to expand. State is per-render only (no localStorage) since this is
+// visual noise-level, not user intent to persist.
+function CudaDetails({ gpu }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-3">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1 text-[10px] font-mono text-nexus-text-faint hover:text-nexus-amber transition-colors"
+        aria-expanded={open}
+      >
+        {open ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+        {open ? 'Hide details' : 'Details (clocks · fan)'}
+      </button>
+      {open && (
+        <div className="grid grid-cols-3 gap-3 mt-2">
+          <div className="text-center">
+            <p className="text-xs font-mono text-nexus-text-faint">Core</p>
+            <p className="text-sm font-mono text-nexus-text">{gpu.clocks.graphics} MHz</p>
+            <p className="text-[10px] font-mono text-nexus-text-faint">/ {gpu.clocks.maxGraphics}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs font-mono text-nexus-text-faint">VRAM Clk</p>
+            <p className="text-sm font-mono text-nexus-text">{gpu.clocks.memory} MHz</p>
+            <p className="text-[10px] font-mono text-nexus-text-faint">/ {gpu.clocks.maxMemory}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs font-mono text-nexus-text-faint">Fan</p>
+            <p className="text-sm font-mono text-nexus-text">{gpu.fan}%</p>
+            <p className="text-[10px] font-mono text-nexus-text-faint">
+              {gpu.fan === 0 ? 'silent' : gpu.fan < 40 ? 'quiet' : 'active'}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

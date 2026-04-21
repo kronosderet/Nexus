@@ -19,15 +19,24 @@
  *   <FuelFreshnessStamp fuel={fuel} />
  *   <FuelFreshnessStamp fuel={fuel} className="ml-2" />
  */
+// v4.5.5 #242 — label phrasing changed from "Nm since report" → "read Nm ago".
+// The old wording read as a technical delta ("since report"); the new wording
+// matches how users think about freshness. Also lowers the "Fresh reading"
+// threshold to prevent the illusion the dashboard was fueled by the stale-look
+// audit flagged. Adds title tooltip with exact delta for power users.
 export default function FuelFreshnessStamp({ fuel, className = '' }) {
   if (!fuel) return null;
   const minutesAgo = fuel.reported?.minutesAgo;
   const isHighConfidence = fuel.estimated?.confidence === 'high';
 
   const label =
-    isHighConfidence && (minutesAgo == null || minutesAgo < 15)
-      ? 'Fresh reading'
-      : `${minutesAgo ?? '?'}m since report`;
+    isHighConfidence && (minutesAgo == null || minutesAgo < 10)
+      ? 'fresh'
+      : minutesAgo == null
+      ? 'age unknown'
+      : minutesAgo < 60
+      ? `read ${minutesAgo}m ago`
+      : `read ${Math.floor(minutesAgo / 60)}h${minutesAgo % 60 > 0 ? ` ${minutesAgo % 60}m` : ''} ago`;
 
   const staleClass =
     minutesAgo == null
@@ -38,5 +47,10 @@ export default function FuelFreshnessStamp({ fuel, className = '' }) {
       ? 'text-nexus-amber'
       : 'text-nexus-text-faint';
 
-  return <span className={`${staleClass} ${className}`}>{label}</span>;
+  const title =
+    minutesAgo == null
+      ? 'No report age available'
+      : `Last fuel reading logged ${minutesAgo} minute${minutesAgo === 1 ? '' : 's'} ago. Values shown are that snapshot — log a fresh reading to refresh.`;
+
+  return <span className={`${staleClass} ${className}`} title={title}>{label}</span>;
 }

@@ -43,6 +43,43 @@ now actually holds for the free-text surfaces it originally missed.
 **Tests:** 189 → **201** (+12 drift specs).
 **MCPB:** rebuilt at v4.4.5, smoke-passes on all 26 tools.
 
+## v4.5.5 — Command Polish II
+
+Eight Tier 2/3/4 polish items from the long-queued Command-view audit batch.
+No breaking changes. Visible-on-every-session surfaces get cleaner.
+
+**Tier 2 (Command view anticipation)**
+- `#223` Auto-generate Session Plan on mount when cache is missing or stale
+  (>1h old). Silent auto-fetch; manual Refresh button preserved. Closes
+  "passive feature that should feel anticipatory" friction.
+- `#224` Cross-project distribution strip at top of Later panel — horizontal
+  proportional bars showing fleet shape at a glance, click-to-toggle group
+  expansion. Replaces the "+N more" fold with something legible.
+- `#225` Staleness badges on each project group header. "today" (green),
+  "Nd ago" colored by age (neutral/amber/red). Derived from max task
+  `updated_at` per group; no extra fetch.
+
+**Tier 3**
+- `#227` Thought Stack actions — pop (top-of-stack only) and abandon (any
+  entry) now inline on the Command-view thought rows. Hover reveals actions
+  so the panel stays quiet when you're not triaging. "+N more" footer points
+  at the Ctrl+T modal for deeper stacks.
+
+**Tier 4**
+- `#230` Live feed scrollable — was hard-capped at 4 visible rows; now shows
+  up to 20 in a `max-h-48` scroll container. "N recent" header stamp.
+- `#232` New-events-since-last-view badge — stores last-seen activity id in
+  `localStorage`, diffs against current slice on mount, renders "◈ N new
+  events" in the header (dismissible). Row-reveal animated.
+- `#242` Fuel freshness stamp rewording — "Nm since report" → "read Nm ago"
+  (matches how users think about the delta). Richer tooltip explains
+  static-snapshot semantics. "fresh" threshold tightened from 15m → 10m.
+- `#244` CUDA Engine panel — Core clock / VRAM clock / Fan collapsed into
+  a `Details` toggle. Power stays visible at-a-glance; full depth one click
+  away.
+
+228 tests. 27 MCP tools.
+
 ## v4.5.4 — Fuel Insights Correctness
 
 Three Tier-1-class correctness fixes to the Fuel Intelligence surface. Users

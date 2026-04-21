@@ -119,7 +119,10 @@ export default function Command({ ws }) {
   const thoughts = (thoughtsSlice.data || []).filter(t => t.status === 'active');
   const fuel = fuelSlice.data;
   const workload = workloadSlice.data;
-  const recentActivity = (activitySlice.data || []).slice(0, 10);
+  // v4.5.5 #230 — live feed shows up to 20 entries in a scroll container (was
+  // sliced to 4-visible pre-v4.5.5). The underlying slice carries far more — we
+  // just expose a useful window with scroll rather than a flat cap.
+  const recentActivity = (activitySlice.data || []).slice(0, 20);
   const loading = tasksSlice.loading;
 
   // Local-only state (Command-specific, not shared)
@@ -159,11 +162,50 @@ export default function Command({ ws }) {
 
   useEffect(() => {
     fetchLocal();
+    // v4.5.5 #223 — auto-generate Session Plan on mount when no cache exists
+    // OR the cached plan is more than an hour old. Keeps the manual "Plan" /
+    // "Refresh" button; the auto-fetch just closes the "passive feature"
+    // friction the audit called out. Cache is still trusted for fast reloads.
+    let usedCache = false;
     try {
       const cached = localStorage.getItem('nexus-plan-cache');
-      if (cached) setPlan(JSON.parse(cached));
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const cachedAtMs = parsed?.generatedAt ? new Date(parsed.generatedAt).getTime() : 0;
+        const hourAgo = Date.now() - 3600 * 1000;
+        if (cachedAtMs > hourAgo) {
+          setPlan(parsed);
+          usedCache = true;
+        }
+      }
     } catch {}
+    if (!usedCache) {
+      // Silent auto-fetch. Ignores failures (LM Studio down, etc.) — user can
+      // still click the manual Refresh button in that case.
+      fetchPlan().catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // v4.5.5 #232 — "N new events since last view" freshness stamp. On mount,
+  // diff the most recent activity id against the last-viewed id stored in
+  // localStorage. Show a subtle badge; clear on interaction (scroll or click).
+  // Rendered inline in the header so it's visible without chrome overhead.
+  const [newEventsBadge, setNewEventsBadge] = useState(0);
+  const [badgeDismissed, setBadgeDismissed] = useState(false);
+  useEffect(() => {
+    if (!activitySlice.data || activitySlice.data.length === 0) return;
+    let lastSeenId = null;
+    try { lastSeenId = parseInt(localStorage.getItem('nexus-command-last-activity-id') || '0', 10); } catch {}
+    const newestId = activitySlice.data[0]?.id ?? 0;
+    if (lastSeenId && newestId > lastSeenId) {
+      const delta = activitySlice.data.filter(a => a.id > lastSeenId).length;
+      setNewEventsBadge(delta);
+    }
+    // Stamp what we've now seen so subsequent mounts compare against this.
+    try { localStorage.setItem('nexus-command-last-activity-id', String(newestId)); } catch {}
+  }, [activitySlice.data]);
+  const dismissBadge = () => { setBadgeDismissed(true); setNewEventsBadge(0); };
 
   useEffect(() => {
     const clear = () => setDraggingId(null);
@@ -261,6 +303,16 @@ export default function Command({ ws }) {
                   doesn't require a tab switch. Shows session% · weekly% · minutes-left,
                   colored by pressure, with freshness stamp so users see staleness. */}
               <FuelChip fuel={fuel} />
+              {/* v4.5.5 #232 — new-events-since-last-view freshness badge */}
+              {newEventsBadge > 0 && !badgeDismissed && (
+                <button
+                  onClick={dismissBadge}
+                  title="Click to dismiss. Counts activity entries that arrived since you last had Command open."
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/20 text-[10px] font-mono hover:bg-nexus-amber/20 transition-colors animate-row-reveal"
+                >
+                  ◈ {newEventsBadge} new event{newEventsBadge === 1 ? '' : 's'}
+                </button>
+              )}
             </div>
           </div>
           <div className="flex gap-1">
@@ -366,18 +418,78 @@ function LaterPanel({ backlog, onUpdate, onStart }) {
   const [expanded, setExpanded] = useState({});
   const toggle = (p) => setExpanded(prev => ({ ...prev, [p]: !prev[p] }));
 
+  // v4.5.5 #225 — per-group staleness. Days since the most recent task update
+  // in that group. "0d" for today; "Nd" otherwise. getFleetOverview has more
+  // accurate session-level staleness but this avoids an extra fetch and stays
+  // directionally correct.
+  const stalenessByGroup = useMemo(() => {
+    const out = {};
+    for (const [project, tasks] of groupByProject(backlog)) {
+      let maxTs = 0;
+      for (const t of tasks) {
+        const ts = t.updated_at ? new Date(t.updated_at).getTime() : 0;
+        if (ts > maxTs) maxTs = ts;
+      }
+      if (maxTs > 0) {
+        const days = Math.floor((Date.now() - maxTs) / 86400000);
+        out[project] = days;
+      }
+    }
+    return out;
+  }, [backlog]);
+  const stalenessColor = (d) => d >= 14 ? 'text-nexus-red' : d >= 7 ? 'text-nexus-amber' : d >= 3 ? 'text-nexus-text-faint' : 'text-nexus-green';
+
+  // v4.5.5 #224 — cross-project distribution strip. Replaces the "+N more" fold
+  // with a visible bar-chart header that shows the fleet shape at a glance.
+  // Click a bar to toggle that group's expansion (same state as the toggle below).
+  const groups = groupByProject(backlog);
+  const maxCount = Math.max(1, ...groups.map(([, t]) => t.length));
+
   return (
     <Panel title="Later" icon={Layers} accent="text-nexus-purple" count={backlog.length}>
       {backlog.length === 0 ? <EmptyState icon={Package} message="Empty backlog." /> : (
         <div className="space-y-3">
-          {groupByProject(backlog).map(([project, tasks]) => {
+          {/* v4.5.5 #224 — distribution strip */}
+          {groups.length > 1 && (
+            <div className="pb-2 mb-1 border-b border-nexus-border/40">
+              <div className="flex items-center gap-0.5 h-4" title="Click a project segment to jump to its group below.">
+                {groups.map(([project, tasks]) => {
+                  const pct = (tasks.length / backlog.length) * 100;
+                  return (
+                    <button
+                      key={project}
+                      onClick={() => toggle(project)}
+                      style={{ width: `${pct}%` }}
+                      title={`${project}: ${tasks.length} (${Math.round(pct)}%)`}
+                      className={`h-full min-w-[4px] first:rounded-l last:rounded-r transition-opacity ${expanded[project] ? 'bg-nexus-purple' : 'bg-nexus-purple/40 hover:bg-nexus-purple/60'}`}
+                    />
+                  );
+                })}
+              </div>
+              <div className="flex items-center justify-between mt-1 text-[9px] font-mono text-nexus-text-faint">
+                <span>{groups.length} projects · {backlog.length} tasks</span>
+                <span>{groups.map(([p, t]) => `${p} ${t.length}`).slice(0, 4).join(' · ')}{groups.length > 4 ? ' …' : ''}</span>
+              </div>
+            </div>
+          )}
+
+          {groups.map(([project, tasks]) => {
             const isExpanded = expanded[project];
             const visible = isExpanded ? tasks : tasks.slice(0, 4);
+            const daysStale = stalenessByGroup[project];
             return (
               <div key={project}>
                 <button onClick={() => toggle(project)} className="flex items-center gap-2 mb-1 w-full text-left">
                   <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-nexus-purple/10 text-nexus-purple border border-nexus-purple/20">{project}</span>
                   <span className="text-[10px] font-mono text-nexus-text-faint">{tasks.length}</span>
+                  {/* v4.5.5 #225 — staleness badge. 0d = today (green), 1-2d neutral,
+                      3-6d amber-dim, 7-13d amber, 14d+ red. Derived from most-recent
+                      task update time within the group. */}
+                  {daysStale != null && (
+                    <span className={`text-[9px] font-mono ${stalenessColor(daysStale)}`} title="Days since most recent task update in this group">
+                      {daysStale === 0 ? 'today' : `${daysStale}d ago`}
+                    </span>
+                  )}
                   <span className="text-[9px] text-nexus-text-faint ml-auto">{isExpanded ? '▾' : '▸'}</span>
                 </button>
                 {visible.map(t => {
@@ -489,25 +601,57 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
           </div>
         </div>
 
-        {/* Thought stack */}
+        {/* Thought stack — v4.5.5 #227: interruption-recovery stack now has pop
+            and abandon actions inline. Top-of-stack (i === 0) shows both; deeper
+            entries show only abandon so users can't accidentally pop-out-of-order.
+            Row hover reveals actions so the panel stays quiet when you're not
+            actively triaging. */}
         {thoughts.length > 0 && (
           <div className="mb-3 pt-2 border-t border-nexus-border">
             <span className="text-[10px] font-mono text-nexus-text-faint flex items-center gap-1 mb-1"><Brain size={9} /> Thoughts ({thoughts.length})</span>
             {thoughts.slice(0, 3).map((t, i) => (
-              <div key={t.id} className={`flex items-start gap-1.5 px-2 py-1 rounded text-[11px] ${i === 0 ? 'bg-nexus-purple/5 border border-nexus-purple/20' : ''}`}>
+              <div key={t.id} className={`group flex items-start gap-1.5 px-2 py-1 rounded text-[11px] ${i === 0 ? 'bg-nexus-purple/5 border border-nexus-purple/20' : ''}`}>
                 <span className="text-nexus-text-faint shrink-0">{i === 0 ? '▸' : `${i + 1}.`}</span>
-                <span className="text-nexus-text-dim truncate">{t.text}</span>
+                <span className="text-nexus-text-dim truncate flex-1">{t.text}</span>
+                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 shrink-0 transition-opacity">
+                  {i === 0 && (
+                    <button
+                      onClick={async () => { try { await api.popThought(t.id); } catch {} }}
+                      className="text-[9px] font-mono text-nexus-purple hover:text-nexus-amber transition-colors"
+                      title="Pop this thought — acknowledges return from the interruption. Keeps a resolution record."
+                    >
+                      pop
+                    </button>
+                  )}
+                  <button
+                    onClick={async () => { try { await api.abandonThought(t.id, 'abandoned from Command view'); } catch {} }}
+                    className="text-[9px] font-mono text-nexus-text-faint hover:text-nexus-red transition-colors"
+                    title="Abandon this thought — clears without claiming resolution. Use when the context is no longer relevant."
+                  >
+                    abandon
+                  </button>
+                </div>
               </div>
             ))}
+            {thoughts.length > 3 && (
+              <p className="text-[9px] font-mono text-nexus-text-faint mt-1 pl-2">
+                + {thoughts.length - 3} more on the stack (use Ctrl+T to open the full modal)
+              </p>
+            )}
           </div>
         )}
 
-        {/* Live activity feed */}
+        {/* Live activity feed — v4.5.5 #230: scrollable window (was hard-capped
+            at 4). Shows up to 20 in a max-h-48 scroll container so the signal
+            from recent activity surfaces without blowing out the panel height. */}
         {recentActivity.length > 0 && (
           <div className="pt-2 border-t border-nexus-border">
-            <span className="text-[10px] font-mono text-nexus-text-faint mb-1 block">Live</span>
-            <div className="space-y-0.5">
-              {recentActivity.slice(0, 4).map((a, i) => (
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-mono text-nexus-text-faint">Live</span>
+              <span className="text-[9px] font-mono text-nexus-text-faint">{recentActivity.length} recent</span>
+            </div>
+            <div className="space-y-0.5 max-h-48 overflow-y-auto pr-1">
+              {recentActivity.map((a, i) => (
                 <div key={a.id || i} className="flex items-start gap-2 text-[10px]">
                   <span className="text-nexus-text-faint w-10 shrink-0 font-mono">
                     {new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
