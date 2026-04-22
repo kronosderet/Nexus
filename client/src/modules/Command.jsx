@@ -136,18 +136,68 @@ export default function Command({ ws }) {
   const [kanbanSearch, setKanbanSearch] = useState('');
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [addingTo, setAddingTo] = useState(null);
+  // v4.5.7 #226 — Overseer risk cards on Command. Risks come from
+  // /api/overseer/risks (cheap, no AI inference — lightweight heuristics).
+  // Dismissed per risk-id, session-scoped (localStorage). New risks resurface
+  // automatically; dismissed ones stay hidden until the tab reload.
+  const [risks, setRisks] = useState([]);
+  const [dismissedRiskIds, setDismissedRiskIds] = useState(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('nexus-command-dismissed-risks') || '[]'));
+    } catch { return new Set(); }
+  });
 
-  // Fetch Command-specific data (plan, predict, critique) — NOT in context
+  // Fetch Command-specific data (plan, predict, critique, risks) — NOT in context
   async function fetchLocal() {
     try {
-      const [p, c] = await Promise.all([
+      const [p, c, r] = await Promise.all([
         api.getPredict().catch(() => ({ suggestions: [] })),
         api.getCritique().catch(() => ({ slowTasks: [] })),
+        api.getOverseerRisks().catch(() => ({ risks: [] })),
       ]);
       setPredict(p);
       setCritique(c);
+      setRisks(r?.risks || []);
     } catch {}
   }
+
+  // v4.5.7 #228 — Memory Bridge visibility. nexus_import_cc_memories shipped in
+  // v4.3.8 but has never had a UI affordance — users had to know the MCP tool
+  // exists. Small chip in Command header shows "CC memories: N / M imported"
+  // with Dry-run and Import buttons inline.
+  const [memoryScan, setMemoryScan] = useState(null);
+  const [memoryBusy, setMemoryBusy] = useState(false);
+  const [memoryResult, setMemoryResult] = useState(null);
+  useEffect(() => {
+    api.getMemoryScan().then(setMemoryScan).catch(() => {});
+  }, []);
+  const runMemoryImport = async (dryRun) => {
+    setMemoryBusy(true); setMemoryResult(null);
+    try {
+      const result = await api.importMemory({ dry_run: dryRun });
+      setMemoryResult({ ...result, at: Date.now() });
+      if (!dryRun) {
+        // Refresh scan after a real import so the count reflects reality
+        api.getMemoryScan().then(setMemoryScan).catch(() => {});
+      }
+    } catch (e) {
+      setMemoryResult({ error: e.message, at: Date.now() });
+    } finally {
+      setMemoryBusy(false);
+    }
+  };
+
+  const dismissRisk = (riskKey) => {
+    setDismissedRiskIds(prev => {
+      const next = new Set(prev);
+      next.add(riskKey);
+      try { localStorage.setItem('nexus-command-dismissed-risks', JSON.stringify(Array.from(next))); } catch {}
+      return next;
+    });
+  };
+  // Derive a stable key per risk so dismissal persists across refetches.
+  const riskKey = (r) => `${r.category}:${r.project || '-'}:${(r.message || '').slice(0, 40)}`;
+  const visibleRisks = risks.filter(r => !dismissedRiskIds.has(riskKey(r)));
 
   function fetchAll() { fetchLocal(); } // For backward compat with onRefresh prop
 
@@ -303,6 +353,52 @@ export default function Command({ ws }) {
                   doesn't require a tab switch. Shows session% · weekly% · minutes-left,
                   colored by pressure, with freshness stamp so users see staleness. */}
               <FuelChip fuel={fuel} />
+              {/* v4.5.7 #228 — Memory Bridge visibility chip. Imported/total count
+                  with Dry-run and Import inline actions when new memories exist.
+                  Hidden when scan is empty or still loading. */}
+              {memoryScan?.memories && memoryScan.memories.length > 0 && (() => {
+                const total = memoryScan.memories.length;
+                const imported = (memoryScan.memories || []).filter(m => m.imported).length;
+                const available = total - imported;
+                const fresh = memoryResult && (Date.now() - memoryResult.at) < 5000;
+                return (
+                  <span
+                    className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-nexus-purple/5 text-nexus-text-dim border border-nexus-purple/20"
+                    title={`Claude Code memory files discovered at ~/.claude/projects/**/memory/*.md. ${imported} of ${total} already imported as reference decisions.`}
+                  >
+                    <Brain size={9} className="text-nexus-purple" />
+                    <span>Memory Bridge:</span>
+                    <span className="text-nexus-text">{imported}/{total}</span>
+                    {available > 0 && !memoryBusy && (
+                      <>
+                        <button
+                          onClick={() => runMemoryImport(true)}
+                          className="ml-1 text-nexus-purple/80 hover:text-nexus-purple transition-colors"
+                          title="Scan + preview without writing anything"
+                        >
+                          [dry run]
+                        </button>
+                        <button
+                          onClick={() => runMemoryImport(false)}
+                          className="text-nexus-amber hover:text-nexus-text transition-colors"
+                          title={`Import ${available} new memor${available === 1 ? 'y' : 'ies'} as reference decisions`}
+                        >
+                          [import]
+                        </button>
+                      </>
+                    )}
+                    {memoryBusy && <Loader2 size={9} className="animate-spin text-nexus-purple" />}
+                    {fresh && memoryResult.imported != null && (
+                      <span className="text-nexus-green">
+                        · +{memoryResult.imported} imported{memoryResult.dryRun ? ' (dry)' : ''}
+                      </span>
+                    )}
+                    {fresh && memoryResult.error && (
+                      <span className="text-nexus-red">· error</span>
+                    )}
+                  </span>
+                );
+              })()}
               {/* v4.5.5 #232 — new-events-since-last-view freshness badge */}
               {newEventsBadge > 0 && !badgeDismissed && (
                 <button
@@ -359,6 +455,7 @@ export default function Command({ ws }) {
           tasks={tasks} inProgress={inProgress} backlog={backlog} done={done}
           thoughts={thoughts} plan={plan} predict={predict} critique={critique}
           fuel={fuel} workload={workload} recentActivity={recentActivity}
+          risks={visibleRisks} onDismissRisk={dismissRisk} riskKey={riskKey}
           loadingPlan={loadingPlan} onRefreshPlan={fetchPlan} onRefresh={fetchAll}
           onUpdate={handleUpdate} onStart={handleStart} onShip={handleShip} onPark={handlePark}
         />
@@ -519,7 +616,7 @@ function LaterPanel({ backlog, onUpdate, onStart }) {
   );
 }
 
-function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predict, critique, fuel, workload, recentActivity, loadingPlan, onRefreshPlan, onUpdate, onStart, onShip, onPark }) {
+function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predict, critique, fuel, workload, recentActivity, risks = [], onDismissRisk, riskKey, loadingPlan, onRefreshPlan, onUpdate, onStart, onShip, onPark }) {
   const gaps = predict?.suggestions || [];
   const planTasks = parsePlanTasks(plan?.aiPlan);
   const focus = planFocus(plan?.aiPlan);
@@ -532,6 +629,52 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      {/* v4.5.7 #226 — Overseer risk cards above Now/Next. Surfaces tier-1 signals
+          (low weekly fuel, stuck tasks, stale repos, uncommitted drift) into the
+          user's field of view instead of hiding them behind the Overseer tab.
+          Each card is dismissible; dismissal persists in localStorage. Spans both
+          columns so risks get attention without competing for panel real estate. */}
+      {risks.length > 0 && (
+        <div className="xl:col-span-2 bg-nexus-surface border border-nexus-amber/20 rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle size={12} className="text-nexus-amber" />
+            <span className="text-xs font-mono text-nexus-amber uppercase tracking-wider">Overseer Risks</span>
+            <span className="text-[10px] font-mono text-nexus-text-faint ml-auto">{risks.length} active</span>
+          </div>
+          <div className="space-y-1.5">
+            {risks.slice(0, 4).map((r) => {
+              const levelCls =
+                r.level === 'critical' ? 'border-nexus-red/40 bg-nexus-red/5' :
+                r.level === 'warning' ? 'border-nexus-amber/30 bg-nexus-amber/5' :
+                'border-nexus-blue/20 bg-nexus-blue/5';
+              const levelText =
+                r.level === 'critical' ? 'text-nexus-red' :
+                r.level === 'warning' ? 'text-nexus-amber' :
+                'text-nexus-blue';
+              return (
+                <div key={riskKey ? riskKey(r) : r.message} className={`flex items-start gap-2 px-2.5 py-1.5 rounded border ${levelCls}`}>
+                  <span className={`text-[9px] font-mono uppercase shrink-0 mt-0.5 ${levelText}`}>
+                    {r.category || r.level}
+                  </span>
+                  <p className="text-[11px] text-nexus-text-dim flex-1 min-w-0">{r.message}</p>
+                  <button
+                    onClick={() => onDismissRisk && onDismissRisk(riskKey(r))}
+                    title="Dismiss for this session (persisted in localStorage)"
+                    className="shrink-0 text-nexus-text-faint hover:text-nexus-red text-[10px] font-mono transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+            {risks.length > 4 && (
+              <p className="text-[10px] font-mono text-nexus-text-faint italic pt-1">
+                + {risks.length - 4} more — see the Overseer tab for full list
+              </p>
+            )}
+          </div>
+        </div>
+      )}
       {/* NOW — what CC is actually doing */}
       <Panel title="Now" icon={Activity} accent="text-nexus-green">
         {/* In-progress tasks with elapsed time + estimated cost */}
@@ -689,16 +832,32 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
         {gaps.length > 0 && (
           <div className="pt-2 mt-2 border-t border-nexus-border">
             <span className="text-[10px] font-mono text-nexus-text-faint mb-1 block"><AlertTriangle size={9} className="inline mr-1" />Gaps ({gaps.length})</span>
-            {gaps.slice(0, 4).map((g, i) => (
-              <div key={i} className="flex items-center gap-1 px-2 py-1 rounded border border-nexus-border mb-1">
-                <div className="flex-1 min-w-0">
-                  <span className={`text-[9px] font-mono uppercase ${CATEGORY_COLOR[g.category] || 'text-nexus-text-faint'}`}>{CATEGORY_LABEL[g.category] || g.category}</span>
-                  <p className="text-xs text-nexus-text-dim truncate">{g.title}</p>
+            {gaps.slice(0, 4).map((g, i) => {
+              // v4.5.7 #231 — hover-to-preview. predict.reason already carries the
+              // full explanation (e.g. "#76 has no graph connections. Isolated…");
+              // previously it was only surfaced when a task was created from the
+              // gap. Now it's a native tooltip on the row — zero fetch cost, cuts
+              // friction for the Gap triage flow. Title attr also carries the
+              // linked decisionId when present so hover reveals the ref.
+              const previewText = [
+                g.decisionId ? `Related to decision #${g.decisionId}` : null,
+                g.reason || null,
+              ].filter(Boolean).join('\n\n');
+              return (
+                <div
+                  key={i}
+                  className="flex items-center gap-1 px-2 py-1 rounded border border-nexus-border mb-1 hover:border-nexus-amber/30 transition-colors cursor-help"
+                  title={previewText || g.title}
+                >
+                  <div className="flex-1 min-w-0">
+                    <span className={`text-[9px] font-mono uppercase ${CATEGORY_COLOR[g.category] || 'text-nexus-text-faint'}`}>{CATEGORY_LABEL[g.category] || g.category}</span>
+                    <p className="text-xs text-nexus-text-dim truncate">{g.title}</p>
+                  </div>
+                  <button onClick={() => { api.createTask({ title: g.title, description: g.reason, priority: g.priority || 1 }).then(() => fetchAll()).catch(() => {}); }}
+                    className="text-nexus-text-faint hover:text-nexus-amber shrink-0" title="Create task from gap"><Plus size={10} /></button>
                 </div>
-                <button onClick={() => { api.createTask({ title: g.title, description: g.reason, priority: g.priority || 1 }).then(() => fetchAll()).catch(() => {}); }}
-                  className="text-nexus-text-faint hover:text-nexus-amber shrink-0" title="Create task from gap"><Plus size={10} /></button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Panel>
@@ -716,15 +875,34 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
               const ageMs = (t.created_at && t.updated_at) ? new Date(t.updated_at).getTime() - new Date(t.created_at).getTime() : 0;
               const ageDays = Math.floor(ageMs / 86400000);
               const ageLabel = ageDays > 0 ? `${ageDays}d in backlog` : null;
+              // v4.5.7 #229 — augment Done with estimated fuel cost. Uses the same
+              // per-task duration estimate the Now panel uses (from critique's
+              // averageCompletionMinutes) times fuel.rates.sessionPerHour. This
+              // feeds the burn-rate learning loop: metabrain needs visible
+              // evidence of what tasks actually cost to calibrate future estimates.
+              // Test delta + commit SHA were also requested but need cross-data
+              // plumbing (git log ↔ task updated_at correlation) — deferred as
+              // a follow-up since the fuel estimate alone closes most of the gap.
+              const estMin = estimateMinutes(t.title, critique?.averageCompletionMinutes || 35);
+              const sessionPerHour = fuel?.rates?.sessionPerHour;
+              const estFuelPct = sessionPerHour > 0 ? Math.round(estMin * sessionPerHour / 60) : null;
               return (
                 <div key={t.id} className="flex items-start gap-2 px-2 py-1 rounded hover:bg-nexus-bg/50">
                   <CheckCircle2 size={10} className="text-nexus-green mt-0.5 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-nexus-text-dim truncate">{t.title}</p>
-                    <div className="flex gap-2 text-[9px] font-mono text-nexus-text-faint">
+                    <div className="flex gap-2 text-[9px] font-mono text-nexus-text-faint flex-wrap">
                       {completedAt && <span>done {completedAt}</span>}
                       <span>{minutesAgo(t.updated_at)}</span>
                       {ageLabel && <span className="text-nexus-text-faint/50">· {ageLabel}</span>}
+                      {estFuelPct != null && estFuelPct > 0 && (
+                        <span
+                          className="text-nexus-amber/60"
+                          title={`Estimated fuel cost: ~${estFuelPct}% based on the average task duration (${estMin}m) and the current burn rate. True cost is not tracked per-task yet.`}
+                        >
+                          · ~{estFuelPct}% fuel
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

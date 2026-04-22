@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { BarChart3, GitCommit, CheckCircle2, FileEdit, BookOpen, Flame, AlertTriangle, Calendar, RefreshCw } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
 
-export default function DigestWidget({ ws }) {
+export default function DigestWidget({ ws, onNavigate }) {
   const [digest, setDigest] = useState(null);
   const [range, setRange] = useState('7d');
   const [fetchedAt, setFetchedAt] = useState(null);
@@ -109,21 +109,40 @@ export default function DigestWidget({ ws }) {
         </div>
       )}
 
-      {/* Busiest day + blockers */}
+      {/* Busiest day + blockers — v4.5.7 #241: clickable. Busiest day opens Log
+          timeline (no direct day filter yet, but the user lands in the right
+          tab with all timestamps visible). Blockers count opens Log sessions
+          tab where the Blockers-only toggle lives. Sessions count just jumps
+          to the same sessions tab. Purely navigational — no new server routes. */}
       <div className="flex gap-4 pt-3 border-t border-nexus-border text-[10px] font-mono text-nexus-text-faint">
         {busiestDay && (
-          <span className="flex items-center gap-1">
+          <button
+            onClick={() => onNavigate && onNavigate('log')}
+            disabled={!onNavigate}
+            className="flex items-center gap-1 hover:text-nexus-amber transition-colors disabled:cursor-default disabled:hover:text-nexus-text-faint"
+            title={onNavigate ? `Open Log timeline (no direct day filter; ${busiestDay.day} has ${busiestDay.count} events)` : undefined}
+          >
             <Calendar size={9} /> Busiest: {busiestDay.day} ({busiestDay.count})
-          </span>
+          </button>
         )}
         {activeBlockers.length > 0 && (
-          <span className="flex items-center gap-1 text-nexus-amber">
+          <button
+            onClick={() => onNavigate && onNavigate('log')}
+            disabled={!onNavigate}
+            className="flex items-center gap-1 text-nexus-amber hover:text-nexus-text transition-colors disabled:cursor-default"
+            title={onNavigate ? 'Open Log sessions tab (use Blockers toggle there)' : undefined}
+          >
             <AlertTriangle size={9} /> {activeBlockers.length} blocker{activeBlockers.length !== 1 ? 's' : ''}
-          </span>
+          </button>
         )}
-        <span className="flex items-center gap-1">
+        <button
+          onClick={() => onNavigate && onNavigate('log')}
+          disabled={!onNavigate}
+          className="flex items-center gap-1 hover:text-nexus-amber transition-colors disabled:cursor-default disabled:hover:text-nexus-text-faint"
+          title={onNavigate ? 'Open Log sessions tab' : undefined}
+        >
           <BookOpen size={9} /> {stats.sessions} session{stats.sessions !== 1 ? 's' : ''}
-        </span>
+        </button>
       </div>
     </div>
   );

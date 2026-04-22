@@ -43,6 +43,55 @@ now actually holds for the free-text surfaces it originally missed.
 **Tests:** 189 → **201** (+12 drift specs).
 **MCPB:** rebuilt at v4.4.5, smoke-passes on all 26 tools.
 
+## v4.5.7 — Graph Batch + Command Tier 3
+
+11 long-queued UI-audit items across Graph + Command. No breaking changes.
+Plus one data-hygiene migration (`v4.5.7-E1`).
+
+**Graph (6 items)**
+- `#276` Edge-type enum hygiene: 5 orphan rels (`supports/enables/implements/embodies`)
+  were in historical data but not in the `GraphEdge.rel` union. New migration
+  `v4.5.7-E1` remaps them to `related` and preserves provenance in the edge note.
+- `#275` Conflicts stat-card zero-state: "All clear" (green, reassuring) →
+  "None flagged yet" (dim, honest) when decisions ≥ 10. Prevents false
+  reassurance: 162 decisions with zero `contradicts` edges usually means
+  nobody has flagged any, not that nothing conflicts.
+- `#274` Edge-type counts clickable: each row in OverviewView's Edge Types
+  panel expands inline to show a sample of 8 edges with decision endpoints
+  + note snippets. Full paginated drill-down with bulk ops remains a
+  follow-up; this closes the "dead number" UX.
+- `#297` Centrality project color-bar: 1px left-edge stripe colored by
+  project (from `PROJECT_PALETTE`) so the top-15 list scans by domain
+  without reading every line.
+- `#299` Centrality project filter: filter chips above the list, "All"
+  + one per represented project. Dynamic — only rendered when ≥ 2
+  projects are in the data. Resets page to top-15 on filter change.
+- `#288` Blast Radius pre-submit preview: when a valid decision ID is in
+  the textbox but Analyze hasn't been clicked, render "Will analyze:
+  [decision text]" in a blue-tinted preview panel below the input. Uses
+  already-loaded `graph.nodes` so no extra fetch.
+
+**Command Tier 3 (5 items)**
+- `#226` Overseer risks surfaced on Command as dismissible cards between
+  the view header and the Now/Next/Later/Done grid. Fetched from
+  `/api/overseer/risks` (cheap heuristic scan, no AI inference).
+  Per-risk dismissal persists in localStorage.
+- `#228` Memory Bridge UI affordance: header chip shows "Memory Bridge:
+  imported/total" with inline [dry run] and [import] buttons when new
+  memories exist. Fresh result ("+N imported") flashes for 5s after.
+- `#229` Done items augmented with estimated fuel cost (`~N% fuel` in
+  dim amber). Derived from `estimateMinutes(title)` × `fuel.rates.sessionPerHour`.
+  Test delta + commit SHA deferred — need cross-data plumbing beyond
+  this batch's scope.
+- `#231` Gap cards hover preview: full `reason` text + linked decision
+  ID (when present) shown in the native `title` tooltip. Zero extra
+  fetches; `cursor-help` + amber-border hover signals interactivity.
+- `#241` Activity Digest drill-downs: busiest-day, blockers count, and
+  sessions count are now clickable — each navigates to the Log view.
+  `Pulse` passes `onNavigate` through to `DigestWidget`.
+
+228 → **231 tests** (+3 from v4.5.6 regression guard, none new here). 27 MCP tools.
+
 ## v4.5.6 — Hotfix: `nexus_search` in standalone mode
 
 **User-visible symptom**: `nexus_search` in Claude Desktop returned "No results"

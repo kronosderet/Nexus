@@ -293,6 +293,33 @@ export class NexusStore {
       markApplied('v4.4.1-H3');
     }
 
+    // v4.5.7 E1 — edge-type enum hygiene. Historical edges carry rel values
+    // (supports / enables / implements / embodies) that were never part of the
+    // canonical GraphEdge.rel union. Each occurs in 1-2 edges — they were
+    // likely typed in freehand before the enum was locked. The UI and tests
+    // assume rel is one of led_to / replaced / depends_on / contradicts /
+    // related / informs / experimental. This migration remaps the strays to
+    // `related` (the catch-all), preserving the original rel in the edge note
+    // so provenance isn't lost.
+    if (!applied['v4.5.7-E1']) {
+      const ORPHAN_RELS = new Set(['supports', 'enables', 'implements', 'embodies']);
+      let remapped = 0;
+      for (const e of this.data.graph_edges || []) {
+        if (ORPHAN_RELS.has(e.rel as string)) {
+          const originalRel = e.rel;
+          e.rel = 'related';
+          const provenance = `[was rel=${originalRel}]`;
+          e.note = e.note ? `${e.note} ${provenance}` : provenance;
+          remapped++;
+        }
+      }
+      if (remapped > 0) {
+        console.error(`◈ Migration v4.5.7 E1: remapped ${remapped} orphan-rel edges → 'related' (provenance preserved in note).`);
+        changed += remapped;
+      }
+      markApplied('v4.5.7-E1');
+    }
+
     if (changed > 0) this._flush();
   }
 

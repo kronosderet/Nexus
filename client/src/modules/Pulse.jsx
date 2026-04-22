@@ -218,7 +218,7 @@ function CudaDetails({ gpu }) {
   );
 }
 
-export default function Pulse({ ws }) {
+export default function Pulse({ ws, onNavigate }) {
   const { pulse: pulseSlice } = useNexusFleet();
   const pulse = pulseSlice.data;
   const loading = pulseSlice.loading;
@@ -301,7 +301,7 @@ export default function Pulse({ ws }) {
 
       {/* Digest + Quick Actions row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <DigestWidget ws={ws} />
+        <DigestWidget ws={ws} onNavigate={onNavigate} />
         <QuickActions />
       </div>
 

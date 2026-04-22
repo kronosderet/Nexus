@@ -240,6 +240,87 @@ export default function GraphModule({ navOptions }) {
   );
 }
 
+// v4.5.7 #274 — edge-type list with inline expand. Click a row to see the first
+// 8 edges of that type with decision endpoints. State local so clicking one row
+// doesn't affect others. Decision labels derived from graph.nodes (already loaded).
+function EdgeTypesList({ edgeTypes, graph, relatedBreakdown }) {
+  const [openType, setOpenType] = useState(null);
+  const nodesById = useMemo(() => {
+    const m = new Map();
+    for (const n of graph?.nodes || []) m.set(n.id, n);
+    return m;
+  }, [graph]);
+  const maxCount = Math.max(...Object.values(edgeTypes), 1);
+  return (
+    <>
+      {Object.entries(edgeTypes).sort((a, b) => b[1] - a[1]).map(([type, count]) => {
+        const isOpen = openType === type;
+        const sampleEdges = isOpen
+          ? (graph?.edges || []).filter(e => e.rel === type).slice(0, 8)
+          : [];
+        return (
+          <div key={type}>
+            <button
+              type="button"
+              onClick={() => setOpenType(isOpen ? null : type)}
+              className="flex items-center gap-2 w-full text-left rounded px-1 py-0.5 hover:bg-nexus-bg/50 transition-colors"
+              aria-expanded={isOpen}
+              title={`Click to ${isOpen ? 'collapse' : 'see a sample of'} ${type} edges`}
+            >
+              <span className="text-[9px] text-nexus-text-faint w-3">{isOpen ? '▾' : '▸'}</span>
+              <span className="text-xs font-mono text-nexus-text-dim w-24">{type}</span>
+              <div className="flex-1 h-1.5 bg-nexus-bg rounded-full">
+                <div className="h-full bg-nexus-amber/50 rounded-full" style={{ width: `${(count / maxCount) * 100}%` }} />
+              </div>
+              <span className="text-xs font-mono text-nexus-text-faint w-8 text-right">{count}</span>
+            </button>
+            {/* v4.3.10 #271 — related-origin breakdown (preserved) */}
+            {type === 'related' && count > 0 && (
+              <div className="flex items-center gap-3 mt-0.5 ml-8 text-[9px] font-mono text-nexus-text-faint">
+                <span title="Auto-linked by keyword overlap (store.ts _autoLinkDecision)">
+                  keyword-auto <span className="text-nexus-text-dim">{relatedBreakdown.keyword}</span>
+                </span>
+                <span className="text-nexus-border">·</span>
+                <span title="Auto-linked by semantic similarity (embeddings + cosine)">
+                  semantic-auto <span className="text-nexus-text-dim">{relatedBreakdown.semantic}</span>
+                </span>
+                <span className="text-nexus-border">·</span>
+                <span title="Manually linked via nexus_link_decisions">
+                  manual <span className={relatedBreakdown.manual > 0 ? 'text-nexus-green' : 'text-nexus-text-dim'}>{relatedBreakdown.manual}</span>
+                </span>
+              </div>
+            )}
+            {/* v4.5.7 #274 — drill-down preview */}
+            {isOpen && sampleEdges.length > 0 && (
+              <div className="ml-8 mt-1 mb-2 pl-3 border-l border-nexus-border/60 space-y-1">
+                {sampleEdges.map((e) => {
+                  const fromDec = nodesById.get(e.from);
+                  const toDec = nodesById.get(e.to);
+                  return (
+                    <div key={e.id} className="text-[10px] font-mono text-nexus-text-faint leading-relaxed">
+                      <span className="text-nexus-text-dim">#{e.from}</span>
+                      <span className="text-nexus-text-faint"> {fromDec ? fromDec.label.slice(0, 36) : '(deleted)'} </span>
+                      <span className="text-nexus-amber">→</span>
+                      <span className="text-nexus-text-dim"> #{e.to}</span>
+                      <span className="text-nexus-text-faint"> {toDec ? toDec.label.slice(0, 36) : '(deleted)'}</span>
+                      {e.note && <span className="text-nexus-text-faint/70 ml-2">· {e.note.slice(0, 60)}</span>}
+                    </div>
+                  );
+                })}
+                {count > 8 && (
+                  <p className="text-[9px] font-mono text-nexus-text-faint italic">
+                    + {count - 8} more — use Visual view to explore the full set
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 function OverviewView({ graph, centrality, contradictions, holes }) {
   // Edge type breakdown
   const edgeTypes = {};
@@ -270,7 +351,23 @@ function OverviewView({ graph, centrality, contradictions, holes }) {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       <StatCard label="Decisions" value={graph?.nodes.length || 0} sub="Total indexed" />
       <StatCard label="Connections" value={graph?.edges.length || 0} sub={`Avg ${centrality?.averageConnections || '?'} per node`} />
-      <StatCard label="Conflicts" value={contradictions?.total || 0} sub={contradictions?.total > 0 ? 'Needs attention' : 'All clear'} color={contradictions?.total > 0 ? 'text-nexus-amber' : 'text-nexus-green'} />
+      {/* v4.5.7 #275 — zero-state copy was "All clear" (green), which reads as false
+          reassurance: 162 decisions with zero contradicts edges typically means
+          nobody has flagged any, not that nothing conflicts. Rephrase so the chip
+          honestly tells you the system hasn't been fed data yet. Non-zero case
+          retains the "Needs attention" signal. */}
+      <StatCard
+        label="Conflicts"
+        value={contradictions?.total || 0}
+        sub={
+          contradictions?.total > 0
+            ? 'Needs attention'
+            : (graph?.nodes?.length || 0) >= 10
+            ? 'None flagged yet'
+            : 'No graph data'
+        }
+        color={contradictions?.total > 0 ? 'text-nexus-amber' : 'text-nexus-text-dim'}
+      />
       {/* v4.3.9 #313 — Overview chip was showing totalHoles (fragmented-project count = 1) while
           the Holes tab headlines totalOrphans (= 7). Same concept, different metric. Align on
           totalOrphans (more actionable — isolated decisions you can fix) and show fragmented
@@ -286,36 +383,15 @@ function OverviewView({ graph, centrality, contradictions, holes }) {
         color={(holes?.totalOrphans || 0) > 0 ? 'text-nexus-amber' : 'text-nexus-green'}
       />
 
-      {/* Edge types */}
+      {/* Edge types — v4.5.7 #274: rows clickable to drill into the edge list
+          for that type. Expanded inline (no modal) showing first 8 edges with
+          decision endpoints and note snippets. Full paginated drill-down with
+          bulk ops lives as follow-up work; this closes the "dead number" UX
+          by giving one click between count and content. */}
       <div className="col-span-2 bg-nexus-surface border border-nexus-border rounded-xl p-4">
         <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Edge Types</span>
         <div className="mt-2 space-y-1">
-          {Object.entries(edgeTypes).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
-            <div key={type}>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-nexus-text-dim w-24">{type}</span>
-                <div className="flex-1 h-1.5 bg-nexus-bg rounded-full"><div className="h-full bg-nexus-amber/50 rounded-full" style={{ width: `${(count / (Math.max(...Object.values(edgeTypes)) || 1)) * 100}%` }} /></div>
-                <span className="text-xs font-mono text-nexus-text-faint w-8 text-right">{count}</span>
-              </div>
-              {/* v4.3.10 #271 — `related` origin breakdown so auto-link noise is separable from
-                  real manual links. Only shown for the dominant type. */}
-              {type === 'related' && count > 0 && (
-                <div className="flex items-center gap-3 pl-26 mt-0.5 ml-24 text-[9px] font-mono text-nexus-text-faint">
-                  <span title="Auto-linked by keyword overlap (store.ts _autoLinkDecision)">
-                    keyword-auto <span className="text-nexus-text-dim">{relatedBreakdown.keyword}</span>
-                  </span>
-                  <span className="text-nexus-border">·</span>
-                  <span title="Auto-linked by semantic similarity (embeddings + cosine)">
-                    semantic-auto <span className="text-nexus-text-dim">{relatedBreakdown.semantic}</span>
-                  </span>
-                  <span className="text-nexus-border">·</span>
-                  <span title="Manually linked via nexus_link_decisions">
-                    manual <span className={relatedBreakdown.manual > 0 ? 'text-nexus-green' : 'text-nexus-text-dim'}>{relatedBreakdown.manual}</span>
-                  </span>
-                </div>
-              )}
-            </div>
-          ))}
+          <EdgeTypesList edgeTypes={edgeTypes} graph={graph} relatedBreakdown={relatedBreakdown} />
         </div>
       </div>
 
@@ -369,6 +445,17 @@ function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, Deci
     queueMicrotask(() => onRun());
   };
 
+  // v4.5.7 #288 — pre-submit preview. When the user has entered/selected a valid
+  // ID but hasn't clicked Analyze yet, render the decision text below the input
+  // so they can confirm they have the right target. Uses graph.nodes (already
+  // loaded) so no extra fetch. Suppressed when a result is already showing
+  // (redundant) and when the input can't be parsed to a number.
+  const previewId = (() => {
+    const n = parseInt(blastId, 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })();
+  const previewNode = previewId != null ? (graph?.nodes || []).find(n => n.id === previewId) : null;
+
   return (
     <div>
       {/* v4.4.1 #285 — DecisionPicker replaces plain numeric input. Type-search by ID,
@@ -419,6 +506,25 @@ function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, Deci
           </div>
         )}
       </div>
+      {/* v4.5.7 #288 — pre-submit preview. Shows up as soon as a valid decision
+          ID is in the textbox, BEFORE clicking Analyze, so users can verify
+          the target before paying the query cost. */}
+      {previewNode && !result && (
+        <div className="mb-3 flex items-start gap-2 px-3 py-2 rounded-lg border border-nexus-blue/20 bg-nexus-blue/5">
+          <span className="text-[10px] font-mono text-nexus-blue uppercase tracking-wider shrink-0 mt-0.5">Will analyze</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-nexus-text">
+              <span className="font-mono text-nexus-text-faint mr-1">#{previewNode.id}</span>
+              {String(previewNode.label || '').slice(0, 180)}
+            </p>
+            {previewNode.project && (
+              <p className="text-[10px] font-mono text-nexus-text-faint mt-0.5">
+                project: {previewNode.project}{previewNode.lifecycle ? ` · ${previewNode.lifecycle}` : ''}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
       {/* v4.3.10 #284 — empty-state explainer + suggested chips so users aren't staring at
           a sterile textbox wondering which ID to try. */}
       {!result && (
@@ -479,6 +585,24 @@ function CentralityView({ data, onPickBlast, onPickVisual }) {
   // v4.4.3 #298 — pagination beyond the top-15 cap. Most users care about top hubs, but
   // scrolling through the long tail matters for orphan-hunting and validation work.
   const [page, setPage] = useState(15);
+  // v4.5.7 #299 — filter to a single project. "most central Nexus decisions" is a
+  // different question than "most central across the whole graph." Project list
+  // derived from the current data rather than hardcoded so it stays in sync.
+  const [projectFilter, setProjectFilter] = useState('all');
+  const projects = useMemo(() => {
+    const set = new Set();
+    for (const c of data?.centrality || []) {
+      if (c.project) set.add(c.project);
+    }
+    return Array.from(set).sort();
+  }, [data]);
+  const filtered = useMemo(() => {
+    if (!data?.centrality) return [];
+    return projectFilter === 'all'
+      ? data.centrality
+      : data.centrality.filter(c => (c.project || '').toLowerCase() === projectFilter.toLowerCase());
+  }, [data, projectFilter]);
+
   return (
     <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
       <div className="flex items-baseline justify-between mb-3">
@@ -491,6 +615,27 @@ function CentralityView({ data, onPickBlast, onPickVisual }) {
           what&rsquo;s this?
         </span>
       </div>
+      {/* v4.5.7 #299 — project filter chips. Only rendered when ≥2 projects are
+          represented so single-project stores don't see a dead "All" toggle. */}
+      {projects.length >= 2 && (
+        <div className="flex items-center gap-1.5 flex-wrap mb-3">
+          <span className="text-[9px] font-mono text-nexus-text-faint mr-1">Filter:</span>
+          {['all', ...projects].map(p => (
+            <button
+              key={p}
+              onClick={() => { setProjectFilter(p); setPage(15); }}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-mono border transition-colors ${
+                projectFilter === p
+                  ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/20'
+                  : 'text-nexus-text-faint border-nexus-border hover:text-nexus-text'
+              }`}
+              style={p !== 'all' ? { borderLeftWidth: 3, borderLeftColor: PROJECT_PALETTE[p] || PROJECT_PALETTE.default } : undefined}
+            >
+              {p === 'all' ? 'All' : p}
+            </button>
+          ))}
+        </div>
+      )}
       {/* v4.3.10 #293 — column header so the count column is no longer ambiguous */}
       <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-nexus-border">
         <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-8">ID</span>
@@ -499,15 +644,23 @@ function CentralityView({ data, onPickBlast, onPickVisual }) {
         <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-48">Decision</span>
       </div>
       <div className="space-y-1.5">
-        {data?.centrality?.slice(0, page).map(c => (
+        {filtered.slice(0, page).map(c => (
           // v4.4.2 #296 — entire row is a clickable button that jumps to Blast Radius
           // with this decision pre-filled and auto-analyzed. Also shows a "view in graph"
           // icon on hover for deep-linking into Visual (#329).
           <div key={c.id} className="flex items-center gap-2 group">
+            {/* v4.5.7 #297 — project color-bar on the left edge so users can
+                scan by domain without reading every line. Falls back to neutral
+                when the project isn't in the palette. Tooltip reveals the name. */}
+            <span
+              className="w-1 h-5 rounded-full shrink-0"
+              style={{ backgroundColor: c.project ? (PROJECT_PALETTE[c.project] || PROJECT_PALETTE.default) : '#334155' }}
+              title={c.project ? `Project: ${c.project}` : 'No project'}
+            />
             <button
               onClick={() => onPickBlast && onPickBlast(c.id)}
               className="flex items-center gap-2 flex-1 min-w-0 text-left hover:bg-nexus-amber/5 rounded px-1 -mx-1 py-0.5 transition-colors"
-              title="Open Blast Radius for this decision"
+              title={`Open Blast Radius for this decision${c.project ? ` · project: ${c.project}` : ''}`}
             >
               <span className="text-xs font-mono text-nexus-text-faint w-8">#{c.id}</span>
               <div className="flex-1 h-2 bg-nexus-bg rounded-full">
@@ -535,20 +688,20 @@ function CentralityView({ data, onPickBlast, onPickVisual }) {
           </div>
         ))}
         {/* v4.4.3 #298 — pagination footer */}
-        {data?.centrality?.length > page && (
+        {filtered.length > page && (
           <div className="pt-3 flex items-center justify-between">
             <button
               onClick={() => setPage(p => Math.min(data.centrality.length, p + 15))}
               className="text-[10px] font-mono text-nexus-amber hover:text-nexus-amber/80 px-3 py-1 rounded border border-nexus-amber/30 hover:bg-nexus-amber/5"
             >
-              Show {Math.min(15, data.centrality.length - page)} more
+              Show {Math.min(15, filtered.length - page)} more
             </button>
             <span className="text-[9px] font-mono text-nexus-text-faint">
-              Showing {page} of {data.centrality.length}
+              Showing {page} of {filtered.length}{projectFilter !== 'all' ? ` (filtered: ${projectFilter})` : ''}
             </span>
-            {data.centrality.length > page && (
+            {filtered.length > page && (
               <button
-                onClick={() => setPage(data.centrality.length)}
+                onClick={() => setPage(filtered.length)}
                 className="text-[9px] font-mono text-nexus-text-faint hover:text-nexus-amber"
               >
                 Show all
@@ -556,7 +709,7 @@ function CentralityView({ data, onPickBlast, onPickVisual }) {
             )}
           </div>
         )}
-        {data?.centrality?.length > 0 && page >= data.centrality.length && data.centrality.length > 15 && (
+        {filtered.length > 0 && page >= filtered.length && filtered.length > 15 && (
           <div className="pt-2 flex justify-end">
             <button
               onClick={() => setPage(15)}

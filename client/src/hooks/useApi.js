@@ -139,6 +139,12 @@ export const api = {
   // ── Critique (v3.0) ────────────────────────────────────
   getCritique: () => request('/critique'),
 
+  // ── Memory Bridge (v4.5.7 #228) ────────────────────────
+  // Lists CC memories discovered at ~/.claude/projects/**/memory/*.md.
+  // Import runs nexus_import_cc_memories server-side; supports dry_run.
+  getMemoryScan: () => request('/memory?limit=200'),
+  importMemory: (body = {}) => request('/memory/import', { method: 'POST', body }),
+
   // ── Guard (v3.0) ───────────────────────────────────────
   checkGuard: (title) => request(`/guard?title=${encodeURIComponent(title)}`),
 
