@@ -234,7 +234,7 @@ export default function GraphModule({ navOptions }) {
       {view === 'blast' && <BlastView blastId={blastId} setBlastId={setBlastId} onRun={runBlast} result={blastResult} graph={graph} centrality={centrality} DecisionPicker={DecisionPicker} onAnalyzeLatest={analyzeLatest} depth={blastDepth} setDepth={setBlastDepth} />}
       {view === 'centrality' && <CentralityView data={centrality} onPickBlast={jumpToBlast} onPickVisual={jumpToVisual} />}
       {view === 'contradictions' && <ContradictionsView data={contradictions} onRefresh={() => graphSlice.refresh()} />}
-      {view === 'holes' && <HolesView data={holes} onLinkOrphan={(id) => jumpToBlast(id)} onRefresh={() => graphSlice.refresh()} DecisionPicker={DecisionPicker} />}
+      {view === 'holes' && <HolesView data={holes} onLinkOrphan={(id) => jumpToBlast(id)} onJumpToVisual={jumpToVisual} onRefresh={() => graphSlice.refresh()} DecisionPicker={DecisionPicker} />}
       {view === 'visual' && <VisualView graph={graph} initialSelectedId={visualFocusId} onSelected={setVisualFocusId} focusProject={focusProject} onFocusConsumed={() => setFocusProject(null)} />}
     </div>
   );
@@ -1073,7 +1073,66 @@ function FlagContradictionForm({ onFlagged }) {
   );
 }
 
-function HolesView({ data, onLinkOrphan, onRefresh, DecisionPicker }) {
+// v4.5.8 #318 — tiny node-link diagram for a single cluster. Deterministic
+// circle layout so position is stable across renders. Edges colored by rel type
+// using the shared EDGE_STYLES palette. Click a node to jump to Visual-tab
+// drilldown (onNodeClick fallback: no-op).
+function ClusterMiniViz({ cluster, onNodeClick }) {
+  const size = cluster.size;
+  if (size < 2) return null; // orphans get the "Link →" shortcut, not a viz
+  const W = 180;
+  const H = 100;
+  const cx = W / 2;
+  const cy = H / 2;
+  const r = Math.min(W, H) * 0.38;
+  // Circle layout: each member on the perimeter at equal angle. Stable because
+  // memberIds is already sorted by cluster formation (stable per scan).
+  const pos = {};
+  cluster.memberIds.forEach((id, i) => {
+    const theta = (i / size) * Math.PI * 2 - Math.PI / 2;
+    pos[id] = { x: cx + Math.cos(theta) * r, y: cy + Math.sin(theta) * r };
+  });
+  const nodeR = size <= 4 ? 5 : size <= 8 ? 4 : 3;
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block shrink-0">
+      {(cluster.edges || []).map((e, i) => {
+        const a = pos[e.from];
+        const b = pos[e.to];
+        if (!a || !b) return null;
+        const style = EDGE_STYLES[e.rel] || EDGE_STYLES.related;
+        return (
+          <line
+            key={i}
+            x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+            stroke={style.stroke}
+            strokeOpacity={0.6}
+            strokeWidth={1}
+            strokeDasharray={style.dash}
+          />
+        );
+      })}
+      {cluster.memberIds.map((id) => {
+        const p = pos[id];
+        return (
+          <circle
+            key={id}
+            cx={p.x} cy={p.y} r={nodeR}
+            fill={THEME.amber}
+            fillOpacity={0.7}
+            stroke={THEME.amber}
+            strokeWidth={1}
+            style={{ cursor: onNodeClick ? 'pointer' : 'default' }}
+            onClick={() => onNodeClick && onNodeClick(id)}
+          >
+            <title>#{id} — click to open in Visual</title>
+          </circle>
+        );
+      })}
+    </svg>
+  );
+}
+
+function HolesView({ data, onLinkOrphan, onJumpToVisual, onRefresh, DecisionPicker }) {
   if (!data) return null;
   const fragmented = data.fragmented || [];
   const healthy = (data.projectAnalysis || []).filter((p) => !p.isFragmented);
@@ -1175,17 +1234,26 @@ function HolesView({ data, onLinkOrphan, onRefresh, DecisionPicker }) {
                             </button>
                           )}
                         </div>
-                        {/* Sample titles — clearly separated region */}
-                        <div className="px-3 py-2 space-y-0.5">
-                          {c.sampleTitles.map((title, j) => (
-                            <p key={j} className="text-xs text-nexus-text-dim truncate" title={title}>
-                              · {title}
-                            </p>
-                          ))}
-                          {c.size > c.sampleTitles.length && (
-                            <p className="text-[10px] font-mono text-nexus-text-faint pl-2 pt-0.5">
-                              +{c.size - c.sampleTitles.length} more decision{c.size - c.sampleTitles.length !== 1 ? 's' : ''} in this cluster
-                            </p>
+                        {/* Sample titles + mini node-link viz (v4.5.8 #318).
+                            Viz shown only for non-orphan clusters; orphans keep the Link shortcut. */}
+                        <div className="px-3 py-2 flex items-start gap-3">
+                          <div className="flex-1 min-w-0 space-y-0.5">
+                            {c.sampleTitles.map((title, j) => (
+                              <p key={j} className="text-xs text-nexus-text-dim truncate" title={title}>
+                                · {title}
+                              </p>
+                            ))}
+                            {c.size > c.sampleTitles.length && (
+                              <p className="text-[10px] font-mono text-nexus-text-faint pl-2 pt-0.5">
+                                +{c.size - c.sampleTitles.length} more decision{c.size - c.sampleTitles.length !== 1 ? 's' : ''} in this cluster
+                              </p>
+                            )}
+                          </div>
+                          {!isOrphan && (
+                            <ClusterMiniViz
+                              cluster={c}
+                              onNodeClick={onJumpToVisual}
+                            />
                           )}
                         </div>
                       </div>
@@ -1314,6 +1382,20 @@ function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocu
   // v4.4.3 #335 — color mode: 'project' (default) or 'cluster' (connected-component).
   // Cluster mode makes the "5 disconnected clusters" claim visually verifiable.
   const [colorMode, setColorMode] = useState('project');
+  // v4.5.8 #328 — fetched decision details (full text, connections, linked tasks).
+  // Thin loading state so the panel doesn't jitter during slice swaps.
+  const [details, setDetails] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  useEffect(() => {
+    if (selectedId == null) { setDetails(null); return; }
+    let cancelled = false;
+    setDetailsLoading(true);
+    api.getLedgerConnections(selectedId)
+      .then(r => { if (!cancelled) setDetails(r); })
+      .catch(() => { if (!cancelled) setDetails(null); })
+      .finally(() => { if (!cancelled) setDetailsLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedId]);
 
   // v4.3.5 I4: delegated project-toggle handler — one stable callback for N buttons.
   const onToggleProject = useCallback((e) => {
@@ -1742,47 +1824,110 @@ function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocu
           </div>
         </div>
 
-        {/* Click-to-detail sidebar */}
+        {/* Click-to-detail sidebar — v4.5.8 #328 enriched version.
+            Fetches /api/ledger/:id/connections for full decision text, tags,
+            linked tasks, and connected decisions. Edges grouped by rel type
+            so typed backbone is visible at a glance. */}
         {selectedId && (() => {
           const node = graph.nodes.find(n => n.id === selectedId);
           if (!node) return null;
-          const edges = (graph.edges || []).filter(e => e.from === selectedId || e.to === selectedId);
+          // Graph-edges fallback so the panel is responsive before the fetch lands.
+          const fallbackEdges = (graph.edges || []).filter(e => e.from === selectedId || e.to === selectedId);
+          const connected = details?.connected || null;
+          const linkedTasks = details?.linkedTasks || [];
+          const fullDecision = details?.decision?.decision || node.label;
+          const tags = details?.decision?.tags || node.tags || [];
+          const lifecycle = details?.decision?.lifecycle || node.lifecycle || 'active';
+          const project = details?.decision?.project || node.project;
+          const lastReviewed = details?.decision?.last_reviewed_at;
+          // Group connected entries by rel for the edges section.
+          const byRel = {};
+          if (connected) {
+            for (const c of connected) {
+              const rel = c.edge.rel || 'related';
+              if (!byRel[rel]) byRel[rel] = [];
+              byRel[rel].push(c);
+            }
+          }
+          const relOrder = ['led_to', 'depends_on', 'contradicts', 'informs', 'experimental', 'replaced', 'related'];
           return (
-            <div className="w-64 shrink-0 bg-nexus-bg border border-nexus-border rounded-xl p-4 max-h-[400px] overflow-y-auto">
-              <div className="flex items-center justify-between mb-3">
+            <div className="w-72 shrink-0 bg-nexus-bg border border-nexus-border rounded-xl p-4 max-h-[600px] overflow-y-auto">
+              <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-mono text-nexus-amber">#{node.id}</span>
-                <button onClick={() => setSelectedId(null)} className="text-nexus-text-faint hover:text-nexus-text text-xs">✕</button>
+                <button onClick={() => setSelectedId(null)} className="text-nexus-text-faint hover:text-nexus-text text-xs" title="Close (or click background)">✕</button>
               </div>
-              <p className="text-sm text-nexus-text mb-2">{node.label}</p>
+              <p className="text-sm text-nexus-text mb-3 leading-snug whitespace-pre-wrap">{fullDecision}</p>
+              {detailsLoading && !details && (
+                <p className="text-[10px] font-mono text-nexus-text-faint italic mb-2">Loading details…</p>
+              )}
               <div className="space-y-2 text-[10px] font-mono text-nexus-text-faint">
                 <div className="flex gap-2">
-                  <span className="text-nexus-text-faint">Project:</span>
-                  <span className="text-nexus-text" style={{ color: hashProjectColor(node.project).fill }}>{node.project}</span>
+                  <span>Project:</span>
+                  <span style={{ color: hashProjectColor(project).fill }}>{project}</span>
                 </div>
                 <div className="flex gap-2">
                   <span>Lifecycle:</span>
-                  <span className={node.lifecycle === 'validated' ? 'text-nexus-green' : node.lifecycle === 'deprecated' ? 'text-nexus-text-faint' : 'text-nexus-amber'}>{node.lifecycle || 'active'}</span>
+                  <span className={lifecycle === 'validated' ? 'text-nexus-green' : lifecycle === 'deprecated' ? 'text-nexus-text-faint' : 'text-nexus-amber'}>{lifecycle}</span>
                 </div>
+                {lastReviewed && (
+                  <div className="flex gap-2">
+                    <span>Reviewed:</span>
+                    <span className="text-nexus-text-dim">{new Date(lastReviewed).toISOString().slice(0, 10)}</span>
+                  </div>
+                )}
+                {tags.length > 0 && (
+                  <div className="flex gap-2 flex-wrap items-baseline">
+                    <span>Tags:</span>
+                    <span className="flex flex-wrap gap-1">
+                      {tags.map(t => (
+                        <span key={t} className="px-1.5 py-0 rounded-full bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/30 text-[9px]">{t}</span>
+                      ))}
+                    </span>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <span>Connections:</span>
-                  <span className="text-nexus-text">{edges.length}</span>
+                  <span className="text-nexus-text">{connected ? connected.length : fallbackEdges.length}</span>
                 </div>
-                {edges.length > 0 && (
+
+                {/* Edges grouped by rel type */}
+                {connected && connected.length > 0 && (
                   <div className="pt-2 border-t border-nexus-border/50">
-                    <p className="mb-1 text-nexus-text-faint uppercase tracking-wider">Edges</p>
-                    {edges.slice(0, 10).map(e => {
-                      const otherId = e.from === selectedId ? e.to : e.from;
-                      const other = graph.nodes.find(n => n.id === otherId);
-                      const style = EDGE_STYLES[e.rel] || EDGE_STYLES.related;
+                    <p className="mb-1.5 text-nexus-text-faint uppercase tracking-wider">Edges</p>
+                    {relOrder.filter(r => byRel[r]?.length).map(rel => {
+                      const style = EDGE_STYLES[rel] || EDGE_STYLES.related;
                       return (
-                        <button key={e.id} onClick={() => setSelectedId(otherId)}
-                          className="block w-full text-left py-1 hover:text-nexus-amber transition-colors">
-                          <span style={{ color: style.stroke }}>{style.label}</span>
-                          <span className="text-nexus-text-dim"> → #{otherId} {other?.label?.slice(0, 30) || '?'}</span>
-                        </button>
+                        <div key={rel} className="mb-2 last:mb-0">
+                          <p className="text-[9px] uppercase tracking-wider mb-0.5" style={{ color: style.stroke }}>
+                            {style.label} <span className="text-nexus-text-faint normal-case">({byRel[rel].length})</span>
+                          </p>
+                          {byRel[rel].map(c => {
+                            const otherId = c.decision.id;
+                            return (
+                              <button key={c.edge.id} onClick={() => setSelectedId(otherId)}
+                                className="block w-full text-left py-0.5 hover:text-nexus-amber transition-colors text-[10px]">
+                                <span className="text-nexus-text-dim">→ #{otherId} {String(c.decision.decision || '').slice(0, 32)}{c.decision.decision?.length > 32 ? '…' : ''}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       );
                     })}
-                    {edges.length > 10 && <p className="text-nexus-text-faint">+{edges.length - 10} more</p>}
+                  </div>
+                )}
+
+                {/* Linked tasks — v4.5.8 #328. Shows tasks whose decision_ids includes this id. */}
+                {linkedTasks.length > 0 && (
+                  <div className="pt-2 border-t border-nexus-border/50">
+                    <p className="mb-1.5 text-nexus-text-faint uppercase tracking-wider">Linked tasks</p>
+                    {linkedTasks.map(t => (
+                      <div key={t.id} className="py-0.5 text-[10px]">
+                        <span className={`mr-1.5 ${t.status === 'done' ? 'text-nexus-green' : t.status === 'in_progress' ? 'text-nexus-amber' : 'text-nexus-text-faint'}`}>
+                          [{t.status}]
+                        </span>
+                        <span className="text-nexus-text-dim">#{t.id} {String(t.title).slice(0, 40)}{t.title.length > 40 ? '…' : ''}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

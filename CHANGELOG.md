@@ -9,6 +9,64 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.5.8 — Graph Polish II + Data Hygiene
+
+Two Graph drilldowns (Tier 2 batch) plus two user-reported hygiene fixes and a
+live-store cleanup. No new tests (but 231/231 still green); no new tools (still 27).
+
+**Graph (2 items — closes Tier 2 drilldowns for Visual + Holes)**
+- `#318` Holes: inline mini node-link viz per cluster. `/api/impact/holes` now
+  emits `edges: [{from, to, rel}]` per cluster (intra-cluster only). A new
+  `ClusterMiniViz` component renders a 180×100 SVG with deterministic circle
+  layout and rel-typed edge colors. Non-orphan clusters only; orphans keep the
+  existing "Link →" shortcut. Clicking a node jumps to Visual tab with that
+  decision focused.
+- `#328` Visual tab: click-to-detail side panel grew from thin metadata pill to
+  a real drilldown. `/api/ledger/:id/connections` now includes `linkedTasks:
+  [{id, title, status, priority}]`. Panel fetches on selectedId change with
+  race-guarded `useEffect` and renders: full decision text (not truncated),
+  project + lifecycle + `last_reviewed_at`, tag pills, edges **grouped by rel
+  type** (led_to/depends_on/contradicts/informs/experimental/replaced/related
+  with per-group counts), and linked tasks. Width 256 → 288px, max-height
+  400 → 600px.
+
+**User-reported fixes (2)**
+- Client route rename `/api/memory` → `/api/cc-memory` in
+  `client/src/hooks/useApi.js`. Dashboard Command tab was throwing
+  `Unexpected token '<', "<!DOCTYPE "... is not valid JSON` because the two
+  Memory Bridge call sites disagreed with the canonical server mount path
+  (confirmed against `server/dashboard.ts`, `localApi.ts`, MCP `nexusFetch`,
+  CHANGELOG, and the `cc-memory` tag convention). Express fell through to
+  the SPA catch-all. Same shape-drift family as the v4.5.6 `nexus_search`
+  hotfix.
+- `/api/pulse/projects` regression fix. Post-cleanup activity entry had
+  `text:` instead of the canonical `message:` key; `pulse.ts:59` does
+  `.message.toLowerCase()` over every row so the one malformed entry 500'd
+  the endpoint. Entry repaired in place with correct shape plus `[Nexus]`
+  prefix so the project-card substring match counts it. Lesson captured in
+  CC memory (`feedback_nexus_store_shape.md`): sample existing keys or call
+  `store.addActivity()` from a script that imports NexusStore — don't hand-
+  construct entries.
+
+**Data cleanup (live store, not a code migration)**
+- Phantom project buckets eliminated. `claude` → `family-coop` (9 ledger + 2
+  sessions — all Alpha/Beta agent-protocol content). `general` ledger split
+  by content: 5 Shadowrun (SR3 Digital Table), 6 Firewall-Godot, 5 Noosphere,
+  1 Nexus, 1 deleted (`#81` was literal `--help` junk). `general` sessions
+  (18) → all Nexus. `general` thoughts (1) → deleted (stale auto-resolve
+  test stub). Stamped `_appliedMigrations['data-phantom-projects-2026-04-22']`;
+  backup at `~/.nexus/nexus.json.bak-phantom-projects-20260422-111625`.
+  Script preserved at `scripts/migrate-phantom-projects.mjs` for audit trail.
+
+**v4.6 queued**: Task `#398` — Continuous Handover. Replaces dated
+`HANDOVER-YYYY-MM-DD.md` files with a live per-project handover card stored in
+Nexus (two new MCP tools: 28 + 29) + a slow-moving `docs/ARCHITECTURE.md` for
+architecture/gotchas/rituals. Removes the duplication between markdown
+handovers and Nexus state that's already auto-injected via SessionStart.
+
+**Tests:** 231/231 green. **Tools:** 27. **Bundle:** 445KB (gzip 122KB,
++3KB for both Graph features).
+
 ## v4.4.5 — Doc-Drift Hardening
 
 Return-trip for v4.3.7's single-source-of-truth promise. The v4.3.7 drift test

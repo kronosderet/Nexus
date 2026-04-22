@@ -353,18 +353,27 @@ export function createImpactRoutes(store: NexusStore) {
       }
 
       const components = Object.values(componentMap)
-        .map((memberIds) => ({
-          size: memberIds.length,
-          memberIds,
-          // Sample decision titles for the largest few members so the UI
-          // can show what the cluster is "about"
-          sampleTitles: memberIds
-            .slice(0, 3)
-            .map((id) => {
-              const d = decisions.find((x: Decision) => x.id === id);
-              return d ? d.decision.slice(0, 60) : `#${id}`;
-            }),
-        }))
+        .map((memberIds) => {
+          const idSet = new Set(memberIds);
+          // v4.5.8 #318 — intra-cluster edges for mini node-link viz.
+          // Thin shape: just what the SVG needs ({from, to, rel}).
+          const clusterEdges = intraEdges
+            .filter((e) => idSet.has(e.from) && idSet.has(e.to))
+            .map((e) => ({ from: e.from, to: e.to, rel: e.rel }));
+          return {
+            size: memberIds.length,
+            memberIds,
+            // Sample decision titles for the largest few members so the UI
+            // can show what the cluster is "about"
+            sampleTitles: memberIds
+              .slice(0, 3)
+              .map((id) => {
+                const d = decisions.find((x: Decision) => x.id === id);
+                return d ? d.decision.slice(0, 60) : `#${id}`;
+              }),
+            edges: clusterEdges,
+          };
+        })
         .sort((a, b) => b.size - a.size);
 
       // Orphans are components of size 1 (isolated decisions)

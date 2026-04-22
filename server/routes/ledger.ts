@@ -203,7 +203,14 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
       return { edge: e, decision: other };
     }).filter((c): c is { edge: GraphEdge; decision: Decision } => Boolean(c.decision));
 
-    res.json({ decision, connected });
+    // v4.5.8 #328 — linked tasks for the Visual-tab side panel.
+    // Tasks reference decisions via `decision_ids`; we surface id/title/status
+    // only, letting the UI render a clickable list.
+    const linkedTasks = store.getAllTasks()
+      .filter(t => Array.isArray(t.decision_ids) && t.decision_ids.includes(id))
+      .map(t => ({ id: t.id, title: t.title, status: t.status, priority: t.priority }));
+
+    res.json({ decision, connected, linkedTasks });
   });
 
   // Traverse the graph from a starting decision

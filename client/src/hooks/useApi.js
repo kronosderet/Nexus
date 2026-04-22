@@ -92,6 +92,8 @@ export const api = {
   autoLinkGraphPreview: () => request('/ledger/auto-link?dry_run=true', { method: 'POST' }),
   // v4.4.1 #285 — decision list for DecisionPicker autocomplete across Blast Radius + Conflicts flag form.
   getLedger: ({ limit = 500 } = {}) => request(`/ledger?limit=${limit}`),
+  // v4.5.8 #328 — full decision + connections + linked tasks for the Graph Visual side panel drilldown.
+  getLedgerConnections: (id) => request(`/ledger/${id}/connections`),
   // v4.4.1 #306 — manual edge creation (contradiction flag + future general use).
   linkDecisions: ({ from, to, rel = 'related', note = '' }) =>
     request('/ledger/link', { method: 'POST', body: JSON.stringify({ from, to, rel, note }) }),
@@ -142,8 +144,8 @@ export const api = {
   // ── Memory Bridge (v4.5.7 #228) ────────────────────────
   // Lists CC memories discovered at ~/.claude/projects/**/memory/*.md.
   // Import runs nexus_import_cc_memories server-side; supports dry_run.
-  getMemoryScan: () => request('/memory?limit=200'),
-  importMemory: (body = {}) => request('/memory/import', { method: 'POST', body }),
+  getMemoryScan: () => request('/cc-memory?limit=200'),
+  importMemory: (body = {}) => request('/cc-memory/import', { method: 'POST', body }),
 
   // ── Guard (v3.0) ───────────────────────────────────────
   checkGuard: (title) => request(`/guard?title=${encodeURIComponent(title)}`),
