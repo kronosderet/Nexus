@@ -9,6 +9,129 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.5.10 — Tier 3 Sweep
+
+Eighteen Tier-3 items in a single pass across Graph (11), Overseer (3), Log (3),
+and Pulse (1). Zero new MCP tools (still 27), zero new migrations, zero new
+tests — all surface polish on existing endpoints plus a couple of thin new
+routes. **231/231 tests green · bundle 468KB (gzip 129KB).**
+
+**Graph — Overview (2)**
+- `#279` Orphan count stat card is now clickable when orphans > 0, jumping
+  straight to the Holes tab. Zero-state card stays decorative.
+- `#280` Auto-link similarity threshold setting. New `AUTOLINK_THRESHOLD_*`
+  controls backed by localStorage with a range slider in Overview. Advisory
+  for now — server hookup queued as a follow-up; the surface matters today.
+
+**Graph — Blast Radius (2)**
+- `#289` Recent-analyses quick-pick chips, cached in localStorage (last 6).
+  Populated automatically when an analysis completes; a "× clear" removes
+  the cache.
+- `#290` "Highly connected (from Centrality)" strip in the Blast empty state.
+  Five one-click chips with top centrality IDs so users jumping from
+  Centrality don't have to re-pick.
+
+**Graph — Centrality (2)**
+- `#300` Per-entry edge-type breakdown. `/api/impact/centrality` now returns
+  `byType: { typed, keyword, semantic, manual }` per entry. UI renders four
+  colored dots (amber / cyan / purple / gray) sized by count. Surfaces the
+  signal-vs-noise ratio at a glance.
+- `#302` Per-entry week-over-week delta. Response adds `priorTotal` (edges
+  as-of 7 days ago) + `weeklyDelta`. UI shows ±N chip in green/red/muted.
+
+**Graph — Holes (3)**
+- `#320` Fragmentation score metric. Response adds `fragmentationScore`
+  per project (0 = fully connected, 1 = every decision orphaned). Formula:
+  `(components − 1) / (decisions − 1)`. Rendered inline on each fragmented
+  card with severity color.
+- `#321` "Auto-link all orphans" batch action. New `orphans_only=true` param
+  on `POST /ledger/auto-link` restricts to decisions with zero edges. Two-
+  phase UI: Preview (dry run, shows proposed edges + sample notes) then
+  Commit. Activity stream logs the write.
+- `#322` Cross-project link drill-down. New `GET /api/impact/cross-links/:a/:b`
+  returns hydrated edge list with both endpoints. Pills in the "Cross-
+  project links" section now expand to show the actual edges (rel type +
+  decision titles) instead of just a count.
+
+**Graph — Visual (1)**
+- `#333` Filter-vs-highlight clarity. Project chips caption rewritten —
+  previously ambiguous ("click to filter") now explicit: chips
+  **hide/show** projects; search input **highlights**. Users kept asking
+  which was which.
+
+**Graph — MCP (1)**
+- `#278` `nexus_link_decisions` suggests a more specific type when caller
+  picks the generic `related`. The ledger is ~76% `related` edges today;
+  the tool's response now nudges toward `led_to / depends_on / informs /
+  supersedes / experimental` with brief semantics. No change to the write
+  path.
+
+**Overseer (3)**
+- `#347` Per-bullet "→ task" conversion. In the RECOMMENDATIONS /
+  ACTIONS / NEXT STEPS / PRIORITIES sections (regex-matched by title),
+  every bullet gets a hover-revealed button that creates a Nexus task with
+  the bullet text as title. Immediate feedback: ✓ task / err / busy.
+- `#348` Inline commit-all affordance. When the analysis mentions
+  "uncommit" or "commit", an `InlineCommitRow` appears under the analysis
+  listing every fleet project with uncommitted changes as one-click commit
+  buttons (reuses `/api/github/commit` via `api.commitProject`). Prompts
+  for a message, shows inline success/failure.
+- `#350` Export conversation as markdown. Button next to the "N questions
+  asked" counter triggers a download of the full `chatHistory` as a
+  `.md` file with Q/A sections. Uses `Blob` + `URL.createObjectURL`.
+
+**Log (3)**
+- `#361` Export activity as CSV / JSON / MD. Three small buttons in the
+  time-range row; exports `filteredActivityAll` so current filters apply.
+  CSV escaping handles quotes, commas, newlines.
+- `#362` 24-hour heat strip. Tiny bar chart (24 hourly buckets) at the top
+  of the activity view. Opacity scales with count; per-bucket tooltip.
+  Quick density read without scrolling.
+- `#364` Live-tail indicator. Green pulse when activity arrived in the
+  last minute, amber for 1–10 min quiet, gray beyond. Re-ticks every 5s
+  so the indicator ages visibly between WS messages.
+
+**Pulse — CUDA Engine (1)**
+- `#349` Overseer-VRAM badge. GpuPanel polls `/api/pulse/gpu` every 10s,
+  matches known AI process names (`lm studio|ollama|koboldcpp|
+  text-generation|llama`) against the `processes` list, and shows a
+  "◈ lmstudio · 4.2 GB" chip in the CUDA Engine header. Tooltips spell
+  out the Overseer-VRAM relationship.
+
+**Deferred from the 25-item Tier 3 triage**
+
+Seven items needed dedicated focus (M/L complexity, algorithm work, or
+multi-step UX) and were explicitly deferred from v4.5.10:
+- `#239` Memory/VRAM as Overseer risks (couples to risk pipeline)
+- `#240` "Today" fusion view (big UX)
+- `#301` Alternative ranking metrics — betweenness/eigenvector (algo)
+- `#310` Semantic-opposition auto-suggest via embeddings (model plumbing)
+- `#311` Conflicts structured resolution workflow (multi-step UI)
+- `#332` Graph alternative layouts — hierarchical/circular/force-directed (algo)
+- `#363` Log burst-grouping collapse (needs design)
+
+These become v4.5.11 / v4.6 polish candidates.
+
+**Backend changes**
+
+- `server/routes/impact.ts` — centrality `byType/weeklyDelta/priorTotal`;
+  holes `fragmentationScore`; new `/cross-links/:a/:b` endpoint.
+- `server/routes/ledger.ts` — `auto-link` accepts `orphans_only=true`.
+- `server/mcp/index.ts` — `nexus_link_decisions` appends edge-type
+  suggestion when caller picks `related`.
+
+**Client changes**
+
+- `client/src/hooks/useApi.js` — `autoLinkOrphansPreview/Commit`, `getCrossLinks`.
+- `client/src/modules/Graph.jsx` — threshold setting, orphan card link,
+  Blast recent + highly-connected strips, Centrality byType + WoW columns,
+  Holes fragmentation + auto-link batch + cross-link drill, Visual caption
+  clarity.
+- `client/src/modules/Overseer.jsx` — AnalysisBlock convert-to-task,
+  InlineCommitRow, Export MD.
+- `client/src/modules/Log.jsx` — live indicator, heat strip, export row.
+- `client/src/modules/Pulse.jsx` — Overseer-VRAM badge in CUDA Engine header.
+
 ## v4.5.9 — Fleet Polish + Cascade Hygiene
 
 Five Tier-2/3 items closing the Fleet-focused backlog plus two hygiene fixes

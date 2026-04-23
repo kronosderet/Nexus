@@ -214,6 +214,56 @@ function AutoFixPanel() {
   );
 }
 
+// v4.5.10 #348 — inline commit-all row. Reads fleet project list; for any
+// project with uncommittedChanges > 0, shows a one-click commit button.
+function InlineCommitRow() {
+  const { fleet: fleetSlice } = useNexusFleet();
+  const projects = fleetSlice?.data?.projects || [];
+  const dirty = projects.filter(p => (p.git?.uncommittedChanges || 0) > 0);
+  const [busy, setBusy] = useState(null);
+  const [results, setResults] = useState({});
+  if (dirty.length === 0) return null;
+  const commit = async (name) => {
+    setBusy(name);
+    try {
+      const msg = window.prompt(`Commit message for ${name}:`, 'Nexus auto-commit');
+      if (!msg) { setBusy(null); return; }
+      const r = await api.commitProject(name, msg);
+      setResults(prev => ({ ...prev, [name]: r }));
+    } catch (e) {
+      setResults(prev => ({ ...prev, [name]: { success: false, error: e.message } }));
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <div className="mt-4 pt-3 border-t border-nexus-border/50">
+      <p className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider mb-2">
+        Quick commit — projects with uncommitted changes
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {dirty.map(p => {
+          const r = results[p.name];
+          return (
+            <div key={p.name} className="flex items-center gap-1.5">
+              <button
+                onClick={() => commit(p.name)}
+                disabled={busy === p.name}
+                className="text-[10px] font-mono px-2 py-1 rounded border border-nexus-amber/30 text-nexus-amber hover:bg-nexus-amber/10 disabled:opacity-50"
+                title={`git add -A && git commit in ${p.name}`}
+              >
+                {busy === p.name ? '…' : `Commit ${p.name} (${p.git.uncommittedChanges})`}
+              </button>
+              {r?.success && <span className="text-[9px] font-mono text-nexus-green">✓ {r.files} files</span>}
+              {r && !r.success && <span className="text-[9px] font-mono text-nexus-red" title={r.error}>err</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function AnalysisBlock({ text }) {
   if (!text) return null;
 
@@ -243,26 +293,68 @@ function AnalysisBlock({ text }) {
     return <p className="text-sm text-nexus-text-dim leading-relaxed whitespace-pre-wrap">{text}</p>;
   }
 
+  // v4.5.10 #347 — Convert-to-task shortcut per bullet. Creates a Nexus-project
+  // task with the bullet text as title. Users can re-assign project later from
+  // Command view. Feedback shown inline next to the button.
+  const [converted, setConverted] = useState({}); // { bulletKey: 'done' | 'busy' | 'err' }
+  const convertBullet = async (key, text) => {
+    if (converted[key]) return;
+    setConverted(prev => ({ ...prev, [key]: 'busy' }));
+    try {
+      const cleaned = String(text).replace(/^\s*[-*•]\s/, '').trim().slice(0, 200);
+      if (!cleaned) throw new Error('empty text');
+      await api.createTask({ title: cleaned, description: 'Converted from Overseer recommendation', project: 'Nexus' });
+      setConverted(prev => ({ ...prev, [key]: 'done' }));
+    } catch (e) {
+      setConverted(prev => ({ ...prev, [key]: 'err' }));
+    }
+  };
+
   return (
     <div className="space-y-4">
-      {sections.map((s, i) => (
-        <div key={i}>
-          {s.title && (
-            <h3 className="text-xs font-mono text-nexus-amber uppercase tracking-wider mb-1.5">{s.title}</h3>
-          )}
-          <div className="text-sm text-nexus-text-dim leading-relaxed space-y-1">
-            {s.lines.map((l, j) => {
-              const isBullet = l.match(/^\s*[-*•]\s/);
-              return (
-                <p key={j} className={isBullet ? 'pl-3' : ''}>
-                  {isBullet && <span className="text-nexus-amber mr-1">›</span>}
-                  {l.replace(/^\s*[-*•]\s/, '')}
-                </p>
-              );
-            })}
+      {sections.map((s, i) => {
+        // Only show convert buttons for RECOMMENDATIONS / ACTIONS / NEXT STEPS sections.
+        const isActionSection = /recommend|action|next step|priorit/i.test(s.title || '');
+        return (
+          <div key={i}>
+            {s.title && (
+              <h3 className="text-xs font-mono text-nexus-amber uppercase tracking-wider mb-1.5">{s.title}</h3>
+            )}
+            <div className="text-sm text-nexus-text-dim leading-relaxed space-y-1">
+              {s.lines.map((l, j) => {
+                const isBullet = l.match(/^\s*[-*•]\s/);
+                const bulletKey = `${i}-${j}`;
+                const showConvert = isBullet && isActionSection;
+                const state = converted[bulletKey];
+                return (
+                  <p key={j} className={`group flex items-start gap-2 ${isBullet ? 'pl-3' : ''}`}>
+                    <span className="flex-1">
+                      {isBullet && <span className="text-nexus-amber mr-1">›</span>}
+                      {l.replace(/^\s*[-*•]\s/, '')}
+                    </span>
+                    {showConvert && (
+                      <button
+                        onClick={() => convertBullet(bulletKey, l)}
+                        disabled={state === 'busy' || state === 'done'}
+                        className={`text-[9px] font-mono px-1.5 py-0.5 rounded border transition-colors shrink-0 ${
+                          state === 'done'
+                            ? 'border-nexus-green/30 text-nexus-green bg-nexus-green/5'
+                            : state === 'err'
+                            ? 'border-nexus-red/30 text-nexus-red'
+                            : 'border-nexus-border text-nexus-text-faint hover:text-nexus-amber hover:border-nexus-amber/40 opacity-0 group-hover:opacity-100'
+                        }`}
+                        title="Create a Nexus-project task from this bullet"
+                      >
+                        {state === 'done' ? '✓ task' : state === 'busy' ? '…' : state === 'err' ? 'err' : '→ task'}
+                      </button>
+                    )}
+                  </p>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -515,7 +607,14 @@ export default function Overseer() {
             )}
 
             {analysis && !loading && (
-              <AnalysisBlock text={analysis} />
+              <>
+                <AnalysisBlock text={analysis} />
+                {/* v4.5.10 #348 — commit-all inline affordance. When analysis mentions
+                    committing and the fleet has uncommitted projects, show them as
+                    one-click commit buttons below the analysis. Triggers project-
+                    scoped git-add-all + commit via /api/github/commit. */}
+                {/uncommitt|\bcommit\b/i.test(analysis) && <InlineCommitRow />}
+              </>
             )}
 
             {context && !loading && (
@@ -536,9 +635,36 @@ export default function Overseer() {
               <Send size={14} className="text-nexus-amber" />
               <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Ask the Overseer</span>
               {chatHistory.length > 0 && (
-                <span className="text-[9px] font-mono text-nexus-text-faint ml-auto">
+                <span className="text-[9px] font-mono text-nexus-text-faint ml-auto flex items-center gap-2">
                   {qaFilterActive ? `${visibleChatHistory.filter(m => m.role === 'user').length} of ` : ''}
                   {Math.floor(chatHistory.filter(m => m.role === 'user').length)} questions asked
+                  {/* v4.5.10 #350 — export conversation history as markdown. Uses
+                      the full chatHistory (not filtered) so the export is complete. */}
+                  <button
+                    onClick={() => {
+                      const md = [
+                        `# Overseer conversation — ${new Date().toISOString().slice(0, 10)}`,
+                        '',
+                        ...chatHistory.flatMap(m => [
+                          m.role === 'user' ? `## Q (${new Date(m.time).toLocaleString()})` : `### Overseer`,
+                          '',
+                          m.text,
+                          '',
+                        ]),
+                      ].join('\n');
+                      const blob = new Blob([md], { type: 'text/markdown' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `overseer-${new Date().toISOString().slice(0, 10)}.md`;
+                      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-nexus-border text-nexus-text-faint hover:text-nexus-amber hover:border-nexus-amber/30"
+                    title="Download the full conversation as markdown"
+                  >
+                    Export MD
+                  </button>
                 </span>
               )}
             </div>

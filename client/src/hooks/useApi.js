@@ -90,6 +90,11 @@ export const api = {
   autoLinkGraph: () => request('/ledger/auto-link', { method: 'POST' }),
   // v4.3.10 #272 — dry-run variant returns { linked, samples } without writing.
   autoLinkGraphPreview: () => request('/ledger/auto-link?dry_run=true', { method: 'POST' }),
+  // v4.5.10 #321 — orphan-only variants for the Holes "Auto-link all orphans" batch.
+  autoLinkOrphansPreview: () => request('/ledger/auto-link?dry_run=true&orphans_only=true', { method: 'POST' }),
+  autoLinkOrphansCommit: () => request('/ledger/auto-link?orphans_only=true', { method: 'POST' }),
+  // v4.5.10 #322 — cross-project link drill-down (hydrated edge list for a project pair).
+  getCrossLinks: (a, b) => request(`/impact/cross-links/${encodeURIComponent(a)}/${encodeURIComponent(b)}`),
   // v4.4.1 #285 — decision list for DecisionPicker autocomplete across Blast Radius + Conflicts flag form.
   getLedger: ({ limit = 500 } = {}) => request(`/ledger?limit=${limit}`),
   // v4.5.8 #328 — full decision + connections + linked tasks for the Graph Visual side panel drilldown.

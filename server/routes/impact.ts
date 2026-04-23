@@ -39,6 +39,11 @@ interface CentralityEntry {
   inbound: number;
   outbound: number;
   total: number;
+  // v4.5.10 #302 — week-over-week delta (this week − prior week)
+  priorTotal?: number;
+  weeklyDelta?: number;
+  // v4.5.10 #300 — edge-type breakdown
+  byType?: { typed: number; keyword: number; semantic: number; manual: number };
 }
 
 // Minimal shapes for the LM Studio /models and /messages responses used by /forecast.
@@ -206,10 +211,33 @@ export function createImpactRoutes(store: NexusStore) {
     const decisions = store.getAllDecisions();
     const edges = store.getAllEdges();
 
+    // v4.5.10 #302 — per-entry week-over-week delta.
+    // Edges carry `created_at`. Split: "current" = edges as-of now, "prior" =
+    // edges that existed as-of 7 days ago. Delta = current.total - prior.total.
+    const now = Date.now();
+    const WEEK = 7 * 86400000;
+    const weekAgo = now - WEEK;
+    const edgesAsOfWeekAgo = edges.filter((e: GraphEdge) => new Date(e.created_at).getTime() < weekAgo);
+
+    // v4.5.10 #300 — per-entry edge-type breakdown (auto-linked vs semantic vs manual vs typed).
+    // Typed: any rel other than 'related'. For rel='related' split by note provenance.
+    const classifyEdge = (e: GraphEdge) => {
+      if (e.rel !== 'related') return 'typed';
+      const note = String(e.note || '');
+      if (note.startsWith('auto-linked')) return 'keyword';
+      if (note.startsWith('semantic-linked')) return 'semantic';
+      return 'manual';
+    };
+
     const centrality: CentralityEntry[] = decisions.map((d: Decision) => {
-      const inbound = edges.filter((e: GraphEdge) => e.to === d.id).length;
-      const outbound = edges.filter((e: GraphEdge) => e.from === d.id).length;
+      const incidentNow = edges.filter((e: GraphEdge) => e.from === d.id || e.to === d.id);
+      const incidentPrior = edgesAsOfWeekAgo.filter((e: GraphEdge) => e.from === d.id || e.to === d.id);
+      const inbound = incidentNow.filter((e: GraphEdge) => e.to === d.id).length;
+      const outbound = incidentNow.filter((e: GraphEdge) => e.from === d.id).length;
       const total = inbound + outbound;
+      // v4.5.10 #300 — edge-type breakdown
+      const byType = { typed: 0, keyword: 0, semantic: 0, manual: 0 };
+      for (const e of incidentNow) byType[classifyEdge(e) as keyof typeof byType]++;
       return {
         id: d.id,
         decision: d.decision,
@@ -217,6 +245,11 @@ export function createImpactRoutes(store: NexusStore) {
         inbound,
         outbound,
         total,
+        // v4.5.10 #302 — week-over-week delta
+        priorTotal: incidentPrior.length,
+        weeklyDelta: total - incidentPrior.length,
+        // v4.5.10 #300 — per-row edge-type breakdown
+        byType,
       };
     });
 
@@ -380,6 +413,16 @@ export function createImpactRoutes(store: NexusStore) {
       const orphans = components.filter((c) => c.size === 1).length;
       const isFragmented = components.length > 1;
 
+      // v4.5.10 #320 — fragmentation score per project. Measures how "split"
+      // the decision graph is on a 0–1 scale.
+      //   0.0 → single connected component (no fragmentation)
+      //   1.0 → every decision is its own orphan (maximum fragmentation)
+      // Formula: (components − 1) / (decisions − 1) clamped to [0,1].
+      // Single-decision projects get 0 (trivially connected).
+      const fragmentationScore = ids.length <= 1
+        ? 0
+        : Math.min(1, Math.max(0, (components.length - 1) / (ids.length - 1)));
+
       return {
         project,
         decisions: ids.length,
@@ -388,6 +431,7 @@ export function createImpactRoutes(store: NexusStore) {
         orphans,
         isFragmented,
         clusters: components,
+        fragmentationScore: Math.round(fragmentationScore * 100) / 100,
       };
     });
 
@@ -435,6 +479,31 @@ export function createImpactRoutes(store: NexusStore) {
       })),
       totalHoles: fragmented.length,
     });
+  });
+
+  // v4.5.10 #322 — drill-down for a cross-project link pair. Returns the
+  // hydrated edge list (edge + both endpoint decisions) so the UI can show
+  // "Nexus ↔ Firewall-Godot 77" with actual titles, not just a count.
+  router.get('/cross-links/:a/:b', (req: Request, res: Response) => {
+    const a = String(req.params.a);
+    const b = String(req.params.b);
+    const decisions = store.getAllDecisions();
+    const edges = store.getAllEdges();
+    const byId = new Map(decisions.map((d: Decision) => [d.id, d]));
+    const aIds = new Set(decisions.filter((d: Decision) => d.project === a).map(d => d.id));
+    const bIds = new Set(decisions.filter((d: Decision) => d.project === b).map(d => d.id));
+    const pairs = edges
+      .filter((e: GraphEdge) =>
+        (aIds.has(e.from) && bIds.has(e.to)) ||
+        (bIds.has(e.from) && aIds.has(e.to))
+      )
+      .map((e: GraphEdge) => ({
+        edge: e,
+        from: byId.get(e.from),
+        to: byId.get(e.to),
+      }))
+      .filter(p => p.from && p.to);
+    res.json({ a, b, count: pairs.length, pairs });
   });
 
   return router;

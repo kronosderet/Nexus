@@ -161,6 +161,44 @@ export default function Log({ onNavigate }) {
   const getActivityId = useCallback((e) => e.id, []);
   const isNewActivity = useWsFlash(entries, getActivityId);
 
+  // v4.5.10 #364 — live-tail indicator. Tracks the id of the newest entry; when
+  // a new one arrives, bumps `lastArrivalMs`. Indicator dot pulses green when
+  // recent (<60s), dims amber when stale (60s-10min), gray after that.
+  const [lastArrivalMs, setLastArrivalMs] = useState(Date.now());
+  const lastIdRef = useRef(null);
+  useEffect(() => {
+    const newestId = entries[0]?.id ?? null;
+    if (newestId != null && newestId !== lastIdRef.current) {
+      lastIdRef.current = newestId;
+      setLastArrivalMs(Date.now());
+    }
+  }, [entries]);
+  // Re-render the indicator every 5s so the "age" drifts visibly.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick(n => n + 1), 5000);
+    return () => clearInterval(t);
+  }, []);
+  const liveAgeMs = Date.now() - lastArrivalMs;
+  const liveState = liveAgeMs < 60000 ? 'live' : liveAgeMs < 600000 ? 'quiet' : 'stale';
+  const liveColor = liveState === 'live' ? 'bg-nexus-green' : liveState === 'quiet' ? 'bg-nexus-amber' : 'bg-nexus-text-faint';
+  const livePulse = liveState === 'live' ? 'animate-pulse' : '';
+
+  // v4.5.10 #362 — 24h heat strip. Buckets entries by hour-of-last-24h and
+  // renders a tiny bar chart. Quick density read at a glance.
+  const heatStrip = useMemo(() => {
+    const buckets = new Array(24).fill(0);
+    const now = Date.now();
+    for (const e of entries) {
+      const ageMs = now - new Date(e.created_at).getTime();
+      if (ageMs < 0 || ageMs >= 24 * 3600000) continue;
+      const hourBack = Math.floor(ageMs / 3600000);
+      buckets[23 - hourBack]++;
+    }
+    return { buckets, max: Math.max(1, ...buckets), total: buckets.reduce((s, n) => s + n, 0) };
+  }, [entries]);
+
+
   // Filtered activity
   const typesPresent = useMemo(() => ['all', ...new Set(entries.map(e => e.type)).values()].sort(), [entries]);
   // v4.4.4 #357 — resolve time-range preset to a cutoff ms. `all` skips the check.
@@ -193,6 +231,37 @@ export default function Log({ onNavigate }) {
   // v4.4.1 #356 — paginate the filtered stream. filteredActivity is what renders; the
   // "Load N more" button grows pageSize until all filtered entries are visible.
   const filteredActivity = useMemo(() => filteredActivityAll.slice(0, pageSize), [filteredActivityAll, pageSize]);
+
+  // v4.5.10 #361 — export filtered activity as CSV / JSON / MD. Uses the
+  // non-paginated filteredActivityAll so export respects current filters.
+  const exportActivity = useCallback((format) => {
+    const rows = filteredActivityAll;
+    let content = '';
+    let mime = 'text/plain';
+    let ext = 'txt';
+    if (format === 'csv') {
+      const esc = (v) => {
+        const s = String(v ?? '');
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      content = 'id,created_at,type,message\n' + rows.map(r => [r.id, r.created_at, r.type, esc(r.message)].join(',')).join('\n');
+      mime = 'text/csv'; ext = 'csv';
+    } else if (format === 'json') {
+      content = JSON.stringify(rows.map(r => ({ id: r.id, created_at: r.created_at, type: r.type, message: r.message })), null, 2);
+      mime = 'application/json'; ext = 'json';
+    } else if (format === 'md') {
+      content = `# Nexus activity export — ${new Date().toISOString().slice(0, 10)}\n\n` +
+        rows.map(r => `- **${r.type}** · ${new Date(r.created_at).toLocaleString()} — ${r.message}`).join('\n');
+      mime = 'text/markdown'; ext = 'md';
+    }
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nexus-activity-${new Date().toISOString().slice(0, 10)}.${ext}`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [filteredActivityAll]);
 
   // Filtered sessions
   const projects = useMemo(() => [...new Set(sessions.map(s => s.project))], [sessions]);
@@ -230,6 +299,16 @@ export default function Log({ onNavigate }) {
           <h2 className="text-lg font-semibold text-nexus-text flex items-center gap-2">
             <ScrollText size={18} className="text-nexus-amber" />
             Log
+            {/* v4.5.10 #364 — live-tail indicator: green pulse when recent activity,
+                amber when quiet, gray after 10min of silence. */}
+            {tab === 'activity' && (
+              <span className="flex items-center gap-1.5 ml-2" title={liveState === 'live' ? 'Live — activity in the last minute' : liveState === 'quiet' ? 'Quiet — last activity within 10 min' : 'Stale — no activity for 10+ minutes'}>
+                <span className={`w-1.5 h-1.5 rounded-full ${liveColor} ${livePulse}`} />
+                <span className="text-[9px] font-mono uppercase tracking-wider text-nexus-text-faint">
+                  {liveState === 'live' ? 'live' : liveState === 'quiet' ? 'quiet' : 'stale'}
+                </span>
+              </span>
+            )}
           </h2>
           <p className="text-xs font-mono text-nexus-text-faint mt-1">
             {tab === 'timeline' ? `${entries.length + sessions.length} events` : tab === 'activity' ? `${filteredActivity.length} of ${filteredActivityAll.length} entries (${entries.length} total)` : `${filteredSessions.length} of ${sessions.length} sessions`}
@@ -287,6 +366,43 @@ export default function Log({ onNavigate }) {
                 {r.label}
               </Chip>
             ))}
+            {/* v4.5.10 #361 — export buttons. Only on activity tab (sessions export
+                is a future follow-up). Exports filteredActivityAll (respects filters). */}
+            {tab === 'activity' && filteredActivityAll.length > 0 && (
+              <span className="ml-auto flex items-center gap-1">
+                <span className="text-[9px] font-mono text-nexus-text-faint">Export:</span>
+                {['csv', 'json', 'md'].map(f => (
+                  <button
+                    key={f}
+                    onClick={() => exportActivity(f)}
+                    className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-nexus-border text-nexus-text-faint hover:text-nexus-amber hover:border-nexus-amber/30"
+                    title={`Download ${filteredActivityAll.length} entries as .${f}`}
+                  >
+                    {f.toUpperCase()}
+                  </button>
+                ))}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* v4.5.10 #362 — 24h activity heat strip. 24 hourly buckets; height scales
+            to max bucket. Tooltip shows count. Only on activity tab; hidden when
+            empty. */}
+        {tab === 'activity' && heatStrip.total > 0 && (
+          <div className="pt-1 pb-1 flex items-end gap-px h-6" title={`${heatStrip.total} events in the last 24h · hover a bar for per-hour count`}>
+            {heatStrip.buckets.map((n, i) => {
+              const pct = (n / heatStrip.max) * 100;
+              const hoursBack = 23 - i;
+              return (
+                <div
+                  key={i}
+                  className="flex-1 min-w-[3px] bg-nexus-amber/40 hover:bg-nexus-amber transition-colors"
+                  style={{ height: `${Math.max(2, pct)}%`, opacity: n === 0 ? 0.15 : 0.85 }}
+                  title={`${hoursBack}h ago: ${n} event${n !== 1 ? 's' : ''}`}
+                />
+              );
+            })}
           </div>
         )}
 

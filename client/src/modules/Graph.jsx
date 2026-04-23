@@ -230,7 +230,7 @@ export default function GraphModule({ navOptions }) {
       )}
 
       {/* Views */}
-      {view === 'overview' && <OverviewView graph={graph} centrality={centrality} contradictions={contradictions} holes={holes} />}
+      {view === 'overview' && <OverviewView graph={graph} centrality={centrality} contradictions={contradictions} holes={holes} onSwitchView={setView} />}
       {view === 'blast' && <BlastView blastId={blastId} setBlastId={setBlastId} onRun={runBlast} result={blastResult} graph={graph} centrality={centrality} DecisionPicker={DecisionPicker} onAnalyzeLatest={analyzeLatest} depth={blastDepth} setDepth={setBlastDepth} />}
       {view === 'centrality' && <CentralityView data={centrality} onPickBlast={jumpToBlast} onPickVisual={jumpToVisual} />}
       {view === 'contradictions' && <ContradictionsView data={contradictions} onRefresh={() => graphSlice.refresh()} />}
@@ -321,7 +321,31 @@ function EdgeTypesList({ edgeTypes, graph, relatedBreakdown }) {
   );
 }
 
-function OverviewView({ graph, centrality, contradictions, holes }) {
+// v4.5.10 #280 — auto-link similarity threshold setting. Stored in localStorage
+// so the preference survives reloads. Currently advisory — the server's
+// threshold is still hardcoded; this is a UI control that the future
+// /api/ledger/auto-link will read. For v4.5.10, the value is displayed on the
+// auto-link preview so users know what's in play and can plan for a future
+// server-side hookup. Exposing as a setting now beats shipping no surface.
+const AUTOLINK_THRESHOLD_KEY = 'nexus:autolink:similarity';
+const AUTOLINK_THRESHOLD_DEFAULT = 0.7;
+function getAutolinkThreshold() {
+  const raw = typeof window !== 'undefined' ? window.localStorage.getItem(AUTOLINK_THRESHOLD_KEY) : null;
+  const n = raw == null ? AUTOLINK_THRESHOLD_DEFAULT : parseFloat(raw);
+  return Number.isFinite(n) && n > 0 && n <= 1 ? n : AUTOLINK_THRESHOLD_DEFAULT;
+}
+function setAutolinkThreshold(v) {
+  if (typeof window !== 'undefined') window.localStorage.setItem(AUTOLINK_THRESHOLD_KEY, String(v));
+}
+
+function OverviewView({ graph, centrality, contradictions, holes, onSwitchView }) {
+  // v4.5.10 #279 — orphan count card links to Holes tab. Card is clickable
+  // (matches Conflicts card pattern) so users can jump straight to the
+  // "actionable list" from the stat. When zero, card stays decorative.
+  const orphansClickable = (holes?.totalOrphans || 0) > 0 && !!onSwitchView;
+  // v4.5.10 #280 — threshold state + handler
+  const [threshold, setThreshold] = useState(getAutolinkThreshold());
+  const saveThreshold = (v) => { setAutolinkThreshold(v); setThreshold(v); };
   // Edge type breakdown
   const edgeTypes = {};
   for (const e of graph?.edges || []) edgeTypes[e.rel] = (edgeTypes[e.rel] || 0) + 1;
@@ -368,20 +392,24 @@ function OverviewView({ graph, centrality, contradictions, holes }) {
         }
         color={contradictions?.total > 0 ? 'text-nexus-amber' : 'text-nexus-text-dim'}
       />
-      {/* v4.3.9 #313 — Overview chip was showing totalHoles (fragmented-project count = 1) while
-          the Holes tab headlines totalOrphans (= 7). Same concept, different metric. Align on
-          totalOrphans (more actionable — isolated decisions you can fix) and show fragmented
-          projects in the sub-label so both numbers are visible. */}
-      <StatCard
-        label="Holes"
-        value={holes?.totalOrphans || 0}
-        sub={
-          (holes?.totalOrphans || 0) > 0
-            ? `orphan decision${holes?.totalOrphans !== 1 ? 's' : ''}${holes?.totalFragmented > 0 ? ` · ${holes?.totalFragmented} fragmented` : ''}`
-            : 'Well connected'
-        }
-        color={(holes?.totalOrphans || 0) > 0 ? 'text-nexus-amber' : 'text-nexus-green'}
-      />
+      {/* v4.3.9 #313 / v4.5.10 #279 — orphan count card is now clickable, linking
+          to the Holes tab when there's something to act on. */}
+      <div
+        onClick={orphansClickable ? () => onSwitchView('holes') : undefined}
+        className={orphansClickable ? 'cursor-pointer hover:scale-[1.01] transition-transform' : ''}
+        title={orphansClickable ? 'Open Holes tab' : undefined}
+      >
+        <StatCard
+          label="Holes"
+          value={holes?.totalOrphans || 0}
+          sub={
+            (holes?.totalOrphans || 0) > 0
+              ? `orphan decision${holes?.totalOrphans !== 1 ? 's' : ''}${holes?.totalFragmented > 0 ? ` · ${holes?.totalFragmented} fragmented` : ''}${orphansClickable ? ' →' : ''}`
+              : 'Well connected'
+          }
+          color={(holes?.totalOrphans || 0) > 0 ? 'text-nexus-amber' : 'text-nexus-green'}
+        />
+      </div>
 
       {/* Edge types — v4.5.7 #274: rows clickable to drill into the edge list
           for that type. Expanded inline (no modal) showing first 8 edges with
@@ -406,6 +434,33 @@ function OverviewView({ graph, centrality, contradictions, holes }) {
               <span className="text-xs font-mono text-nexus-text-faint w-8 text-right">{count}</span>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* v4.5.10 #280 — auto-link similarity threshold setting. UI-side for now;
+          localStorage persists the value. Future server hookup will read this. */}
+      <div className="col-span-4 bg-nexus-surface border border-nexus-border rounded-xl p-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Auto-link similarity threshold</span>
+            <p className="text-[10px] font-mono text-nexus-text-faint mt-1">
+              Minimum semantic similarity for auto-linking two decisions. Higher = fewer but more confident links.
+              <span className="text-nexus-text-dim"> Currently advisory — auto-link previews will display this value; server hookup is queued.</span>
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min="0.4"
+              max="0.95"
+              step="0.05"
+              value={threshold}
+              onChange={(e) => saveThreshold(parseFloat(e.target.value))}
+              className="w-32"
+              title={`threshold = ${threshold}`}
+            />
+            <span className="text-xs font-mono text-nexus-amber tabular-nums w-10 text-right">{threshold.toFixed(2)}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -438,6 +493,31 @@ function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, Deci
     }
     return picks;
   })();
+
+  // v4.5.10 #289 — recent analyses quick-pick chips, cached in localStorage.
+  // Writes when the user successfully runs an analysis (tracked by result change).
+  const RECENT_KEY = 'nexus:blast:recent';
+  const [recentPicks, setRecentPicks] = useState(() => {
+    try { return JSON.parse(window.localStorage.getItem(RECENT_KEY) || '[]'); } catch { return []; }
+  });
+  useEffect(() => {
+    if (!result?.decision?.id) return;
+    setRecentPicks(prev => {
+      const entry = {
+        id: result.decision.id,
+        label: String(result.decision.decision || '').slice(0, 40),
+        ts: Date.now(),
+      };
+      const next = [entry, ...prev.filter(e => e.id !== entry.id)].slice(0, 6);
+      try { window.localStorage.setItem(RECENT_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, [result?.decision?.id]);
+
+  // v4.5.10 #290 — "highly connected" strip from Centrality. Shows the top-5
+  // architectural hubs as one-click chips. Different affordance from the
+  // suggestions above (which includes "most recent" — a temporal signal).
+  const highlyConnected = (centrality?.centrality || []).slice(0, 5);
 
   const runFor = (id) => {
     setBlastId(String(id));
@@ -525,8 +605,35 @@ function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, Deci
           </div>
         </div>
       )}
+      {/* v4.5.10 #289 — recent-analyses strip (above all else when populated).
+          localStorage-backed. Ephemeral state so don't mix with suggested/highlyConnected. */}
+      {recentPicks.length > 0 && (
+        <div className="mb-2 flex items-center gap-2 flex-wrap">
+          <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider">Recent:</span>
+          {recentPicks.map(s => (
+            <button
+              key={s.id}
+              onClick={() => runFor(s.id)}
+              className="px-2 py-0.5 rounded-full border border-nexus-blue/30 hover:bg-nexus-blue/10 text-[10px] font-mono text-nexus-blue transition-colors"
+              title={`${s.label} (last analyzed ${new Date(s.ts).toLocaleDateString()})`}
+            >
+              #{s.id}
+            </button>
+          ))}
+          <button
+            onClick={() => { try { window.localStorage.removeItem(RECENT_KEY); } catch {} setRecentPicks([]); }}
+            className="text-[9px] font-mono text-nexus-text-faint hover:text-nexus-text"
+            title="Clear recent analyses"
+          >
+            ✕ clear
+          </button>
+        </div>
+      )}
+
       {/* v4.3.10 #284 — empty-state explainer + suggested chips so users aren't staring at
-          a sterile textbox wondering which ID to try. */}
+          a sterile textbox wondering which ID to try.
+          v4.5.10 #290 — added "highly connected" strip from Centrality for cross-tab
+          intelligence; users who come to Blast via Centrality don't have to re-pick. */}
       {!result && (
         <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5 mb-2">
           <p className="text-xs text-nexus-text-dim mb-3">
@@ -550,6 +657,27 @@ function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, Deci
                     <span className="text-nexus-amber">#{s.id}</span>
                     <span className="text-nexus-text-dim"> · {s.reason} · </span>
                     <span className="truncate">{s.label}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {highlyConnected.length > 0 && (
+            <>
+              <span className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider block mt-3 mb-1.5">
+                Highly connected (from Centrality)
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {highlyConnected.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => runFor(c.id)}
+                    className="px-2.5 py-1 rounded-full border border-nexus-amber/30 hover:bg-nexus-amber/10 text-[10px] font-mono text-nexus-text-dim hover:text-nexus-amber transition-colors text-left max-w-xs"
+                    title={String(c.decision || '').slice(0, 180)}
+                  >
+                    <span className="text-nexus-amber">#{c.id}</span>
+                    <span className="text-nexus-text-faint"> · {c.total} edges · </span>
+                    <span className="truncate">{String(c.decision || '').slice(0, 36)}</span>
                   </button>
                 ))}
               </div>
@@ -636,11 +764,14 @@ function CentralityView({ data, onPickBlast, onPickVisual }) {
           ))}
         </div>
       )}
-      {/* v4.3.10 #293 — column header so the count column is no longer ambiguous */}
+      {/* v4.3.10 #293 + v4.5.10 #300/#302 — column header updated for new cells */}
       <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-nexus-border">
+        <span className="w-1 shrink-0" />{/* color bar spacer */}
         <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-8">ID</span>
         <span className="flex-1 text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider">Centrality</span>
         <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-6 text-right">Edges</span>
+        <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-10 text-right" title="Change vs 7 days ago">WoW</span>
+        <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-12" title="Edge types: typed (amber) · keyword-auto (cyan) · semantic-auto (purple) · manual (gray)">Types</span>
         <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-48">Decision</span>
       </div>
       <div className="space-y-1.5">
@@ -670,6 +801,44 @@ function CentralityView({ data, onPickBlast, onPickVisual }) {
                 className="text-xs font-mono text-nexus-text-dim w-6 text-right"
                 title={`${c.total} edge${c.total !== 1 ? 's' : ''} in the knowledge graph`}
               >{c.total}</span>
+              {/* v4.5.10 #302 — WoW delta chip. Shows +/− vs 7d ago. Muted when 0. */}
+              {c.weeklyDelta != null && (
+                <span
+                  className={`text-[9px] font-mono tabular-nums w-10 text-right ${
+                    c.weeklyDelta > 0 ? 'text-nexus-green' : c.weeklyDelta < 0 ? 'text-nexus-red' : 'text-nexus-text-faint'
+                  }`}
+                  title={`Week-over-week change: ${c.priorTotal} edges 7d ago → ${c.total} now`}
+                >
+                  {c.weeklyDelta > 0 ? `+${c.weeklyDelta}` : c.weeklyDelta === 0 ? '·' : c.weeklyDelta}
+                </span>
+              )}
+              {/* v4.5.10 #300 — edge-type breakdown dots (typed / keyword / semantic / manual).
+                  Each dot sized by count. Tooltip gives the exact numbers. */}
+              {c.byType && (
+                <span
+                  className="flex items-center gap-0.5 w-12 shrink-0"
+                  title={`Edge types: typed=${c.byType.typed} · keyword-auto=${c.byType.keyword} · semantic-auto=${c.byType.semantic} · manual=${c.byType.manual}`}
+                >
+                  {['typed', 'keyword', 'semantic', 'manual'].map((k, idx) => {
+                    const n = c.byType[k] || 0;
+                    const size = n === 0 ? 3 : n < 3 ? 5 : n < 8 ? 7 : 9;
+                    const colors = { typed: '#f5b043', keyword: '#4ec3e0', semantic: '#a78bfa', manual: '#94a3b8' };
+                    return (
+                      <span
+                        key={k}
+                        className="rounded-full shrink-0"
+                        style={{
+                          width: size,
+                          height: size,
+                          backgroundColor: n === 0 ? 'transparent' : colors[k],
+                          border: n === 0 ? `1px dashed ${colors[k]}40` : 'none',
+                          opacity: n === 0 ? 0.3 : 0.8,
+                        }}
+                      />
+                    );
+                  })}
+                </span>
+              )}
               <span
                 className="text-xs text-nexus-text-dim truncate w-48 cursor-pointer"
                 title={`${c.decision}\n\nClick: open Blast Radius`}
@@ -1133,6 +1302,44 @@ function ClusterMiniViz({ cluster, onNodeClick }) {
 }
 
 function HolesView({ data, onLinkOrphan, onJumpToVisual, onRefresh, DecisionPicker }) {
+  // v4.5.10 #321 — "Auto-link all orphans" batch action. Uses the existing
+  // /api/ledger/auto-link endpoint with orphans_only=true. Two-phase: preview
+  // first (dry run), then commit.
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchPreview, setBatchPreview] = useState(null);
+  const [batchResult, setBatchResult] = useState(null);
+  const runBatchPreview = async () => {
+    setBatchBusy(true); setBatchResult(null);
+    try { setBatchPreview(await api.autoLinkOrphansPreview()); }
+    catch (e) { setBatchResult({ error: e.message }); }
+    finally { setBatchBusy(false); }
+  };
+  const runBatchCommit = async () => {
+    setBatchBusy(true);
+    try {
+      const r = await api.autoLinkOrphansCommit();
+      setBatchResult({ linked: r.linked });
+      setBatchPreview(null);
+      if (onRefresh) onRefresh();
+    } catch (e) {
+      setBatchResult({ error: e.message });
+    } finally { setBatchBusy(false); }
+  };
+
+  // v4.5.10 #322 — cross-project drill-down state. Click a pill → fetch hydrated
+  // edge list via /api/impact/cross-links/:a/:b and show inline.
+  const [drillKey, setDrillKey] = useState(null); // "A::B"
+  const [drillData, setDrillData] = useState(null);
+  const [drillBusy, setDrillBusy] = useState(false);
+  const openDrill = async (a, b) => {
+    const key = `${a}::${b}`;
+    if (drillKey === key) { setDrillKey(null); setDrillData(null); return; }
+    setDrillKey(key); setDrillData(null); setDrillBusy(true);
+    try { setDrillData(await api.getCrossLinks(a, b)); }
+    catch (e) { setDrillData({ error: e.message }); }
+    finally { setDrillBusy(false); }
+  };
+
   if (!data) return null;
   const fragmented = data.fragmented || [];
   const healthy = (data.projectAnalysis || []).filter((p) => !p.isFragmented);
@@ -1185,9 +1392,26 @@ function HolesView({ data, onLinkOrphan, onJumpToVisual, onRefresh, DecisionPick
                       {p.decisions} decisions · {p.edges} internal edges
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono text-nexus-amber">
-                    {p.components} clusters · {p.orphans} orphan{p.orphans !== 1 ? 's' : ''}
-                  </span>
+                  <div className="flex items-baseline gap-3">
+                    {/* v4.5.10 #320 — fragmentation score as tracked metric.
+                        0 = fully connected, 1 = every decision is an orphan.
+                        Color scales with severity. */}
+                    {p.fragmentationScore != null && (
+                      <span
+                        className={`text-[10px] font-mono tabular-nums ${
+                          p.fragmentationScore >= 0.6 ? 'text-nexus-red' :
+                          p.fragmentationScore >= 0.3 ? 'text-nexus-amber' :
+                          'text-nexus-text-faint'
+                        }`}
+                        title="Fragmentation score: 0 = fully connected, 1 = every decision is its own orphan. Formula: (components − 1) / (decisions − 1)."
+                      >
+                        frag: {p.fragmentationScore.toFixed(2)}
+                      </span>
+                    )}
+                    <span className="text-[10px] font-mono text-nexus-amber">
+                      {p.components} clusters · {p.orphans} orphan{p.orphans !== 1 ? 's' : ''}
+                    </span>
+                  </div>
                 </div>
 
                 {/* v4.4.1 #315 — rearchitected cluster rendering. Each cluster is a clearly
@@ -1308,19 +1532,121 @@ function HolesView({ data, onLinkOrphan, onJumpToVisual, onRefresh, DecisionPick
         </div>
       )}
 
-      {/* Cross-project links (supplementary, not flagged as holes) */}
+      {/* v4.5.10 #321 — Auto-link all orphans batch action. Preview first, then commit.
+          Uses the existing /api/ledger/auto-link with orphans_only=true. */}
+      {data.totalOrphans > 0 && (
+        <div className="bg-nexus-surface border border-nexus-border rounded-xl p-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-[10px] font-mono text-nexus-amber uppercase tracking-[0.2em] mb-1">
+                Auto-link all orphans
+              </h3>
+              <p className="text-[10px] font-mono text-nexus-text-faint">
+                Tries to link {data.totalOrphans} orphan{data.totalOrphans !== 1 ? 's' : ''} via temporal chain · keyword overlap · shared tag.
+                Restricted to decisions with zero edges — won't touch connected decisions.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {!batchPreview && (
+                <button
+                  onClick={runBatchPreview}
+                  disabled={batchBusy}
+                  className="text-[10px] font-mono px-3 py-1 rounded border border-nexus-amber/30 text-nexus-amber hover:bg-nexus-amber/10 disabled:opacity-50"
+                >
+                  {batchBusy ? 'Loading…' : 'Preview'}
+                </button>
+              )}
+              {batchPreview && (
+                <>
+                  <span className="text-[10px] font-mono text-nexus-text-faint">
+                    would link {batchPreview.linked} edge{batchPreview.linked !== 1 ? 's' : ''}
+                  </span>
+                  <button
+                    onClick={runBatchCommit}
+                    disabled={batchBusy || batchPreview.linked === 0}
+                    className="text-[10px] font-mono px-3 py-1 rounded bg-nexus-amber/10 border border-nexus-amber/30 text-nexus-amber hover:bg-nexus-amber/20 disabled:opacity-50"
+                  >
+                    {batchBusy ? 'Linking…' : `Commit ${batchPreview.linked}`}
+                  </button>
+                  <button
+                    onClick={() => setBatchPreview(null)}
+                    className="text-[10px] font-mono text-nexus-text-faint hover:text-nexus-text"
+                  >
+                    Cancel
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+          {batchPreview && batchPreview.samples?.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-nexus-border/50 space-y-0.5 max-h-32 overflow-y-auto">
+              {batchPreview.samples.slice(0, 6).map((s, i) => (
+                <p key={i} className="text-[10px] font-mono text-nexus-text-dim">
+                  #{s.from} --[<span className="text-nexus-amber">{s.rel}</span>]--&gt; #{s.to}
+                  <span className="text-nexus-text-faint"> · {String(s.note).slice(0, 60)}</span>
+                </p>
+              ))}
+              {batchPreview.samples.length > 6 && (
+                <p className="text-[10px] font-mono text-nexus-text-faint">+ {batchPreview.samples.length - 6} more samples not shown…</p>
+              )}
+            </div>
+          )}
+          {batchResult?.linked != null && (
+            <p className="text-[10px] font-mono text-nexus-green mt-2">✓ Linked {batchResult.linked} new edge{batchResult.linked !== 1 ? 's' : ''}.</p>
+          )}
+          {batchResult?.error && (
+            <p className="text-[10px] font-mono text-nexus-red mt-2">Error: {batchResult.error}</p>
+          )}
+        </div>
+      )}
+
+      {/* Cross-project links — v4.5.10 #322: pills now clickable to drill into the
+          hydrated edge list. */}
       {crossLinks.length > 0 && (
         <div>
           <h3 className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-[0.2em] mb-2">
             Cross-project links ({crossLinks.length})
           </h3>
           <div className="bg-nexus-surface border border-nexus-border rounded-xl p-3 space-y-1">
-            {crossLinks.map(([pair, count]) => (
-              <div key={pair} className="flex items-center justify-between text-xs font-mono">
-                <span className="text-nexus-text-dim">{pair}</span>
-                <span className="text-nexus-text-faint">{count}</span>
-              </div>
-            ))}
+            {crossLinks.map(([pair, count]) => {
+              // Parse "A ↔ B" back into the two project names.
+              const [a, b] = pair.split(' \u2194 ');
+              const key = `${a}::${b}`;
+              const isOpen = drillKey === key;
+              return (
+                <div key={pair}>
+                  <button
+                    onClick={() => openDrill(a, b)}
+                    className="w-full flex items-center justify-between text-xs font-mono hover:text-nexus-amber transition-colors py-0.5"
+                    title="Click to see edge list"
+                  >
+                    <span className="text-nexus-text-dim">
+                      {isOpen ? '▾' : '▸'} {pair}
+                    </span>
+                    <span className="text-nexus-text-faint">{count}</span>
+                  </button>
+                  {isOpen && (
+                    <div className="ml-4 mt-1 mb-2 pl-2 border-l border-nexus-amber/30 space-y-0.5 max-h-48 overflow-y-auto">
+                      {drillBusy && <p className="text-[10px] font-mono text-nexus-text-faint italic">Loading…</p>}
+                      {drillData?.error && <p className="text-[10px] font-mono text-nexus-red">{drillData.error}</p>}
+                      {drillData?.pairs && drillData.pairs.slice(0, 20).map((pp, i) => (
+                        <p key={i} className="text-[10px] font-mono text-nexus-text-dim">
+                          <span className="text-nexus-amber">#{pp.from.id}</span>
+                          <span className="text-nexus-text-faint"> --[{pp.edge.rel}]--&gt; </span>
+                          <span className="text-nexus-amber">#{pp.to.id}</span>
+                          <span className="text-nexus-text-faint">
+                            {' '}{String(pp.from.decision || '').slice(0, 22)}… ↔ {String(pp.to.decision || '').slice(0, 22)}…
+                          </span>
+                        </p>
+                      ))}
+                      {drillData?.pairs?.length > 20 && (
+                        <p className="text-[10px] font-mono text-nexus-text-faint">+ {drillData.pairs.length - 20} more edges</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -1597,13 +1923,15 @@ function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocu
       </div>
 
       {/* Project toggle chips — double as color legend (each chip's color = its node color).
-          v4.3.10 #326 adds the caption so the chips' legend role is explicit. */}
+          v4.3.10 #326 adds the caption so the chips' legend role is explicit.
+          v4.5.10 #333 — caption clarified: these chips FILTER (hide) projects; they don't
+          HIGHLIGHT. Previously ambiguous — new users assumed click = highlight. */}
       {(() => {
         const projectSet = [...new Set(graph.nodes.map(n => n.project))].sort();
         return (
           <div className="mb-3">
             <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider block mb-1.5">
-              Projects (click to filter · colors match node circles)
+              Projects (click to <span className="text-nexus-amber">hide/show</span> · colors match node circles · use search to highlight)
             </span>
             <div className="flex flex-wrap gap-1.5">
               {projectSet.map(p => {

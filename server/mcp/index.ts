@@ -1286,9 +1286,17 @@ async function handleTool(name: string, args: any): Promise<string> {
         method: 'POST',
         body: JSON.stringify(body),
       });
-      return `◈ Linked #${body.from} --[${body.rel}]--> #${body.to}${
+      let response = `◈ Linked #${body.from} --[${body.rel}]--> #${body.to}${
         result.id ? ` (edge #${result.id})` : ''
       }`;
+      // v4.5.10 #278 — when caller picks the generic 'related' edge, suggest a
+      // more specific type. 'related' is the default; the ledger is already
+      // ~76% 'related' edges, so nudging toward typed rels (led_to / depends_on
+      // / informs / experimental / supersedes) is a cheap quality win.
+      if (body.rel === 'related') {
+        response += '\n  💡 Consider a more specific type: `led_to` (A caused B), `depends_on` (B requires A), `informs` (A provides context for B), `supersedes` (B replaces A), `experimental` (tentative, revisit).';
+      }
+      return response;
     }
 
     // ── v2 intelligence tools ─────────────────────────

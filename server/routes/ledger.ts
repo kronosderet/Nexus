@@ -82,8 +82,17 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
   // up to 10 sample proposed edges without writing. Lets the UI preview scope before committing.
   router.post('/auto-link', async (req: Request, res: Response) => {
     const dryRun = req.query.dry_run === 'true' || req.body?.dry_run === true;
-    const decisions = store.getLedger({ limit: 60 });
-    if (decisions.length < 2) return res.json({ linked: 0, dryRun, samples: [] });
+    // v4.5.10 #321 — orphans_only flag restricts auto-link to decisions that
+    // currently have zero edges. Lets the Holes tab fire "try to link every
+    // orphan" without re-running full auto-link across the whole graph.
+    const orphansOnly = req.query.orphans_only === 'true' || req.body?.orphans_only === true;
+    let decisions = store.getLedger({ limit: 60 });
+    if (orphansOnly) {
+      const incidentIds = new Set<number>();
+      for (const e of store.getAllEdges()) { incidentIds.add(e.from); incidentIds.add(e.to); }
+      decisions = decisions.filter((d: Decision) => !incidentIds.has(d.id));
+    }
+    if (decisions.length < 2) return res.json({ linked: 0, dryRun, samples: [], orphansOnly });
 
     // Group by project for intra-project linking
     const byProject: Record<string, Decision[]> = {};

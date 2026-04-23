@@ -68,6 +68,28 @@ function barColor(pct, invert = false) {
 }
 
 function GpuPanel({ gpu }) {
+  // v4.5.10 #349 — detect Overseer AI processes (LM Studio / Ollama) via
+  // /api/pulse/gpu (which returns active CUDA processes). Shows an "Overseer
+  // engaged" badge when a known AI process holds VRAM, so the user can see
+  // the Overseer-VRAM relationship directly on the CUDA Engine panel.
+  const [aiProcess, setAiProcess] = useState(null);
+  useEffect(() => {
+    if (!gpu?.available) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const r = await fetch('/api/pulse/gpu').then(x => x.json());
+        if (cancelled) return;
+        const procs = r.processes || [];
+        const ai = procs.find(p => /lm\s*studio|lmstudio|ollama|koboldcpp|text-generation|llama/i.test(p.name || ''));
+        setAiProcess(ai || null);
+      } catch {}
+    };
+    tick();
+    const t = setInterval(tick, 10000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [gpu?.available]);
+
   if (!gpu || !gpu.available) {
     return (
       <div className="bg-nexus-surface border border-nexus-border rounded-xl p-4">
@@ -89,6 +111,17 @@ function GpuPanel({ gpu }) {
         <div className="flex items-center gap-2">
           <Flame size={16} className="text-nexus-green" />
           <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">CUDA Engine</span>
+          {/* v4.5.10 #349 — Overseer-VRAM badge. Shows which AI process is
+              holding VRAM (LM Studio / Ollama / etc) so the user can connect
+              "Overseer is slow" or "VRAM spike" to a specific process. */}
+          {aiProcess && (
+            <span
+              className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-nexus-amber/10 text-nexus-amber border border-nexus-amber/30"
+              title={`${aiProcess.name} is holding ${Math.round(aiProcess.vram / 1024 * 10) / 10} GB VRAM — the Overseer runs on this process.`}
+            >
+              ◈ {aiProcess.name.replace(/\.exe$/i, '')} · {Math.round(aiProcess.vram / 1024 * 10) / 10} GB
+            </span>
+          )}
         </div>
         <span className="text-[10px] font-mono text-nexus-text-faint px-2 py-0.5 rounded bg-nexus-bg border border-nexus-border">
           {gpu.pstate} | Driver {gpu.driver}
