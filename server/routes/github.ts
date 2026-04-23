@@ -81,6 +81,25 @@ export function createGitHubRoutes(store: NexusStore, broadcast: BroadcastFn) {
     res.json(results);
   });
 
+  // v4.5.9 #253 — diff for a project (inline Fleet card action).
+  // Returns { diff, files, stat } where diff is stdout of `git diff --stat + --patch`
+  // capped at 64KB for the UI. Only touches the working tree (unstaged + staged).
+  router.get('/diff/:project', (req: Request, res: Response) => {
+    const project = safeProject(req.params.project);
+    if (!project) return res.status(400).json({ error: 'Invalid project name.' });
+    const cwd = join(PROJECTS_DIR, project);
+    try {
+      const stat = execFileSync('git', ['diff', 'HEAD', '--stat'], { cwd, encoding: 'utf-8' }).trim();
+      const diff = execFileSync('git', ['diff', 'HEAD'], { cwd, encoding: 'utf-8', maxBuffer: 1024 * 1024 });
+      const capped = diff.length > 64 * 1024 ? diff.slice(0, 64 * 1024) + '\n... [truncated]' : diff;
+      const files = stat.split('\n').filter(l => l.includes('|')).length;
+      res.json({ project, files, stat, diff: capped, truncated: diff.length > 64 * 1024 });
+    } catch (err) {
+      console.error(`[github] diff failed for ${project}:`, (err as Error).message);
+      res.status(500).json({ error: 'Diff failed — see server logs.' });
+    }
+  });
+
   // Commit all changes in a project
   router.post('/commit', (req: Request, res: Response) => {
     const { project: rawProject, message: rawMessage = 'Nexus auto-commit' } = req.body ?? {};

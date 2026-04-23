@@ -141,6 +141,14 @@ export const api = {
   // ── Critique (v3.0) ────────────────────────────────────
   getCritique: () => request('/critique'),
 
+  // ── Git / GitHub (v4.5.9 #253) ─────────────────────────
+  // Fleet card inline actions: diff view + commit all. Reuses existing
+  // /api/github routes. Diff returns { files, stat, diff, truncated }; commit
+  // returns { success, files, project } or { success: false, error }.
+  getGitDiff: (project) => request(`/github/diff/${encodeURIComponent(project)}`),
+  commitProject: (project, message) =>
+    request('/github/commit', { method: 'POST', body: { project, message } }),
+
   // ── Memory Bridge (v4.5.7 #228) ────────────────────────
   // Lists CC memories discovered at ~/.claude/projects/**/memory/*.md.
   // Import runs nexus_import_cc_memories server-side; supports dry_run.

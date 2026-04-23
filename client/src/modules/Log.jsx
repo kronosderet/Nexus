@@ -39,6 +39,15 @@ const TYPE_CONFIG = {
   memory_import: { icon: BookMarked, color: 'text-nexus-amber', label: 'Imported', module: 'graph' },
 };
 
+// v4.5.9 #360 — display-time sanitize for historical "(_project)" activity
+// messages from the pre-v4.3.9-H1 blank-project bug. Store keeps history
+// immutable; this runs at render. New entries don't carry the bug because
+// the hygiene migration fixed the source, so this is a read-only cleanup.
+function sanitizeMessage(msg) {
+  if (typeof msg !== 'string') return msg;
+  return msg.replace(/\(_project\)/g, '(—)').replace(/\b_project\b/g, '(unknown)');
+}
+
 function formatTime(dateStr) { return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
 function formatDate(dateStr) {
   const d = new Date(dateStr); const today = new Date();
@@ -379,7 +388,8 @@ export default function Log({ onNavigate }) {
                     // Non-navigation entries become the expand toggle; navigation entries
                     // still navigate on primary click but have a native tooltip with full text.
                     const MSG_TRUNC = 120;
-                    const isLong = (entry.message || '').length > MSG_TRUNC;
+                    const cleanMessage = sanitizeMessage(entry.message || '');
+                    const isLong = cleanMessage.length > MSG_TRUNC;
                     // v4.5.0 — per-row stagger on reveal (cap at 100ms total so
                     // long lists don't feel sluggish). New WS arrivals get an
                     // amber flash on top of the reveal.
@@ -391,11 +401,11 @@ export default function Log({ onNavigate }) {
                         {...(clickable ? { onClick, type: 'button' } : {})}
                         className={`flex items-start gap-3 py-2 px-3 rounded-lg transition-colors w-full text-left animate-row-reveal${wsClass} ${clickable ? 'hover:bg-nexus-surface cursor-pointer' : 'hover:bg-nexus-surface/50'}`}
                         style={{ animationDelay: `${delay}ms` }}
-                        title={clickable ? `Click to open ${config.module}` : (isLong ? entry.message : undefined)}
+                        title={clickable ? `Click to open ${config.module}` : (isLong ? cleanMessage : undefined)}
                       >
                         <span className="text-xs font-mono text-nexus-text-faint w-12 pt-0.5 shrink-0">{formatTime(entry.created_at)}</span>
                         <Icon size={14} className={`${config.color} mt-0.5 shrink-0`} />
-                        <span className="text-sm text-nexus-text-dim">{entry.message}</span>
+                        <span className="text-sm text-nexus-text-dim">{cleanMessage}</span>
                       </Tag>
                     );
                   })}
@@ -489,7 +499,7 @@ function TimelineView({ entries, sessions, search, rangeCutoffMs, mutedTypes }) 
       const config = TYPE_CONFIG[e.type] || TYPE_CONFIG.system;
       items.push({
         time: e.created_at, kind: e.type === 'task_done' ? 'task' : e.type === 'decision' ? 'decision' : 'activity',
-        icon: config.icon, color: config.color, label: config.label, text: e.message, id: `a-${e.id}`,
+        icon: config.icon, color: config.color, label: config.label, text: sanitizeMessage(e.message), id: `a-${e.id}`,
       });
     }
     for (const s of sessions) {

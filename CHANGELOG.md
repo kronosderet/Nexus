@@ -9,6 +9,76 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.5.9 — Fleet Polish + Cascade Hygiene
+
+Five Tier-2/3 items closing the Fleet-focused backlog plus two hygiene fixes
+(#266 label SSOT, #360 Log display sanitize). One item closed as already-done
+(#254). **231/231 tests green · 27 MCP tools · bundle 450KB (gzip 124KB).**
+No new tools, no new migrations.
+
+**Fleet (4 items)**
+
+- `#248` Activity sparklines on project cards. `/api/pulse/projects` now emits
+  `activity.daily: number[7]` (index 0 = 6 days ago, 6 = today). New
+  `Sparkline` component in Fleet.jsx renders a 56×14 polyline with a last-day
+  dot so "today" is visible even when the line ends at zero. Hidden for quiet
+  projects; color picks up heat (green for hot, amber for warm).
+- `#252` Staleness list unified. Previously titled "Project Staleness" but
+  listed only non-card projects (nexus-client, level, direwolf, etc. — tracked
+  via sessions/decisions but with no folder in PROJECTS_DIR). Relabeled to
+  **"Other tracked projects"** with a subtitle spelling out what qualifies.
+  Also now filtered to exclude any project already shown as a card, so there's
+  no duplication with the grid above.
+- `#253` Inline git actions (Diff / Commit) on cards with uncommitted changes.
+  New `GET /api/github/diff/:project` returns `{files, stat, diff, truncated}`
+  (diff capped at 64KB). **Diff** button toggles an expandable drawer under
+  the card with the `--stat` summary + raw patch. **Commit** button prompts
+  for a message (default `Nexus auto-commit`), reuses existing
+  `POST /api/github/commit`, and shows success/failure inline. Closes the
+  fleet-oversight loop without leaving the dashboard.
+- `#254` **already done via v4.4.5 #380** (Network icon on each card jumps to
+  Graph/Visual filtered to the project). Closed with no additional work.
+
+**Hygiene (2 items)**
+
+- `#266` Fuel label single source of truth. The "session window expired" copy
+  fixed in v4.3.9 #234 lived in two files (ClockWidget, Fuel). Extracted to
+  `client/src/lib/fuelLabels.js` with three exports (`SESSION_EXPIRED_SHORT`,
+  `SESSION_EXPIRED_LONG`, `SESSION_EXPIRED_TOOLTIP`) so the two surfaces can't
+  drift again. Also added the tooltip to ClockWidget — previously only Fuel
+  explained *why* "window expired" doesn't mean "fuel paused".
+- `#360` Log `(_project)` display sanitize. 11 historical activity entries
+  carry `Session ended (_project)` from the pre-v4.3.9-H1 blank-project bug.
+  Store keeps history immutable, so Log now applies a display-time
+  `sanitizeMessage` helper that rewrites `(_project)` → `(—)` and bare
+  `_project` → `(unknown)`. Applied at both the list render and the timeline
+  item transform.
+
+**Backend changes**
+
+- `server/routes/pulse.ts` — per-project `activity.daily[7]` array in
+  `/api/pulse/projects`.
+- `server/routes/github.ts` — new `GET /diff/:project` endpoint (`execFileSync`
+  with argv to avoid injection; 64KB cap with truncation flag).
+- `server/routes/ledger.ts`, `server/routes/impact.ts`, `server/mcp/localApi.ts`
+  — no changes.
+
+**Client changes**
+
+- `client/src/hooks/useApi.js` — added `getGitDiff` + `commitProject`.
+- `client/src/lib/fuelLabels.js` — new. Single source of truth.
+- `client/src/modules/Fleet.jsx` — sparklines, inline git actions, staleness
+  list rewrite.
+- `client/src/components/ClockWidget.jsx` — import label constants.
+- `client/src/modules/Fuel.jsx` — import label constants.
+- `client/src/modules/Log.jsx` — `sanitizeMessage` helper + two call sites.
+
+**What's next**
+
+Tier 3 long tail (Centrality #300s, Holes #320s, Conflicts #310s, Blast
+#289/#290, Log #361-#364, Overseer export #347-#350, Today fusion #240) —
+orthogonal to v4.6. `#398` Continuous Handover is the natural v4.6 headline.
+
 ## v4.5.8 — Graph Polish II + Data Hygiene
 
 Two Graph drilldowns (Tier 2 batch) plus two user-reported hygiene fixes and a

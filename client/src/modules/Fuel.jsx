@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useNexusFuel } from '../context/useNexus.js';
 import FuelFreshnessStamp from '../components/FuelFreshnessStamp.jsx';
+import { SESSION_EXPIRED_LONG, SESSION_EXPIRED_TOOLTIP } from '../lib/fuelLabels.js';
 
 function color(pct) {
   if (pct == null) return 'text-nexus-text-faint';
@@ -290,10 +291,9 @@ export default function FuelModule() {
               <p><Timer size={10} className="inline mr-1" />Resets in {sessionReset.countdown}</p>
             )}
             {sessionReset?.expired && (
-              // v4.3.9 #234 — "Waiting for next session window" was ambiguous. Users kept
-              // thinking fuel was paused; it's not. Session window rolled over but usage
-              // continues against weekly until a new reading is logged. Say what's true.
-              <p className="text-nexus-amber"><Timer size={10} className="inline mr-1" />Session window expired · log a fresh reading to reset timer</p>
+              // v4.3.9 #234 / v4.5.9 #266 — single source of truth in lib/fuelLabels.js.
+              // Previously duplicated between this view and ClockWidget.
+              <p className="text-nexus-amber" title={SESSION_EXPIRED_TOOLTIP}><Timer size={10} className="inline mr-1" />{SESSION_EXPIRED_LONG}</p>
             )}
             {(session <= 0 || timingData?.extra_usage) && <p className="text-nexus-red">On extra usage (session limit reached)</p>}
           </div>

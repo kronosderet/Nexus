@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Clock, Calendar, Timer, Fuel } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
 import { useTweenedNumber } from '../hooks/useMotion.js';
+import { SESSION_EXPIRED_SHORT, SESSION_EXPIRED_TOOLTIP } from '../lib/fuelLabels.js';
 
 function formatCountdown(ms) {
   if (ms <= 0) return 'now';
@@ -105,11 +106,12 @@ export default function ClockWidget({ ws }) {
                 <Timer size={11} className="text-nexus-text-faint" />
                 <span className="text-[10px] font-mono text-nexus-text-faint uppercase">Session</span>
               </div>
-              <span className={`text-xs font-mono font-medium tabular-nums ${sessionMs != null && sessionMs <= 0 ? 'text-nexus-red' : sessionMs != null && sessionMs < 1800000 ? 'text-nexus-amber' : 'text-nexus-text-dim'}`}>
-                {/* v4.3.9 #234 — "waiting for reset" implied fuel was paused; rolled-over
-                    window actually means usage now burns against weekly. "window expired"
-                    is shorter and truthful; Fuel view shows the "log a fresh reading" nudge. */}
-                {sessionMs == null ? '—' : sessionMs <= 0 ? 'window expired' : formatCountdown(sessionMs)}
+              <span
+                className={`text-xs font-mono font-medium tabular-nums ${sessionMs != null && sessionMs <= 0 ? 'text-nexus-red' : sessionMs != null && sessionMs < 1800000 ? 'text-nexus-amber' : 'text-nexus-text-dim'}`}
+                title={sessionMs != null && sessionMs <= 0 ? SESSION_EXPIRED_TOOLTIP : undefined}
+              >
+                {/* v4.3.9 #234 / v4.5.9 #266 — label in lib/fuelLabels.js (single source of truth). */}
+                {sessionMs == null ? '—' : sessionMs <= 0 ? SESSION_EXPIRED_SHORT : formatCountdown(sessionMs)}
               </span>
             </div>
             <div className="flex items-center gap-2">

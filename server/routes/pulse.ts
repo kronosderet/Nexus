@@ -60,6 +60,14 @@ export function createPulseRoutes(store: NexusStore) {
       const activity7d = projActivity.filter((a: ActivityEntry) => now - new Date(a.created_at).getTime() < 7 * DAY).length;
       const activityToday = projActivity.filter((a: ActivityEntry) => now - new Date(a.created_at).getTime() < DAY).length;
       const lastActivity = projActivity[0]?.created_at || null;
+      // v4.5.9 #248 — per-day counts for the 7-day sparkline. Index 0 = 6 days ago,
+      // index 6 = today. Quiet projects get [0,0,0,0,0,0,0] — client decides whether
+      // to render or skip. Keeps the pulse response thin (8 numbers per project).
+      const activityDaily: number[] = [0, 0, 0, 0, 0, 0, 0];
+      for (const a of projActivity) {
+        const daysAgo = Math.floor((now - new Date(a.created_at).getTime()) / DAY);
+        if (daysAgo >= 0 && daysAgo < 7) activityDaily[6 - daysAgo]++;
+      }
 
       // Tasks referencing this project. v4.4.1 #246 — was filtering only by title substring,
       // which missed every task whose project was set via the `project` field (v4.3.5 C1 added
@@ -105,7 +113,7 @@ export function createPulseRoutes(store: NexusStore) {
       return {
         ...p,
         git,
-        activity: { today: activityToday, week: activity7d, last: lastActivity },
+        activity: { today: activityToday, week: activity7d, last: lastActivity, daily: activityDaily },
         tasks: { open: openTasks, done: doneTasks },
         sessions: { count: projSessions.length, last: lastSession },
         decisions: decisions.filter((d: Decision) => d.project.toLowerCase() === name).length,
