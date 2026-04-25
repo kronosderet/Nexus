@@ -168,16 +168,25 @@ export async function localApiFetch(path: string, init: LocalApiInit = {}): Prom
       const updates: Partial<FuelConfig> = {};
       if (body.plan) updates.plan = body.plan;
       if (body.timezone) updates.timezone = body.timezone;
+      let resetDate: Date | null = null;
       if (body.weekly_reset_at && typeof body.weekly_reset_at === 'string') {
         const d = new Date(body.weekly_reset_at);
-        if (!isNaN(d.getTime())) updates.weeklyResetTime = d.toISOString();
+        if (!isNaN(d.getTime())) resetDate = d;
       } else if (body.weekly_reset_in_hours != null) {
         const h = Number(body.weekly_reset_in_hours);
         if (Number.isFinite(h) && h >= 0) {
-          updates.weeklyResetTime = new Date(Date.now() + h * 3600000).toISOString();
+          resetDate = new Date(Date.now() + h * 3600000);
         }
       }
-      const current = store.getFuelConfig() || { plan: 'pro', timezone: 'Europe/Prague', sessionWindowHours: 5, weeklyResetDay: 4, weeklyResetHour: 21 };
+      // v4.5.12 — match server/routes/usage.ts: derive day+hour fallback from the
+      // recorded reset so the cycle continues after weeklyResetTime passes.
+      const current = store.getFuelConfig() || { plan: 'pro', timezone: 'Europe/Prague', sessionWindowHours: 5, weeklyResetDay: 6, weeklyResetHour: 10 };
+      if (resetDate) {
+        updates.weeklyResetTime = resetDate.toISOString();
+        const localized = new Date(resetDate.toLocaleString('en-US', { timeZone: current.timezone }));
+        updates.weeklyResetDay = localized.getDay();
+        updates.weeklyResetHour = localized.getHours();
+      }
       store.setFuelConfig({ ...current, ...updates });
     }
     const entry = store.logUsage({ session_percent: body.session_percent, weekly_percent: body.weekly_percent, sonnet_weekly_percent: body.sonnet_weekly_percent, extra_usage: body.extra_usage, note: body.note });

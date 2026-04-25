@@ -9,6 +9,48 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.5.12 — Hotfix: Residual Thursday Hardcodes
+
+Audit of v4.5.11 found four places where the old Thursday-21:00 fallback
+still leaked through after the sliding-window switch. **231/231 tests · 27
+tools · no migrations · no breaking changes.**
+
+**The four leaks**
+
+1. **`DEFAULT_CONFIG` still defaulted to Thursday/21** — first-run stores
+   would carry the legacy schedule even though Anthropic moved everyone
+   to Saturday/10. New default: `weeklyResetDay: 6 (Sat), weeklyResetHour: 10`.
+2. **`weeklyResetDay/Hour` weren't auto-derived from `weeklyResetTime`** — once
+   the recorded reset passed, fallback would revert to whatever was on the
+   config (Thursday for legacy stores). Now: every time
+   `nexus_log_usage` records a `weekly_reset_in_hours` or `weekly_reset_at`,
+   we also derive the day-of-week and hour from the resulting Date (in the
+   user's timezone) and persist them — so the cycle continues correctly
+   after the recorded reset expires.
+3. **`clock.ts` calendar hardcoded `dayOfWeek === 4`** for the weekly-reset
+   marker on the week-ahead strip. Now derives from `nextWeeklyReset.getDay()`.
+4. **`clock.ts` calendar note hardcoded "Weekly fuel reset 21:00"**. Now
+   derives the time string from `nextWeeklyReset` (e.g. "Weekly fuel reset 10:00").
+
+**Verification**
+
+- Test dashboard fed `weekly_reset_in_hours: 162` (next Sat 10am).
+  Stored fields: `weeklyResetDay: 6, weeklyResetHour: 10` (auto-derived).
+  Timing payload: `resetsAt: 'Sat 10:44 Europe/Prague', source: 'reported'`.
+  Calendar week-strip marks Saturday with `isWeeklyReset: true` and note
+  "Weekly fuel reset 10:44".
+
+**Files touched**
+
+- `server/lib/fuelConfig.ts` — DEFAULT_CONFIG flipped to Sat/10.
+- `server/routes/usage.ts` — `weeklyResetDay/Hour` auto-derive on save.
+- `server/mcp/localApi.ts` — same auto-derive in standalone path.
+- `server/routes/clock.ts` — calendar marker + note + outdated comment.
+
+**No new memory rule** — `feedback/usage_schedule.md` from v4.5.11 already
+spells out the sliding model. This is purely the implementation matching
+what the docs say.
+
 ## v4.5.11 — Sliding Weekly Window
 
 Anthropic moved the weekly limit from a fixed Thursday-21:00-CET reset to a

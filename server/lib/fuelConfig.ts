@@ -24,12 +24,16 @@ export const PLAN_INFO: Record<ClaudePlan, { label: string; multiplier: number; 
 };
 
 // ── Defaults ──────────────────────────────────────────────
+// v4.5.12 — Anthropic moved weekly reset to Saturday 10:00 (local) for current
+// plans. Previous default was Thursday 21:00. The legacy values stay supported
+// (FuelConfig.weeklyResetDay/Hour are user-editable); this only changes the
+// first-run default for stores without a recorded reset.
 const DEFAULT_CONFIG: FuelConfig = {
   plan: 'pro',
   timezone: 'Europe/Prague',
   sessionWindowHours: 5,
-  weeklyResetDay: 4,   // Thursday
-  weeklyResetHour: 21, // 21:00
+  weeklyResetDay: 6,   // Saturday
+  weeklyResetHour: 10, // 10:00
 };
 
 // ── Accessors ─────────────────────────────────────────────

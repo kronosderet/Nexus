@@ -79,7 +79,8 @@ export function createClockRoutes(store: NexusStore, _getUsageTiming?: () => any
           if (daysUntilEmpty != null && daysUntilEmpty >= 0 && daysUntilEmpty <= 6.99) {
             emptyDayIndex = Math.floor(daysUntilEmpty);
           }
-          // Does it run out before the next Thursday 21:00 reset?
+          // v4.5.12 — "the next weekly reset" is sliding (per-user). weeklyMs
+          // already reflects whatever getNextWeeklyReset(config) computed.
           const runsOutBeforeReset = daysUntilEmpty != null && daysUntilEmpty * 86400000 < weeklyMs;
           weeklyProjection = {
             perDay,
@@ -92,6 +93,12 @@ export function createClockRoutes(store: NexusStore, _getUsageTiming?: () => any
     }
 
     // Calendar
+    // v4.5.12 — weekly-reset marker derives from nextWeeklyReset (sliding per
+    // user) instead of hardcoded Thursday. Note text reflects actual reset hour.
+    const resetDayOfWeek = nextWeeklyReset.getDay();
+    const resetHourLocal = nextWeeklyReset.getHours();
+    const resetMinLocal = nextWeeklyReset.getMinutes();
+    const resetTimeLabel = `${String(resetHourLocal).padStart(2, '0')}:${String(resetMinLocal).padStart(2, '0')}`;
     interface CalendarDay {
       date: string;
       dayOfWeek: number;
@@ -120,13 +127,14 @@ export function createClockRoutes(store: NexusStore, _getUsageTiming?: () => any
         projectedWeekly = Math.max(0, Math.round(projected * 10) / 10);
         isProjectedEmpty = weeklyProjection.emptyDayIndex === d;
       }
+      const isWeeklyReset = dayOfWeek === resetDayOfWeek;
       calendar.push({
         date: dateStr,
         dayOfWeek,
         isToday: d === 0,
         isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
-        isWeeklyReset: dayOfWeek === 4,
-        note: dayOfWeek === 4 ? 'Weekly fuel reset 21:00' : d === 0 ? 'Current session' : null,
+        isWeeklyReset,
+        note: isWeeklyReset ? `Weekly fuel reset ${resetTimeLabel}` : d === 0 ? 'Current session' : null,
         projectedWeekly,
         isProjectedEmpty,
       });

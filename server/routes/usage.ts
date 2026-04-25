@@ -172,18 +172,32 @@ export function createUsageRoutes(store: NexusStore, broadcast: BroadcastFn) {
     // v4.5.11 — also persist weekly_reset_in_hours (sliding window). Either
     // the explicit ISO `weekly_reset_at` OR `weekly_reset_in_hours` (relative)
     // is accepted; the latter is converted to absolute and stored.
+    // v4.5.12 — when storing weeklyResetTime, ALSO derive weeklyResetDay/Hour
+    // from the resulting Date. The weekly cycle is fixed (every 7d at the same
+    // local time), so updating the fallback fields keeps them correct after
+    // weeklyResetTime expires and we fall back to day-of-week + hour.
     if (plan || timezone || weekly_reset_in_hours != null || weekly_reset_at) {
       const updates: Partial<FuelConfig> = {};
       if (plan && VALID_PLANS.has(plan)) updates.plan = plan;
       if (timezone && typeof timezone === 'string' && timezone.includes('/')) updates.timezone = timezone;
+      let resetDate: Date | null = null;
       if (weekly_reset_at && typeof weekly_reset_at === 'string') {
         const d = new Date(weekly_reset_at);
-        if (!isNaN(d.getTime())) updates.weeklyResetTime = d.toISOString();
+        if (!isNaN(d.getTime())) resetDate = d;
       } else if (weekly_reset_in_hours != null) {
         const hours = Number(weekly_reset_in_hours);
         if (Number.isFinite(hours) && hours >= 0) {
-          updates.weeklyResetTime = new Date(Date.now() + hours * 3600000).toISOString();
+          resetDate = new Date(Date.now() + hours * 3600000);
         }
+      }
+      if (resetDate) {
+        updates.weeklyResetTime = resetDate.toISOString();
+        // Derive day-of-week + hour fallback from the same Date so the cycle
+        // continues correctly once weeklyResetTime passes.
+        const cfg = getFuelConfig(store);
+        const localized = new Date(resetDate.toLocaleString('en-US', { timeZone: cfg.timezone }));
+        updates.weeklyResetDay = localized.getDay();
+        updates.weeklyResetHour = localized.getHours();
       }
       if (Object.keys(updates).length > 0) saveFuelConfig(store, updates);
     }
