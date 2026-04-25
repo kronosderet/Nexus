@@ -74,16 +74,26 @@ export function buildTimingInfo(store: NexusStore) {
     };
   }
 
+  // v4.5.11 — derive the resetsAt label from the actual next-reset Date so the
+  // label reflects the sliding window. When the user has reported a specific
+  // weeklyResetTime via nexus_log_usage, the label shows that exact day+hour;
+  // when falling back to weeklyResetDay/Hour, the label still reads correctly.
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const resetsAtLabel = `${dayNames[nextWeekly.getDay()]} ${String(nextWeekly.getHours()).padStart(2, '0')}:${String(nextWeekly.getMinutes()).padStart(2, '0')} ${config.timezone}`;
+
   return {
     now: now.toISOString(),
     timezone: config.timezone,
     plan: { name: config.plan, label: planInfo.label, multiplier: planInfo.multiplier, description: planInfo.description },
     session: sessionInfo,
     weekly: {
-      resetsAt: `${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][config.weeklyResetDay]} ${config.weeklyResetHour}:00 ${config.timezone}`,
+      resetsAt: resetsAtLabel,
       nextReset: nextWeekly.toISOString(),
       countdown: formatCountdown(weeklyMs),
       countdownMs: weeklyMs,
+      // v4.5.11 — let the UI distinguish user-supplied vs legacy fallback so we
+      // can show "since last reading" vs "estimated".
+      source: config.weeklyResetTime ? 'reported' : 'estimated',
     },
   };
 }
@@ -152,17 +162,29 @@ export function createUsageRoutes(store: NexusStore, broadcast: BroadcastFn) {
 
   // Log a usage data point
   router.post('/', (req: Request, res: Response) => {
-    const { session_percent, weekly_percent, sonnet_weekly_percent, extra_usage, note, reset_in_minutes, plan, timezone } = req.body;
+    const { session_percent, weekly_percent, sonnet_weekly_percent, extra_usage, note, reset_in_minutes, plan, timezone, weekly_reset_in_hours, weekly_reset_at } = req.body;
 
     if (session_percent == null && weekly_percent == null) {
       return res.status(400).json({ error: 'Provide session_percent and/or weekly_percent.' });
     }
 
     // Save plan/timezone config if provided — validate before saving (#161)
-    if (plan || timezone) {
+    // v4.5.11 — also persist weekly_reset_in_hours (sliding window). Either
+    // the explicit ISO `weekly_reset_at` OR `weekly_reset_in_hours` (relative)
+    // is accepted; the latter is converted to absolute and stored.
+    if (plan || timezone || weekly_reset_in_hours != null || weekly_reset_at) {
       const updates: Partial<FuelConfig> = {};
       if (plan && VALID_PLANS.has(plan)) updates.plan = plan;
       if (timezone && typeof timezone === 'string' && timezone.includes('/')) updates.timezone = timezone;
+      if (weekly_reset_at && typeof weekly_reset_at === 'string') {
+        const d = new Date(weekly_reset_at);
+        if (!isNaN(d.getTime())) updates.weeklyResetTime = d.toISOString();
+      } else if (weekly_reset_in_hours != null) {
+        const hours = Number(weekly_reset_in_hours);
+        if (Number.isFinite(hours) && hours >= 0) {
+          updates.weeklyResetTime = new Date(Date.now() + hours * 3600000).toISOString();
+        }
+      }
       if (Object.keys(updates).length > 0) saveFuelConfig(store, updates);
     }
 

@@ -100,8 +100,13 @@ export interface FuelConfig {
   plan: ClaudePlan;
   timezone: string;              // IANA timezone
   sessionWindowHours: number;    // default 5
-  weeklyResetDay: number;        // 0=Sun..6=Sat (default 4=Thu for "All models")
-  weeklyResetHour: number;       // 0-23 (default 21)
+  // v4.5.11 — Anthropic moved both session and weekly limits to SLIDING windows.
+  // weeklyResetTime (ISO) is the user-reported next reset and slides whenever
+  // the user logs a fresh reading. weeklyResetDay/Hour become FALLBACK only
+  // (used pre-first-report or when the recorded reset has passed).
+  weeklyResetTime?: string;      // ISO timestamp; sliding, set via nexus_log_usage
+  weeklyResetDay: number;        // FALLBACK only: 0=Sun..6=Sat (legacy default 4=Thu)
+  weeklyResetHour: number;       // FALLBACK only: 0-23 (legacy default 21)
   sonnetResetDay?: number;       // 0=Sun..6=Sat (default 0=Sun for "Sonnet only")
   sonnetResetHour?: number;      // 0-23 (default 22)
 }

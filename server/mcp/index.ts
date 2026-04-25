@@ -459,6 +459,12 @@ const TOOLS: Tool[] = [
       'Example: user says "17% session used" → pass session_percent: 83. ' +
       'Optionally pass reset_in_minutes to (re)start the session timing window (use this when the user ' +
       'tells you how long until their session resets, e.g. "resets in 3h 43m" → 223). ' +
+      // v4.5.11 — sliding weekly window. Anthropic moved both session and weekly to per-user
+      // sliding windows; pass weekly_reset_in_hours when the user reports the actual countdown
+      // they see on /settings/usage (e.g. "Resets Sat 10:00 AM" 6 days out → 144).
+      'For the weekly window, pass weekly_reset_in_hours OR weekly_reset_at (ISO) when the user ' +
+      'reports the weekly reset time — the legacy hardcoded Thursday-21:00 fallback is only ' +
+      'used pre-first-report or when the recorded reset has passed. ' +
       'This feeds the Fuel Intelligence module, burn-rate estimation, workload advisor, and the Overseer ' +
       'risk scanner. Call it whenever the user reports a new fuel reading.',
     inputSchema: {
@@ -483,6 +489,14 @@ const TOOLS: Tool[] = [
         reset_in_minutes: {
           type: 'number',
           description: 'Optional: minutes until the session window resets. If provided, (re)starts the session timing window. Example: "resets in 3h 43m" → 223.',
+        },
+        weekly_reset_in_hours: {
+          type: 'number',
+          description: 'Optional: hours until the weekly window resets (sliding model, v4.5.11+). Example: "Resets Sat 10:00 AM" 6 days out → 144. Slides whenever a fresh reading is logged.',
+        },
+        weekly_reset_at: {
+          type: 'string',
+          description: 'Optional: ISO timestamp of the next weekly reset. Alternative to weekly_reset_in_hours when the exact time is known.',
         },
         note: {
           type: 'string',
@@ -1160,6 +1174,9 @@ async function handleTool(name: string, args: any): Promise<string> {
       if (args.sonnet_weekly_percent != null) body.sonnet_weekly_percent = Number(args.sonnet_weekly_percent);
       if (args.extra_usage != null) body.extra_usage = !!args.extra_usage;
       if (args.reset_in_minutes != null) body.reset_in_minutes = Number(args.reset_in_minutes);
+      // v4.5.11 — sliding weekly window. Either form acceptable; server stores absolute ISO.
+      if (args.weekly_reset_in_hours != null) body.weekly_reset_in_hours = Number(args.weekly_reset_in_hours);
+      if (args.weekly_reset_at) body.weekly_reset_at = String(args.weekly_reset_at);
       if (args.note) body.note = String(args.note);
       if (args.plan) body.plan = args.plan;
       if (args.timezone) body.timezone = args.timezone;

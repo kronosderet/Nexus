@@ -162,11 +162,21 @@ export async function localApiFetch(path: string, init: LocalApiInit = {}): Prom
 
   // ── Usage ─────────────────────────────────────────
   if (pathname === '/api/usage' && method === 'POST') {
-    // Save plan/timezone config if provided
-    if (body.plan || body.timezone) {
+    // Save plan/timezone config if provided.
+    // v4.5.11 — also persist sliding weekly reset (weekly_reset_in_hours OR weekly_reset_at).
+    if (body.plan || body.timezone || body.weekly_reset_in_hours != null || body.weekly_reset_at) {
       const updates: Partial<FuelConfig> = {};
       if (body.plan) updates.plan = body.plan;
       if (body.timezone) updates.timezone = body.timezone;
+      if (body.weekly_reset_at && typeof body.weekly_reset_at === 'string') {
+        const d = new Date(body.weekly_reset_at);
+        if (!isNaN(d.getTime())) updates.weeklyResetTime = d.toISOString();
+      } else if (body.weekly_reset_in_hours != null) {
+        const h = Number(body.weekly_reset_in_hours);
+        if (Number.isFinite(h) && h >= 0) {
+          updates.weeklyResetTime = new Date(Date.now() + h * 3600000).toISOString();
+        }
+      }
       const current = store.getFuelConfig() || { plan: 'pro', timezone: 'Europe/Prague', sessionWindowHours: 5, weeklyResetDay: 4, weeklyResetHour: 21 };
       store.setFuelConfig({ ...current, ...updates });
     }

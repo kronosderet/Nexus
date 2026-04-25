@@ -50,6 +50,16 @@ export function nowInTZ(config: FuelConfig): Date {
 }
 
 export function getNextWeeklyReset(config: FuelConfig): Date {
+  // v4.5.11 — sliding model. If the user has reported an actual next-reset
+  // timestamp via nexus_log_usage AND it's still in the future, use it. The
+  // day-of-week + hour fields are fallback only (pre-first-report, or when the
+  // last recorded reset has passed and the user hasn't logged a fresh one).
+  if (config.weeklyResetTime) {
+    const recorded = new Date(config.weeklyResetTime);
+    if (!isNaN(recorded.getTime()) && recorded.getTime() > Date.now()) {
+      return recorded;
+    }
+  }
   const now = nowInTZ(config);
   const target = new Date(now);
   target.setHours(config.weeklyResetHour, 0, 0, 0);

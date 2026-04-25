@@ -9,6 +9,62 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.5.11 — Sliding Weekly Window
+
+Anthropic moved the weekly limit from a fixed Thursday-21:00-CET reset to a
+per-user **sliding 7-day window** (confirmed 2026-04-25). Nexus's session
+window already slid via the user-supplied `reset_in_minutes`; this release
+brings the weekly window to parity. **231/231 tests green · 27 MCP tools ·
+no migrations.**
+
+**The change**
+
+- New optional `weeklyResetTime: string` (ISO) on `FuelConfig`. When set, it
+  IS the next reset and slides on every `nexus_log_usage` call that includes
+  weekly timing. The legacy `weeklyResetDay/Hour` (Thursday 21:00) becomes
+  fallback only — used pre-first-report or when the recorded reset has
+  passed and no fresh reading exists.
+- `nexus_log_usage` accepts two new args: **`weekly_reset_in_hours`** (relative)
+  or **`weekly_reset_at`** (ISO). The relative form is the common case —
+  user reads "Resets Sat 10:00 AM" off `https://claude.ai/settings/usage`,
+  computes hours, passes them.
+- `POST /api/usage` accepts the same. `localApi.ts` handles them in
+  standalone mode.
+- `getNextWeeklyReset(config)` prefers `config.weeklyResetTime` if it's in
+  the future; falls back to the day-of-week + hour computation otherwise.
+- `buildTimingInfo()` derives the `resetsAt` label from the actual next-reset
+  Date (no more hardcoded "Thu 21:00"). Adds `source: 'reported' | 'estimated'`
+  so the UI can distinguish.
+
+**Why the change matters**
+
+Pre-v4.5.11 Nexus's brief said "weekly resets Thursday 21:00 CET" regardless
+of what the user actually saw on Anthropic's billing page. After Anthropic
+moved to sliding, the brief drifted from reality — sometimes by days. The
+SessionStart hook would inject "27% weekly remaining, Thursday reset" when
+the actual reset was Saturday. Pacing decisions based on the wrong reset
+made the brief actively misleading.
+
+**No breaking changes**
+
+The legacy `weeklyResetDay/Hour` fields stay on `FuelConfig` for backwards
+compatibility. Stored values from earlier releases keep working until the
+user logs a fresh reading with `weekly_reset_in_hours`.
+
+**CC memory updated**
+
+`feedback/usage_schedule.md` rewritten to reflect the sliding model, with
+the new `nexus_log_usage` call shape and explicit "no more Thursday" note.
+
+**Files touched**
+
+- `server/types.ts` — `FuelConfig.weeklyResetTime?: string`
+- `server/lib/fuelConfig.ts` — sliding-aware `getNextWeeklyReset`
+- `server/routes/usage.ts` — accepts new args; derives `resetsAt` from next-reset
+- `server/mcp/index.ts` — `nexus_log_usage` schema + handler
+- `server/mcp/localApi.ts` — same shape in standalone mode
+- `~/.claude/projects/C--Projects/memory/usage_schedule.md` — model rewrite
+
 ## v4.5.10 — Tier 3 Sweep
 
 Eighteen Tier-3 items in a single pass across Graph (11), Overseer (3), Log (3),
