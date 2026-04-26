@@ -119,7 +119,7 @@ Without LM Studio, all 22 non-AI tools work normally (4 AI-dependent tools: `nex
 | Layer | Stack |
 |---|---|
 | MCP | 29 tools, stdio, standalone (no server needed) |
-| Dashboard | React 19 + Vite + Tailwind CSS 4 (optional, 7 modules) |
+| Dashboard | React 19 + Vite + Tailwind CSS 4 (optional, 8 modules) |
 | Server | Express 5 + TypeScript (dashboard only) |
 | Store | JSON at `~/.nexus/nexus.json` (atomic writes, 3-gen backup, idempotent migrations) |
 | AI | LM Studio / Ollama (optional, auto-detected, GPU-aware) |

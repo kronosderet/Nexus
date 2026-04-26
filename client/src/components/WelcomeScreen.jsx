@@ -4,7 +4,7 @@ import { api } from '../hooks/useApi.js';
 // v4.4.9 — tool count mirrored from the MCP TOOLS[] array. Guarded by
 // tests/versionDrift.test.ts so it can't silently drift behind the real count.
 const TOOL_COUNT = 29;
-const MODULE_COUNT = 7;
+const MODULE_COUNT = 8;
 
 const INIT_STEPS = [
   { key: 'system', label: 'System core', icon: '⚙' },
