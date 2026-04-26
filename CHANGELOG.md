@@ -9,6 +9,90 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.6.0 — Continuous Handover
+
+The headline `#398` shipped. Per-project markdown card stored in Nexus
+replaces the dated `HANDOVER-YYYY-MM-DD.md` workflow. Each instance writes
+its handover before docking; the next instance reads it on session start
+(auto-injected by `nexus_brief`). Two new MCP tools (27 → **29**); new
+Handover dashboard tab with per-project cards; new `docs/ARCHITECTURE.md`
+for slow-moving content. **231/231 tests · bundle 478KB (gzip 132KB).**
+
+**The change**
+
+- New schema field: `NexusData._handovers: Record<string, HandoverEntry>`
+  (stored in `nexus.json`). `HandoverEntry: { content, updated_at, updated_by? }`.
+- New store methods: `getHandover`, `getAllHandovers`, `setHandover`,
+  `deleteHandover`.
+- New REST routes (`server/routes/handover.ts`): `GET /api/handover` (all),
+  `GET /api/handover/:project` (one), `PUT /api/handover/:project`,
+  `DELETE /api/handover/:project`. Mirror in standalone `localApi.ts`.
+- New MCP tools (28 + 29):
+  - `nexus_read_handover(project)` → returns card, defaults to "Nexus"
+  - `nexus_update_handover(project, content, updated_by?)` → writes/replaces
+- `nexus_brief` extended: when a handover exists for the project, prepends
+  it to the brief output so the next instance reads the live card before
+  the structured tasks/sessions/risks block.
+- Migration **v4.6.0-E1**: seeds the Nexus project's handover from a TL;DR
+  template. Idempotent — won't overwrite user edits.
+
+**Dashboard — new Handover tab**
+
+`client/src/modules/Handover.jsx` — grid of cards, one per project
+discovered from the fleet (plus any projects with handover but no fleet
+card). Each card:
+- Header: project name, "updated Nm/h/d ago · updated_by · N chars · N words"
+- Soft-cap warning when content > 500 words
+- Inline edit (textarea) with Save / Cancel
+- Empty state with "Write first handover" affordance
+- Refresh button at top-level
+
+Wired into `App.jsx` nav as the 8th module (`shortcut: '8'`). Sidebar icon:
+`book-marked`.
+
+**docs/ARCHITECTURE.md (new)**
+
+The slow-moving content that used to live in dated handovers — architecture
+spine, recurring patterns, known issues + gotchas, commands/rituals, fuel
+model, the v4.5.x → v4.6.0 arc. Update when patterns change, not per
+release. The live per-project handover card is for live state only.
+
+**Backwards compatibility**
+
+- `_handovers` is additive — stores without it (i.e. before this release)
+  load fine; the migration seeds Nexus's card on first run.
+- Dated `docs/HANDOVER-YYYY-MM-DD.md` files stay in the repo as historical
+  markers. New ones won't be created.
+- All v4.5.x MCP tools unchanged. `nexus_brief` output gains a prepended
+  handover block when one exists; existing consumers ignore it cleanly.
+
+**Files touched**
+
+- `server/types.ts` — `_handovers`, `HandoverEntry`
+- `server/db/store.ts` — store methods + v4.6.0-E1 migration
+- `server/routes/handover.ts` — NEW route module
+- `server/dashboard.ts` — wires `/api/handover`
+- `server/mcp/index.ts` — 2 new tool specs + handlers; `nexus_brief` prepend
+- `server/mcp/localApi.ts` — standalone `/api/handover` shape
+- `server/lib/version.ts` — `TOOL_COUNT_EXPECTED: 27 → 29`
+- `mcpb/manifest.json` — version, long_description, +2 tool entries
+- `mcpb/README.md`, `README.md`, `plugin/README.md`, `cli/nexus.js`,
+  `CONCEPT.md`, `.claude-plugin/marketplace.json`, `plugin/.claude-plugin/plugin.json`
+  — count drift updates (27 → 29)
+- `client/src/components/WelcomeScreen.jsx` — `TOOL_COUNT: 27 → 29`
+- `client/src/hooks/useApi.js` — `getAllHandovers`, `getHandover`,
+  `putHandover`, `deleteHandover`
+- `client/src/modules/Handover.jsx` — NEW module
+- `client/src/App.jsx`, `client/src/components/Sidebar.jsx` — 8th nav slot
+- `docs/ARCHITECTURE.md` — NEW reference doc
+
+**What's next**
+
+The dated-handover lifecycle ends here. Next instance picking up Nexus dev
+reads the live card via `nexus_brief`. Tier 2 = 0; 7 deferred Tier-3 items
+still on the slate. Structural carry-overs unchanged (`#217` split files,
+`#218` route tests, `#219` Zod).
+
 ## v4.5.12 — Hotfix: Residual Thursday Hardcodes
 
 Audit of v4.5.11 found four places where the old Thursday-21:00 fallback

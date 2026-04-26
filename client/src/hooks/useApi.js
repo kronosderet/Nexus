@@ -154,6 +154,17 @@ export const api = {
   commitProject: (project, message) =>
     request('/github/commit', { method: 'POST', body: { project, message } }),
 
+  // ── Handover (v4.6.0 #398) ─────────────────────────────
+  // Continuous per-project handover card. Replaces dated HANDOVER-X.md files.
+  getAllHandovers: () => request('/handover'),
+  getHandover: (project) => request(`/handover/${encodeURIComponent(project)}`, { silent: true }),
+  putHandover: (project, content, updated_by) =>
+    request(`/handover/${encodeURIComponent(project)}`, {
+      method: 'PUT', body: { content, ...(updated_by ? { updated_by } : {}) },
+    }),
+  deleteHandover: (project) =>
+    request(`/handover/${encodeURIComponent(project)}`, { method: 'DELETE' }),
+
   // ── Memory Bridge (v4.5.7 #228) ────────────────────────
   // Lists CC memories discovered at ~/.claude/projects/**/memory/*.md.
   // Import runs nexus_import_cc_memories server-side; supports dry_run.

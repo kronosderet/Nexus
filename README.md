@@ -2,7 +2,7 @@
 
 **AI Cowork Metabrain for Claude Code**
 
-A local-first metabrain that gives every Claude Code instance persistent memory, a Knowledge Graph, and a strategic AI advisor. 27 native MCP tools. Ambient-telemetry hook layer injects rich context on every session start. Zero cloud dependencies.
+A local-first metabrain that gives every Claude Code instance persistent memory, a Knowledge Graph, and a strategic AI advisor. 29 native MCP tools. Ambient-telemetry hook layer injects rich context on every session start. Zero cloud dependencies.
 
 ## Install as Claude Code Plugin
 
@@ -48,7 +48,7 @@ Nexus solves the biggest problem with AI-assisted development: **Claude forgets 
 - **Self-Critique** — identifies slow tasks, stuck items, completion patterns
 - **Local AI Overseer** (optional) — strategic analysis via LM Studio with up to 200k context
 
-## 27 Native MCP Tools
+## 29 Native MCP Tools
 
 After installing, Claude Code can call these directly — no shell-outs, no CLI:
 
@@ -118,7 +118,7 @@ Without LM Studio, all 22 non-AI tools work normally (4 AI-dependent tools: `nex
 
 | Layer | Stack |
 |---|---|
-| MCP | 27 tools, stdio, standalone (no server needed) |
+| MCP | 29 tools, stdio, standalone (no server needed) |
 | Dashboard | React 19 + Vite + Tailwind CSS 4 (optional, 7 modules) |
 | Server | Express 5 + TypeScript (dashboard only) |
 | Store | JSON at `~/.nexus/nexus.json` (atomic writes, 3-gen backup, idempotent migrations) |

@@ -181,6 +181,17 @@ export interface NexusData {
   // `rel='contradicts'` edge) or dismissed (→ hidden from the Conflicts tab).
   // Dismissal is sticky: the same pair won't re-surface in subsequent scans.
   _suggestedContradictions?: SuggestedContradiction[];
+  // v4.6.0 #398 — continuous handover. Per-project markdown card replacing the
+  // dated HANDOVER-YYYY-MM-DD.md file workflow. Each instance updates before
+  // docking; next instance reads via nexus_brief / Handover dashboard tab.
+  _handovers?: Record<string, HandoverEntry>;
+}
+
+// v4.6.0 #398 — handover card payload.
+export interface HandoverEntry {
+  content: string;          // markdown body (~500-word soft cap)
+  updated_at: string;       // ISO timestamp of last write
+  updated_by?: string;      // optional source — instance label, MCP tool, dashboard, etc.
 }
 
 export interface SuggestedContradiction {

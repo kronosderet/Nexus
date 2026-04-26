@@ -9,6 +9,7 @@ import FuelModule from './modules/Fuel.jsx';
 import GraphModule from './modules/Graph.jsx';
 import Overseer from './modules/Overseer.jsx';
 import Log from './modules/Log.jsx';
+import Handover from './modules/Handover.jsx';
 import NexusProvider from './context/NexusProvider.jsx';
 import WelcomeScreen from './components/WelcomeScreen.jsx';
 import ToastOverlay from './components/ToastOverlay.jsx';
@@ -16,7 +17,7 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 import ThoughtStackModal from './components/ThoughtStackModal.jsx';
 import ShortcutHelpModal from './components/ShortcutHelpModal.jsx';
 
-const MODULE_KEYS = ['command', 'pulse', 'fleet', 'fuel', 'graph', 'overseer', 'log'];
+const MODULE_KEYS = ['command', 'pulse', 'fleet', 'fuel', 'graph', 'overseer', 'log', 'handover'];
 const MODULES = {
   command: { label: 'Command', icon: 'compass', component: Command, shortcut: '1' },
   pulse: { label: 'Dashboard', icon: 'activity', component: Pulse, shortcut: '2' },
@@ -25,6 +26,7 @@ const MODULES = {
   graph: { label: 'Graph', icon: 'git-branch', component: GraphModule, shortcut: '5' },
   overseer: { label: 'Overseer', icon: 'brain', component: Overseer, shortcut: '6' },
   log: { label: 'Log', icon: 'scroll-text', component: Log, shortcut: '7' },
+  handover: { label: 'Handover', icon: 'book-marked', component: Handover, shortcut: '8' },
 };
 
 export default function App() {

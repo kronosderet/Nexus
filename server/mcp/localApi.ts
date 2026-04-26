@@ -267,6 +267,34 @@ export async function localApiFetch(path: string, init: LocalApiInit = {}): Prom
     return result;
   }
 
+  // ── Handover (v4.6.0 #398) ─────────────────────────
+  // GET /api/handover         → list all per-project handovers
+  // GET /api/handover/:project → read one
+  // PUT /api/handover/:project → write/replace one (body: { content, updated_by? })
+  if (pathname === '/api/handover' && method === 'GET') {
+    return { handovers: store.getAllHandovers() };
+  }
+  if (pathname.startsWith('/api/handover/')) {
+    const project = decodeURIComponent(pathname.slice('/api/handover/'.length));
+    if (!project) throw new Error('400: project required');
+    if (method === 'GET') {
+      const entry = store.getHandover(project);
+      if (!entry) throw new Error('404: no handover for this project yet');
+      return { project, ...entry };
+    }
+    if (method === 'PUT') {
+      if (typeof body.content !== 'string') throw new Error('400: content (string) required');
+      const entry = store.setHandover(project, body.content, typeof body.updated_by === 'string' ? body.updated_by : undefined);
+      store.addActivity('system', `[${project}] Handover updated (${body.content.length} chars)`);
+      return { project, ...entry };
+    }
+    if (method === 'DELETE') {
+      const removed = store.deleteHandover(project);
+      if (!removed) throw new Error('404: no handover for this project');
+      return { success: true, project };
+    }
+  }
+
   // ── Overseer risks ────────────────────────────────
   if (pathname === '/api/overseer/risks') {
     // Lightweight risk scan — no AI needed

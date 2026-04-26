@@ -902,6 +902,54 @@ const TOOLS: Tool[] = [
     inputSchema: { type: 'object', properties: {} },
   },
   {
+    // v4.6.0 #398 — Continuous Handover. Read the live per-project handover card.
+    name: 'nexus_read_handover',
+    description:
+      'Read the continuous handover card for a project. The handover replaces the dated ' +
+      'HANDOVER-YYYY-MM-DD.md file workflow — it is a live markdown card stored in Nexus ' +
+      'that each instance updates before docking and the next reads on session start. ' +
+      'Returns { project, content, updated_at, updated_by? } or a "not yet" signal if the project has no card. ' +
+      'Defaults to project="Nexus" since that is the active development project most often.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project: {
+          type: 'string',
+          description: 'Project name to read the handover for. Defaults to "Nexus".',
+        },
+      },
+    },
+  },
+  {
+    // v4.6.0 #398 — Continuous Handover. Write/replace the per-project handover card.
+    name: 'nexus_update_handover',
+    description:
+      'Write or replace the continuous handover card for a project. Call before docking — the ' +
+      'next instance picking up this project will read whatever you write here. Markdown body, ' +
+      '~500-word soft cap (no enforcement; treat as discipline). Include: current state, what is ' +
+      'in flight, what to pick up next, gotchas. Architecture-spine / slow-moving content belongs ' +
+      'in docs/ARCHITECTURE.md instead — keep this card live and short. Returns the saved entry ' +
+      'with updated_at timestamp.',
+    inputSchema: {
+      type: 'object',
+      required: ['content'],
+      properties: {
+        project: {
+          type: 'string',
+          description: 'Project name. Defaults to "Nexus".',
+        },
+        content: {
+          type: 'string',
+          description: 'Full markdown content of the new handover card. Replaces any prior card for this project.',
+        },
+        updated_by: {
+          type: 'string',
+          description: 'Optional source label (e.g. "claude-cli", "dashboard", "v4.6.0-instance"). Aids audit trail.',
+        },
+      },
+    },
+  },
+  {
     // v4.3.8 #200 — Memory Bridge first-run import. Turns CC\'s auto-memory files
     // (~/.claude/projects/*/memory/*.md) into first-class `lifecycle: \'reference\'` decisions
     // in the Ledger so they become searchable, taggable, and link-targetable. Idempotent.
@@ -948,7 +996,7 @@ async function handleTool(name: string, args: any): Promise<string> {
       // Per-call 10s timeout via Promise.race to prevent hanging on slow routes
       const withTimeout = <T>(p: Promise<T>, fallback: T) =>
         Promise.race([p, new Promise<T>(r => setTimeout(() => r(fallback), 10000))]);
-      const [tasks, sessions, ledger, fuel, risks, plansIndex, memoriesIndex] = await Promise.all([
+      const [tasks, sessions, ledger, fuel, risks, plansIndex, memoriesIndex, handover] = await Promise.all([
         withTimeout(nexusFetch('/api/tasks'), []),
         withTimeout(nexusFetch('/api/sessions'), []),
         withTimeout(nexusFetch('/api/ledger'), []),
@@ -956,6 +1004,11 @@ async function handleTool(name: string, args: any): Promise<string> {
         withTimeout(nexusFetch('/api/overseer/risks'), { risks: [] }),
         withTimeout(nexusFetch('/api/cc-plans?limit=10'), { available: false, plans: [], totalFiles: 0 }),
         withTimeout(nexusFetch('/api/cc-memory?limit=40'), { available: false, memories: [], totalFiles: 0 }),
+        // v4.6.0 #398 — Continuous Handover injection. Tolerate 404 when no card exists.
+        withTimeout(
+          nexusFetch(`/api/handover/${encodeURIComponent(project)}`).catch(() => null),
+          null
+        ) as Promise<null | { project: string; content: string; updated_at: string; updated_by?: string }>,
       ]);
 
       const projectLower = project.toLowerCase();
@@ -1012,7 +1065,7 @@ async function handleTool(name: string, args: any): Promise<string> {
       const matchedMemories = allMemories.filter((m) => m.project && m.project.toLowerCase() === projectLower);
       const ccMemories = matchedMemories.length > 0 ? matchedMemories : allMemories.slice(0, 5);
 
-      return formatBrief(
+      const briefBody = formatBrief(
         {
           fuel: fuel?.estimated
             ? {
@@ -1032,6 +1085,17 @@ async function handleTool(name: string, args: any): Promise<string> {
         },
         project
       );
+
+      // v4.6.0 #398 — Continuous Handover prepend. When a card exists for the
+      // project, lead with it so the next instance reads the live handover
+      // before the structured brief. Falls through silently when none.
+      if (handover && handover.content) {
+        const ageH = (Date.now() - new Date(handover.updated_at).getTime()) / 3600000;
+        const ageStr = ageH < 1 ? `${Math.round(ageH * 60)}m` : ageH < 24 ? `${Math.round(ageH)}h` : `${Math.round(ageH / 24)}d`;
+        const header = `◈ HANDOVER · ${project} (updated ${ageStr} ago${handover.updated_by ? ' · ' + handover.updated_by : ''})`;
+        return `${header}\n\n${handover.content}\n\n${'─'.repeat(60)}\n\n${briefBody}`;
+      }
+      return briefBody;
     }
 
     case 'nexus_get_plan': {
@@ -1682,6 +1746,42 @@ async function handleTool(name: string, args: any): Promise<string> {
         `  overseer:           ${ai.available ? `${ai.provider} · ${ai.model}` : 'unavailable'}`,
       ];
       return lines.join('\n');
+    }
+
+    case 'nexus_read_handover': {
+      // v4.6.0 #398 — Continuous Handover read.
+      const project = String(args?.project || 'Nexus');
+      try {
+        const entry = await nexusFetch(`/api/handover/${encodeURIComponent(project)}`) as {
+          project: string; content: string; updated_at: string; updated_by?: string;
+        };
+        const ageH = (Date.now() - new Date(entry.updated_at).getTime()) / 3600000;
+        const ageStr = ageH < 1 ? `${Math.round(ageH * 60)}m` : ageH < 24 ? `${Math.round(ageH)}h` : `${Math.round(ageH / 24)}d`;
+        return [
+          `◈ Handover · ${project} (updated ${ageStr} ago${entry.updated_by ? ' · ' + entry.updated_by : ''})`,
+          '',
+          entry.content,
+        ].join('\n');
+      } catch (err) {
+        if (String((err as Error).message).includes('404')) {
+          return `◈ No handover yet for project "${project}". Use nexus_update_handover to write the first one.`;
+        }
+        throw err;
+      }
+    }
+
+    case 'nexus_update_handover': {
+      // v4.6.0 #398 — Continuous Handover write.
+      if (typeof args?.content !== 'string') throw new Error('content (string) is required');
+      const project = String(args?.project || 'Nexus');
+      const body = JSON.stringify({
+        content: args.content,
+        ...(args?.updated_by ? { updated_by: String(args.updated_by) } : {}),
+      });
+      const entry = await nexusFetch(`/api/handover/${encodeURIComponent(project)}`, {
+        method: 'PUT', body,
+      }) as { project: string; content: string; updated_at: string };
+      return `◈ Handover saved · ${entry.project} · ${entry.content.length} chars · ${entry.updated_at}`;
     }
 
     case 'nexus_import_cc_memories': {

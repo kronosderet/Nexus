@@ -320,6 +320,40 @@ export class NexusStore {
       markApplied('v4.5.7-E1');
     }
 
+    // v4.6.0 E1 — seed continuous-handover for the Nexus project from the
+    // last dated HANDOVER-X.md TL;DR. Idempotent: only seeds if no handover
+    // exists yet for "Nexus", so re-running won't clobber user edits.
+    if (!applied['v4.6.0-E1']) {
+      if (!this.data._handovers) this.data._handovers = {};
+      if (!this.data._handovers['Nexus']) {
+        this.data._handovers['Nexus'] = {
+          content: [
+            '# Nexus — Continuous Handover',
+            '',
+            '**v4.6.0 shipped 2026-04-26**: Continuous Handover replaces dated `HANDOVER-YYYY-MM-DD.md` files. This card lives in Nexus and updates per session via `nexus_update_handover` or the Handover tab editor.',
+            '',
+            '## Current state',
+            '- 27 → **29 MCP tools** (added `nexus_read_handover`, `nexus_update_handover`)',
+            '- Tier 2 = 0 (cleared at v4.5.9)',
+            '- Tier 3: 7 deferred items remaining',
+            '- Fuel model: sliding session + sliding weekly (Sat 10:00 Prague)',
+            '',
+            '## What I\'d pick up first',
+            '- **#218** route tests for github / overseer / webhooks (best stability ROI)',
+            '- One of 7 deferred Tier-3 items',
+            '- Tier 4 polish sweep',
+            '',
+            'See `docs/ARCHITECTURE.md` for slow-moving content (architecture spine, gotchas, rituals).',
+          ].join('\n'),
+          updated_at: new Date().toISOString(),
+          updated_by: 'migration:v4.6.0-E1',
+        };
+        console.error('◈ Migration v4.6.0 E1: seeded continuous handover for Nexus project.');
+        changed++;
+      }
+      markApplied('v4.6.0-E1');
+    }
+
     if (changed > 0) this._flush();
   }
 
@@ -437,6 +471,33 @@ export class NexusStore {
   setSessionTiming(timing: SessionTiming): void { this.data._sessionTiming = timing; this._flush(); }
   getFuelConfig(): import('../types.js').FuelConfig | undefined { return this.data._fuelConfig; }
   setFuelConfig(config: import('../types.js').FuelConfig): void { this.data._fuelConfig = config; this._flush(); }
+
+  // v4.6.0 #398 — continuous handover. Per-project markdown card replacing
+  // dated HANDOVER-YYYY-MM-DD.md files. ~500-word soft cap (no enforcement;
+  // it's advisory).
+  getHandover(project: string): import('../types.js').HandoverEntry | undefined {
+    return this.data._handovers?.[project];
+  }
+  getAllHandovers(): Record<string, import('../types.js').HandoverEntry> {
+    return this.data._handovers || {};
+  }
+  setHandover(project: string, content: string, updated_by?: string): import('../types.js').HandoverEntry {
+    if (!this.data._handovers) this.data._handovers = {};
+    const entry: import('../types.js').HandoverEntry = {
+      content: String(content || ''),
+      updated_at: new Date().toISOString(),
+      ...(updated_by ? { updated_by } : {}),
+    };
+    this.data._handovers[project] = entry;
+    this._flush();
+    return entry;
+  }
+  deleteHandover(project: string): boolean {
+    if (!this.data._handovers || !this.data._handovers[project]) return false;
+    delete this.data._handovers[project];
+    this._flush();
+    return true;
+  }
   getScheduledScans(type?: string, limit = 10): import('../types.js').ScheduledScan[] {
     const scans = this.data._scheduledScans || [];
     const filtered = type ? scans.filter(s => s.type === type) : scans;

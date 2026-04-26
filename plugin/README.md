@@ -21,11 +21,11 @@ Nexus gives Claude Code a persistent brain across conversations:
 /plugin install nexus@nexus-marketplace
 ```
 
-## Available tools (27)
+## Available tools (29)
 
-**Read:** nexus_brief, nexus_get_plan, nexus_check_guard, nexus_search, nexus_get_critique, nexus_predict_gaps, nexus_get_blast_radius, nexus_ask_overseer, nexus_version
+**Read:** nexus_brief, nexus_get_plan, nexus_check_guard, nexus_search, nexus_get_critique, nexus_predict_gaps, nexus_get_blast_radius, nexus_ask_overseer, nexus_version, nexus_read_handover
 
-**Write:** nexus_create_task, nexus_complete_task, nexus_delete_task, nexus_log_activity, nexus_log_session, nexus_log_usage, nexus_record_decision, nexus_update_decision, nexus_link_decisions, nexus_push_thought, nexus_pop_thought, nexus_import_cc_memories
+**Write:** nexus_create_task, nexus_complete_task, nexus_delete_task, nexus_log_activity, nexus_log_session, nexus_log_usage, nexus_record_decision, nexus_update_decision, nexus_link_decisions, nexus_push_thought, nexus_pop_thought, nexus_import_cc_memories, nexus_update_handover
 
 **Async AI:** nexus_ask_overseer_start, nexus_get_overseer_result, nexus_propose_edges
 
@@ -46,7 +46,7 @@ All data stored at `~/.nexus/nexus.json` with automatic backup rotation (3 gener
 
 ## Local AI (optional)
 
-For AI-powered features (Overseer, session plan, code audit), install [LM Studio](https://lmstudio.ai) and load a model. Tested with Gemma 4 31B and 26B A4B (Q4_K_M). Auto-detects at `localhost:1234`. Without it, the 22 non-AI tools still work normally (4 AI-dependent tools: `nexus_ask_overseer`, `nexus_ask_overseer_start`, `nexus_get_overseer_result`, `nexus_propose_edges`).
+For AI-powered features (Overseer, session plan, code audit), install [LM Studio](https://lmstudio.ai) and load a model. Tested with Gemma 4 31B and 26B A4B (Q4_K_M). Auto-detects at `localhost:1234`. Without it, the 25 non-AI tools still work normally (4 AI-dependent tools: `nexus_ask_overseer`, `nexus_ask_overseer_start`, `nexus_get_overseer_result`, `nexus_propose_edges`).
 
 ## Privacy
 

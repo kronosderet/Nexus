@@ -64,6 +64,7 @@ async function start() {
   const { createSmartSearchRoutes } = await import('./routes/smartSearch.ts');
   const { createEmbeddingRoutes } = await import('./routes/embeddings.ts');
   const { createMemoryRoutes } = await import('./routes/memory.ts');
+  const { createHandoverRoutes } = await import('./routes/handover.ts');
   const { SERVER_VERSION } = await import('./lib/version.ts');
 
   const store = new NexusStore();
@@ -133,6 +134,8 @@ async function start() {
   // v4.3.8 #200 — was previously only served by localApi.ts in standalone mode.
   // Wire here so dashboard mode handles GET /api/cc-memory and POST /api/cc-memory/import.
   app.use('/api/cc-memory', createMemoryRoutes(store, broadcast));
+  // v4.6.0 #398 — Continuous Handover. Per-project markdown card replacing dated HANDOVER files.
+  app.use('/api/handover', createHandoverRoutes(store, broadcast));
 
   // Fleet overview (cross-project priority)
   app.get('/api/fleet', (_req, res) => res.json(store.getFleetOverview()));

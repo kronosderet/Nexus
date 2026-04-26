@@ -517,7 +517,7 @@ Local AI-powered mission control (v4.3). Tracks tasks, sessions, decisions,
 fuel usage, and git state across all projects. Features:
   • Knowledge Graph of 140+ decisions with 7 typed edge types + blast-radius analysis
   • Local AI Overseer (Gemma 4 via LM Studio) with self-improving Advice Journal
-  • 27 native MCP tools — every Nexus operation callable from Claude Desktop natively
+  • 29 native MCP tools — every Nexus operation callable from Claude Desktop natively
   • Compass module — Now/Next/Later/Done strategic dashboard replacing Scratchpad
   • Smart Fuel Intelligence with autonomous session planning
   • Predictive Task Generation from graph gaps (6 gap categories)
@@ -1711,7 +1711,7 @@ Ritual:  nexus_bridge_session (end-of-work: auto-summary + handoff)
     console.log(`
   ${amber('◈')} ${amber('NEXUS MCP SERVER')} -- v${NEXUS_VERSION}
 
-  ${dim('Exposes the Nexus metabrain as 27 native MCP tools so every Claude')}
+  ${dim('Exposes the Nexus metabrain as 29 native MCP tools so every Claude')}
   ${dim('instance can call mcp__nexus__brief, mcp__nexus__check_guard, etc.')}
   ${dim('without shelling out to the CLI or fetching the HTTP API.')}
 
