@@ -6,6 +6,9 @@ nexus.db
 .DS_Store
 Thumbs.db
 tests/.test-nexus.*
+tests/.test-*.json
+tests/.test-*.json.*
+nexus-webhooks.json
 nexus-embeddings.json
 nexus.json
 nexus.json.bak
