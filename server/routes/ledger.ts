@@ -86,7 +86,13 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
     // currently have zero edges. Lets the Holes tab fire "try to link every
     // orphan" without re-running full auto-link across the whole graph.
     const orphansOnly = req.query.orphans_only === 'true' || req.body?.orphans_only === true;
-    let decisions = store.getLedger({ limit: 60 });
+    // v4.6.3 — exclude lifecycle=reference (cc-memory imports etc.) from the
+    // pool. Without this filter, sequential cc-memory imports (Level Magazine,
+    // Fedora Dual-Boot, DIREWOLF system info...) get strung as a `led_to`
+    // chain just because they were imported one after another — false-positive
+    // edges that pollute the typed graph. Reference material is meant to be
+    // a separate layer, not auto-linked.
+    let decisions = store.getLedger({ limit: 60 }).filter((d: Decision) => d.lifecycle !== 'reference');
     if (orphansOnly) {
       const incidentIds = new Set<number>();
       for (const e of store.getAllEdges()) { incidentIds.add(e.from); incidentIds.add(e.to); }

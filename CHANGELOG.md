@@ -9,6 +9,56 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.6.3 — Orphan Resolution + Reference-Layer Honesty
+
+User-driven follow-up to v4.6.2. The post-cleanup orphan count was 35
+"orphans" — but **32 of those were intentional reference imports** (cc-memory)
+that the design says should NOT be in the typed graph. This release fixes the
+metric to be honest, prevents auto-link from polluting the graph with
+false-positive `led_to` chains across reference imports, and links the 3
+real orphans to their natural parents. **281 tests · 29 tools · no
+migrations · no breaking changes.**
+
+**The metric problem**
+
+Before v4.6.3, the Holes view + Overseer risk scanner counted every decision
+without graph edges as an "orphan", including the cc-memory reference layer
+(imported with `autoLink: false` by design). This inflated the metric and
+hid the actual graph fragmentation:
+
+| | Pre-v4.6.3 | Post-v4.6.3 |
+|---|---|---|
+| Reported "orphans" | 35 | **3 → 0** |
+| Actual graph orphans | 3 | 0 |
+| Reference imports | counted | excluded (correct layer) |
+
+**Code changes — exclude `lifecycle=reference` everywhere it inflates signal**
+
+- `server/routes/impact.ts /holes` — `getAllDecisions().filter(d => d.lifecycle !== 'reference')` before the union-find pass.
+- `server/routes/overseer.ts /risks` — `orphanCount` calc same filter; the orphans-risk message now reflects real fragmentation.
+- `server/routes/ledger.ts /auto-link` — pool excludes reference decisions. **This was the bigger fix**: a dry-run preview showed auto-link would have generated 45 `led_to` edges chaining cc-memory imports as a temporal sequence ("Level Magazine → Fedora Dual-Boot → DIREWOLF system info..."), all of which are semantically wrong. Now the auto-link tool stays in the typed-graph layer.
+
+**Manual links applied to the live store** (the 3 real orphans found):
+
+- `#158` "P1 TypeScript any reduction reached practical zero (262 → 4, 98.5%)" — `led_to → #159` "v4.3.5 polish pile closed" (the achievement is what #159 documents)
+- `#157` "Decision records in The Ledger are historical references" — `informs → #59` "The Ledger is the strategic memory layer" (#157 informs how to read entries)
+- `#76` "Captain says go bigger — burn rate is efficient enough for medium-large tasks" — `related → #3` "weekly fuel identified as tighter constraint" (both about pacing work against fuel)
+
+After: **0 active/proposed orphans in Nexus**. The 32 cc-memory imports stay as a clean reference layer, properly tagged + lifecycle-marked but not muddying the typed graph.
+
+**Tests added**
+
+`tests/routes.test.ts` — 1 new spec verifying `/api/impact/holes` excludes
+`lifecycle=reference` from the per-project decision count.
+
+**Files touched**
+
+- `server/routes/impact.ts` — reference filter on `/holes`
+- `server/routes/overseer.ts` — reference filter on orphan risk count
+- `server/routes/ledger.ts` — reference filter on auto-link pool
+- `tests/routes.test.ts` — new spec
+- `package.json`, `cli/package.json`, `mcpb/manifest.json`, `CHANGELOG.md`, `ROADMAP.md`
+
 ## v4.6.2 — Knowledge Graph Hygiene
 
 Audit of the live decision/tag knowledge graph found 4 issues; this release

@@ -341,7 +341,13 @@ export function createImpactRoutes(store: NexusStore) {
   // signal: "your Nexus decisions split into 3 islands that don't reference
   // each other" is something worth knowing.
   router.get('/holes', (_req: Request, res: Response) => {
-    const decisions = store.getAllDecisions();
+    // v4.6.3 — exclude lifecycle=reference decisions from the orphan/holes
+    // calculation. cc-memory imports (and other reference material) are a
+    // separate documentation layer by design — they're not supposed to be
+    // typed graph nodes. Counting them as orphans inflates the metric and
+    // hides real fragmentation. The Nexus project had 35 "orphans" pre-fix,
+    // 32 of which were intentional reference imports.
+    const decisions = store.getAllDecisions().filter(d => d.lifecycle !== 'reference');
     const edges = store.getAllEdges();
 
     // Group decisions by project

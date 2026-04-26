@@ -1124,7 +1124,10 @@ Propose edges from the SUBJECT to one or more CANDIDATES. Remember: JSON only, m
     const allEdges = store.getAllEdges();
     const connected = new Set<number>();
     for (const e of allEdges) { connected.add(e.from); connected.add(e.to); }
-    const orphanCount = store.getAllDecisions().filter(d => !connected.has(d.id)).length;
+    // v4.6.3 — exclude lifecycle=reference (cc-memory imports etc.) from
+    // the orphan risk count. They're a separate reference layer by design
+    // and inflating this metric hid real graph-fragmentation signal.
+    const orphanCount = store.getAllDecisions().filter(d => d.lifecycle !== 'reference' && !connected.has(d.id)).length;
     if (orphanCount >= 10) {
       risks.push({ level: 'warning', category: 'orphans', message: `${orphanCount} orphan decisions — knowledge graph fragmenting`, fix: { cmd: 'nexus graph holes', label: 'Review holes' } });
     } else if (orphanCount >= 5) {

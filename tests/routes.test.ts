@@ -345,6 +345,24 @@ describe('Impact API', () => {
     expect(res.body.totalFragmented).toBeDefined();
   });
 
+  it('GET /api/impact/holes excludes lifecycle=reference from orphan count (v4.6.3)', async () => {
+    // Seed a project with one active decision + one reference (cc-memory).
+    // Pre-v4.6.3 the reference would inflate the orphan count to 2; post-fix
+    // it counts only the active decision.
+    await request(app).post('/api/ledger').send({ decision: 'Active solo decision', project: 'RefTest' });
+    const ref = await request(app).post('/api/ledger').send({ decision: 'Imported memory', project: 'RefTest', tags: ['cc-memory', 'reference'] });
+    // Promote the ref decision to lifecycle=reference (recordDecision defaults
+    // to active, so we PATCH it via the same route the importCCMemory path uses).
+    await request(app).patch(`/api/ledger/${ref.body.id}`).send({ lifecycle: 'reference' });
+
+    const res = await request(app).get('/api/impact/holes');
+    expect(res.status).toBe(200);
+    const refTest = res.body.projectAnalysis.find((p: { project: string }) => p.project === 'RefTest');
+    expect(refTest).toBeDefined();
+    // Only the active decision should count — ref excluded.
+    expect(refTest.decisions).toBe(1);
+  });
+
   it('GET /api/impact/blast/:id returns 404 for missing decision', async () => {
     const res = await request(app).get('/api/impact/blast/99999');
     expect(res.status).toBe(404);
