@@ -100,11 +100,15 @@ export const api = {
   // v4.5.8 #328 — full decision + connections + linked tasks for the Graph Visual side panel drilldown.
   getLedgerConnections: (id) => request(`/ledger/${id}/connections`),
   // v4.4.1 #306 — manual edge creation (contradiction flag + future general use).
+  // v4.6.4 — pass plain object; request() stringifies once. The previous
+  // pre-stringify caused a double-encode (body became a JSON-encoded string,
+  // not an object), 400'ing at the body-parser layer.
   linkDecisions: ({ from, to, rel = 'related', note = '' }) =>
-    request('/ledger/link', { method: 'POST', body: JSON.stringify({ from, to, rel, note }) }),
+    request('/ledger/link', { method: 'POST', body: { from, to, rel, note } }),
   // v4.4.8 #307 — Overseer contradiction scan + accept/dismiss endpoints.
+  // v4.6.4 — same fix: pass object, not string.
   scanContradictions: (opts = {}) => request('/overseer/scan-contradictions', {
-    method: 'POST', body: JSON.stringify(opts),
+    method: 'POST', body: opts,
   }),
   getScanContradictionsResult: (taskId) => request(`/overseer/ask/result/${encodeURIComponent(taskId)}`),
   getSuggestedContradictions: () => request('/ledger/suggested-contradictions'),

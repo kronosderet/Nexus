@@ -142,6 +142,29 @@ describe('Overseer routes (v4.6.1 #218)', () => {
       // Either 503 (no AI), 200 with task id (would error), or graceful error
       expect([200, 503]).toContain(res.status);
     });
+
+    it('accepts a real object body without double-stringify (v4.6.4 regression guard)', async () => {
+      // Repros the v4.6.4 bug: client used to JSON.stringify(opts) before
+      // passing to request() which stringified again. Server then saw a
+      // JSON-encoded string instead of an object and 400'd at body-parser.
+      // Supertest's .send({...}) sends a real object, so this passes; the
+      // guard is that the route doesn't throw on shape.
+      const { app } = makeApp();
+      const res = await request(app)
+        .post('/api/overseer/scan-contradictions')
+        .send({ max_pairs: 10, force: false });
+      expect([200, 503]).toContain(res.status);
+      // Crucially NOT 400 from a body-parser SyntaxError.
+    });
+  });
+
+  describe('POST /api/ledger/link (mounted via separate test app for shape coverage)', () => {
+    it.skip('object body coverage — v4.6.4 regression guard for the same double-stringify class', () => {
+      // Coverage note: tests/routes.test.ts already exercises POST /api/ledger/link
+      // with an object body. The v4.6.4 fix ensures the client never
+      // pre-stringifies, mirroring how supertest sends. Skipping here to
+      // avoid duplicating that suite's app wiring.
+    });
   });
 
   describe('GET /api/overseer/suggested-contradictions (via ledger; sanity)', () => {

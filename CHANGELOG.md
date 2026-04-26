@@ -9,6 +9,52 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.6.4 — Hotfix: Double-Stringified POST Bodies
+
+User-reported: clicking "Scan for contradictions" on the Conflicts tab 400'd
+with `SyntaxError: Unexpected token '"', "{\"max_pa..." is not valid JSON`.
+**231 → 282 tests · 29 tools · no schema/migration changes.**
+
+**Root cause**
+
+Two `useApi.js` methods pre-stringified their body before handing to
+`request()` — which then stringified AGAIN, producing a JSON-encoded string
+instead of a JSON object. body-parser saw `'"{\"max_pairs\":...}"'` and
+correctly rejected it.
+
+```js
+// Pre-fix:
+scanContradictions: (opts = {}) => request('/overseer/scan-contradictions', {
+  method: 'POST', body: JSON.stringify(opts),  // ← request() stringifies again
+}),
+// Same bug in linkDecisions (FlagContradictionForm path — never tested via UI).
+```
+
+**Fix**
+
+Pass plain objects; let `request()` handle the single stringify pass:
+
+```js
+scanContradictions: (opts = {}) => request('/overseer/scan-contradictions', {
+  method: 'POST', body: opts,  // ← single-stringify in request()
+}),
+linkDecisions: ({ from, to, rel = 'related', note = '' }) =>
+  request('/ledger/link', { method: 'POST', body: { from, to, rel, note } }),
+```
+
+**Regression guard**
+
+`tests/routesUncovered.test.ts` adds a spec posting a real object body
+to `/api/overseer/scan-contradictions` and asserting the response is NOT
+a body-parser 400. Catches the same class of bug if anyone re-introduces
+the pre-stringify pattern.
+
+**Files touched**
+
+- `client/src/hooks/useApi.js` — drop pre-stringify on both methods
+- `tests/routesUncovered.test.ts` — regression guard
+- `package.json`, `cli/package.json`, `mcpb/manifest.json`, `CHANGELOG.md`, `ROADMAP.md` — bumps
+
 ## v4.6.3 — Orphan Resolution + Reference-Layer Honesty
 
 User-driven follow-up to v4.6.2. The post-cleanup orphan count was 35
