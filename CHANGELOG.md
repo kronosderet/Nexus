@@ -9,6 +9,101 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.6.1 — Overseer Sweep + Route Tests
+
+Five-item Overseer-themed batch closing one structural carry-over (#218),
+one already-done Tier-3 (#239 verified), and three Tier-4 polish items
+(#351/#352/#353). **231 → 264 tests (+33 specs)** across the three
+previously-uncovered route files. **29 MCP tools · no migrations · no
+breaking changes.**
+
+**#218 — Route tests for `github` / `overseer` / `webhooks`**
+
+The audit's longest-deferred structural item. New file
+`tests/routesUncovered.test.ts` covers all three route modules with
+hermetic supertest fixtures. Highlights:
+- `/api/overseer/risks` — shape contract, level-vocabulary, memory-threshold
+  conditional behavior
+- `/api/overseer/status`, `/ask` validation (400 missing question), `/ask/result/:id`
+  404, `/scan-contradictions` no-AI fallback
+- `/api/github/repos`, `/commits`, `/commits/:project` (path-traversal guard),
+  `/commit` (validation + sanitization + nonexistent-project graceful failure),
+  `/diff/:project`, `/sync`
+- `/api/webhooks` GET/POST/DELETE/test/inbound — including the 4 GitHub event
+  parsers (push, pull_request, release, unknown)
+
+One test marked `.skip()` with a documentation note: the AI-dependent
+`/ask` happy path can't run reliably in CI (depends on whether LM Studio
+is up locally; when up the inference exceeds the per-test timeout).
+
+**#239 — Memory/VRAM > 85% as Overseer risks** — closed as **already-done**.
+v4.3.9 #341 implemented the exact 85%/95% thresholds; today's audit confirmed
+the code matches the spec. No code change needed.
+
+**#351 — Per-response metadata (latency · tokens · VRAM peak)**
+
+New `askWithMeta()` wrapper around the existing `ask()` helper. Captures
+`{latencyMs, tokens?, vramPeakMib?, model}` for each Overseer Q/A turn and
+threads it through:
+- `POST /api/overseer/ask` returns `meta` alongside `answer`
+- Client `chatHistory[i].meta` rendered as a compact badge:
+  `2.3s · 1247t · +480M`
+- Tooltip spells out: `Latency: 2.3s · Tokens: 412 prompt + 835 completion = 1247 total · VRAM delta: +480 MiB during call · Model: gemma-4-31b`
+- Token usage decoded from Anthropic, OpenAI-compatible (LM Studio), and
+  Ollama response shapes
+- VRAM "peak" computed as `vram_used at end − vram_used at start` from the
+  GPU history slice (defensive: undefined if no GPU samples)
+
+`ask()` itself is unchanged; only `/ask` uses the wrapper. Other call sites
+(analysis, contradiction-scan, propose-edges) still get plain string returns.
+
+**#352 — Question-input history (↑ arrow recall)**
+
+The Ask-the-Overseer textbox now responds to:
+- **↑** — recall previous user question (walks backward through `chatHistory`)
+- **↓** — walk forward; at the end, restores the live draft buffer
+- **Esc** — abort history nav, restore live draft
+- **Type** — exits history mode (preserves the recalled question as the
+  starting point for editing)
+- Sending a question resets the cursor
+
+State: `historyIdx` (-1 = live draft) + `draftBuffer` (preserves what was
+typed before ↑). Placeholder updated to `(↑ recalls last question)`.
+
+**#353 — Risk-category legend + manual Refresh trigger**
+
+Risk Scanner panel header gains a `RefreshCw` icon button next to the
+title that re-runs `/api/overseer/risks` without a full page reload.
+A new collapsible `<details>` "Categories ▾" expands to a 2-column grid
+showing all 8 risk categories with color-coded level dot + description:
+
+```
+● fuel        · session/weekly fuel low      ● memory      · system RAM ≥85%
+● vram        · GPU VRAM ≥85%                ● stale       · project gone cold
+● uncommitted · unsaved changes at risk      ● stuck       · task stuck in progress
+● blocker     · session blocker logged       ● orphans     · graph fragmenting
+```
+
+Self-documenting — users no longer need to grep server code to understand
+what triggers each risk.
+
+**Files touched**
+
+- `server/routes/overseer.ts` — `askWithMeta()` helper, `/ask` returns `meta`
+- `client/src/modules/Overseer.jsx` — meta badge, ↑/↓/Esc input nav, Refresh
+  button, categories legend
+- `tests/routesUncovered.test.ts` — NEW (+33 specs)
+- `package.json`, `cli/package.json`, `mcpb/manifest.json`, `CHANGELOG.md`,
+  `ROADMAP.md` — version bumps
+
+**What's next**
+
+Tier 3 deferred down to **6 items** (#239 closed): #240, #301, #310, #311,
+#332, #363. Tier 4: 23 polish items remaining. Structural carry-overs
+(#217 split files, #219 Zod) untouched. The sliding fuel model + continuous
+handover are settled; v4.6.x can be a small-batch polish track until the
+next headline feature.
+
 ## v4.6.0 — Continuous Handover
 
 The headline `#398` shipped. Per-project markdown card stored in Nexus

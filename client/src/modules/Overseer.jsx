@@ -365,6 +365,11 @@ export default function Overseer() {
   const [loading, setLoading] = useState(false);
   const [question, setQuestion] = useState('');
   const [asking, setAsking] = useState(false);
+  // v4.6.1 #352 — question-input history nav. ↑ recalls the previous user
+  // question (walking back); ↓ walks forward; Esc restores the live draft.
+  // Index is "how many steps back in the user-question stream"; -1 = live draft.
+  const [historyIdx, setHistoryIdx] = useState(-1);
+  const [draftBuffer, setDraftBuffer] = useState('');
   const [context, setContext] = useState(null);
   const [aiStatus, setAiStatus] = useState(null);
   const [gpuInfo, setGpuInfo] = useState(null);
@@ -447,6 +452,9 @@ export default function Overseer() {
 
     setAsking(true);
     setQuestion('');
+    // v4.6.1 #352 — reset history-nav cursor on send.
+    setHistoryIdx(-1);
+    setDraftBuffer('');
     // v4.4.7 #343 — send current mode + last 4 Q/A pairs as history when in refine.
     // Server uses this to skip re-running full strategic scaffolding on follow-ups.
     const historyPayload = askMode === 'refine'
@@ -457,7 +465,9 @@ export default function Overseer() {
     try {
       const data = await api.askOverseer({ question: q, mode: askMode, history: historyPayload });
       const answer = data.answer || data.error || 'No response';
-      setChatHistory(prev => [...prev, { role: 'overseer', text: answer, time: new Date().toISOString(), adviceId: data.adviceId, mode: askMode }]);
+      // v4.6.1 #351 — capture per-response metadata (latency/tokens/VRAM peak)
+      // returned by the server. Threaded through to the UI badge in ChatBubble.
+      setChatHistory(prev => [...prev, { role: 'overseer', text: answer, time: new Date().toISOString(), adviceId: data.adviceId, mode: askMode, meta: data.meta }]);
       // Auto-switch to refine after the first exchange unless the user has manually
       // overridden. Makes the common "one big question then a few follow-ups" flow
       // one-shot: first question is strategic, everything after is lean.
@@ -753,6 +763,24 @@ export default function Overseer() {
                           {msg.mode === 'refine' ? 'refine' : 'strategic'}
                         </span>
                       )}
+                      {/* v4.6.1 #351 — per-response metadata badge. Shows latency,
+                          tokens, and VRAM peak (when available) so users can see what
+                          each Overseer call cost. Tooltip spells out the precise figures. */}
+                      {msg.role === 'overseer' && msg.meta && (
+                        <span
+                          className="text-[8px] font-mono px-1 rounded bg-nexus-text-faint/10 text-nexus-text-faint border border-nexus-border"
+                          title={[
+                            `Latency: ${(msg.meta.latencyMs / 1000).toFixed(1)}s`,
+                            msg.meta.tokens ? `Tokens: ${msg.meta.tokens.prompt} prompt + ${msg.meta.tokens.completion} completion = ${msg.meta.tokens.total} total` : null,
+                            msg.meta.vramPeakMib != null ? `VRAM delta: +${msg.meta.vramPeakMib} MiB during call` : null,
+                            msg.meta.model ? `Model: ${msg.meta.model}` : null,
+                          ].filter(Boolean).join('\n')}
+                        >
+                          {(msg.meta.latencyMs / 1000).toFixed(1)}s
+                          {msg.meta.tokens ? ` · ${msg.meta.tokens.total}t` : ''}
+                          {msg.meta.vramPeakMib != null && msg.meta.vramPeakMib > 0 ? ` · +${msg.meta.vramPeakMib}M` : ''}
+                        </span>
+                      )}
                       {/* v4.4.2 #345 — smart timestamp: "HH:MM" for today, "Nd · HH:MM"
                           for recent days, full date for older. Audit flagged that just
                           "22:52" was ambiguous across days. */}
@@ -860,10 +888,44 @@ export default function Overseer() {
             <div className="flex gap-2">
               <input
                 value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && !asking && askOverseer()}
+                onChange={(e) => {
+                  setQuestion(e.target.value);
+                  // v4.6.1 #352 — typing exits history-nav mode.
+                  if (historyIdx !== -1) setHistoryIdx(-1);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !asking) {
+                    askOverseer();
+                    return;
+                  }
+                  // v4.6.1 #352 — ↑/↓ navigate user-question history.
+                  if (e.key === 'ArrowUp') {
+                    const userQs = chatHistory.filter(m => m.role === 'user');
+                    if (userQs.length === 0) return;
+                    e.preventDefault();
+                    if (historyIdx === -1) setDraftBuffer(question);
+                    const next = Math.min(historyIdx + 1, userQs.length - 1);
+                    setHistoryIdx(next);
+                    setQuestion(userQs[userQs.length - 1 - next].text || '');
+                  } else if (e.key === 'ArrowDown') {
+                    if (historyIdx === -1) return;
+                    e.preventDefault();
+                    const next = historyIdx - 1;
+                    setHistoryIdx(next);
+                    if (next === -1) {
+                      setQuestion(draftBuffer);
+                    } else {
+                      const userQs = chatHistory.filter(m => m.role === 'user');
+                      setQuestion(userQs[userQs.length - 1 - next].text || '');
+                    }
+                  } else if (e.key === 'Escape' && historyIdx !== -1) {
+                    e.preventDefault();
+                    setHistoryIdx(-1);
+                    setQuestion(draftBuffer);
+                  }
+                }}
                 maxLength={5000}
-                placeholder={askMode === 'refine' ? 'Follow up on the previous answer...' : 'What should I prioritize? / What are the biggest risks? / ...'}
+                placeholder={askMode === 'refine' ? 'Follow up on the previous answer... (↑ recalls last question)' : 'What should I prioritize? / What are the biggest risks? / ... (↑ recalls last question)'}
                 className="flex-1 bg-nexus-bg border border-nexus-border rounded-lg px-3 py-2 text-sm text-nexus-text placeholder:text-nexus-text-faint focus:border-nexus-amber focus:outline-none"
               />
               <button
@@ -883,7 +945,47 @@ export default function Overseer() {
             <div className="flex items-center gap-2 mb-4">
               <Shield size={14} className="text-nexus-amber" />
               <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Risk Scanner</span>
+              {/* v4.6.1 #353 — manual refresh trigger. Risks auto-load on mount; this
+                  re-runs without a full page reload (cheap — no AI call, just
+                  /api/overseer/risks). */}
+              <button
+                onClick={fetchRisks}
+                title="Re-scan risks (re-runs /api/overseer/risks)"
+                aria-label="Refresh risks"
+                className="ml-auto p-1 rounded text-nexus-text-faint hover:text-nexus-amber hover:bg-nexus-amber/10 transition-colors"
+              >
+                <RefreshCw size={11} />
+              </button>
             </div>
+
+            {/* v4.6.1 #353 — risk category legend. Eight categories with their
+                level + color so the panel is self-documenting. Compact 2-col grid. */}
+            <details className="mb-3 group">
+              <summary className="cursor-pointer text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider hover:text-nexus-text">
+                Categories ▾
+              </summary>
+              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 pl-1">
+                {[
+                  { cat: 'fuel',        level: 'critical', desc: 'session/weekly fuel low' },
+                  { cat: 'memory',      level: 'warning',  desc: 'system RAM ≥85%' },
+                  { cat: 'vram',        level: 'warning',  desc: 'GPU VRAM ≥85%' },
+                  { cat: 'stale',       level: 'warning',  desc: 'project gone cold' },
+                  { cat: 'uncommitted', level: 'warning',  desc: 'unsaved changes at risk' },
+                  { cat: 'stuck',       level: 'info',     desc: 'task stuck in progress' },
+                  { cat: 'blocker',     level: 'warning',  desc: 'session blocker logged' },
+                  { cat: 'orphans',     level: 'warning',  desc: 'graph fragmenting' },
+                ].map(({ cat, level, desc }) => {
+                  const color = level === 'critical' ? 'text-nexus-red' : level === 'warning' ? 'text-nexus-amber' : 'text-nexus-blue';
+                  return (
+                    <div key={cat} className="flex items-baseline gap-1.5 text-[9px] font-mono">
+                      <span className={color}>●</span>
+                      <span className="text-nexus-text-dim">{cat}</span>
+                      <span className="text-nexus-text-faint truncate" title={desc}>· {desc}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
 
             {risks === null && (
               <p className="text-xs text-nexus-text-faint">Loading...</p>

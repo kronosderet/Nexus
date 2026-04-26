@@ -32,6 +32,70 @@ type BroadcastFn = (data: unknown) => void;
 // ── AI connection — shared detection from lib/aiEndpoints.ts ─────
 import { detectAI } from '../lib/aiEndpoints.ts';
 
+// v4.6.1 #351 — per-response metadata. The /ask handler uses askWithMeta to
+// surface latency/tokens/VRAM-peak in the chat history. Other callers (analysis,
+// scan-contradictions, etc.) keep using ask() for the unchanged string return.
+async function askWithMeta(ai: AIConfig, system: string, prompt: string, maxTokens = 1500, store?: NexusStore): Promise<{ answer: string; meta: { latencyMs: number; tokens?: { prompt: number; completion: number; total: number }; vramPeakMib?: number; model: string } }> {
+  const startedAt = Date.now();
+  // Sample VRAM at start so we can compute "peak above baseline" using the
+  // GPU watcher data the gpuPoller already captures every few seconds.
+  const baselineGpu = store?.getGpuHistory?.(0.05) || []; // last ~3min
+  const vramBaseline = baselineGpu.length > 0 ? baselineGpu[baselineGpu.length - 1].vram_used : null;
+
+  // Reuse the existing ask() but capture the raw response too, by inlining the call.
+  const releaseLock = await acquireAiLock();
+  const { signal, cleanup } = createGpuAwareSignal();
+  let answer = '';
+  let tokens: { prompt: number; completion: number; total: number } | undefined;
+  try {
+    if (ai.type === 'anthropic') {
+      const payload = { model: ai.model, max_tokens: maxTokens, system, messages: [{ role: 'user', content: prompt }] };
+      const data = await aiFetch(`${ai.base}/messages`, payload, signal);
+      const blocks: AnthropicContentBlock[] = data.content || [];
+      answer = blocks.filter((b) => b.type === 'text').map((b) => b.text || '').join('\n').trim();
+      if (data.usage) {
+        tokens = { prompt: data.usage.input_tokens || 0, completion: data.usage.output_tokens || 0, total: (data.usage.input_tokens || 0) + (data.usage.output_tokens || 0) };
+      }
+    } else {
+      const url = ai.type === 'ollama' ? `${ai.base}/api/chat` : `${ai.base}/chat/completions`;
+      const messages = [{ role: 'system', content: system }, { role: 'user', content: prompt }];
+      const payload = ai.type === 'ollama'
+        ? { model: ai.model, messages, stream: false }
+        : { model: ai.model, messages, max_tokens: maxTokens + 2048, temperature: 0.4 };
+      const data = await aiFetch(url, payload, signal);
+      if (ai.type === 'ollama') {
+        answer = data.message?.content || '';
+        if (data.prompt_eval_count != null && data.eval_count != null) {
+          tokens = { prompt: data.prompt_eval_count, completion: data.eval_count, total: data.prompt_eval_count + data.eval_count };
+        }
+      } else {
+        const choice = data.choices?.[0]?.message;
+        if (choice?.content?.trim()) answer = choice.content.trim();
+        else if (choice?.reasoning_content) {
+          const paras = choice.reasoning_content.trim().split(/\n\n+/).filter((p: string) => p.trim().length > 20);
+          answer = paras.slice(-3).join('\n\n').replace(/^\s*[*•-]\s+/gm, '').trim();
+        }
+        if (data.usage) {
+          tokens = { prompt: data.usage.prompt_tokens || 0, completion: data.usage.completion_tokens || 0, total: data.usage.total_tokens || 0 };
+        }
+      }
+    }
+  } finally {
+    cleanup();
+    releaseLock();
+  }
+  const latencyMs = Date.now() - startedAt;
+  // Sample VRAM after completion; "peak" = max of (final − baseline, 0). The
+  // poller may not have captured the actual peak mid-call but this catches
+  // the common case where the model loaded into VRAM and stayed there.
+  const finalGpu = store?.getGpuHistory?.(0.05) || [];
+  const vramFinal = finalGpu.length > 0 ? finalGpu[finalGpu.length - 1].vram_used : null;
+  const vramPeakMib = vramBaseline != null && vramFinal != null
+    ? Math.max(0, vramFinal - vramBaseline)
+    : undefined;
+  return { answer, meta: { latencyMs, tokens, vramPeakMib, model: ai.model } };
+}
+
 async function ask(ai: AIConfig, system: string, prompt: string, maxTokens = 1500): Promise<string> {
   // Semaphore: only one AI inference at a time (prevents slot contention on 8GB VRAM)
   const releaseLock = await acquireAiLock();
@@ -542,7 +606,9 @@ export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) 
       : `Given this workspace state:\n\n${contextPrompt}\n\nQuestion: ${question}`;
 
     try {
-      const answer = await ask(ai, systemMsg, userMsg);
+      // v4.6.1 #351 — capture per-response metadata (latency, tokens, VRAM peak)
+      // for the chat-history surface. Other callers still use plain ask().
+      const { answer, meta } = await askWithMeta(ai, systemMsg, userMsg, 1500, store);
 
       // Auto-log advice
       const advice = store.recordAdvice({
@@ -551,7 +617,7 @@ export function createOverseerRoutes(store: NexusStore, broadcast: BroadcastFn) 
         recommendation: answer,
       });
 
-      res.json({ answer, adviceId: advice?.id ?? null, model: ai.model, mode });
+      res.json({ answer, adviceId: advice?.id ?? null, model: ai.model, mode, meta });
     } catch (err) {
       res.json({ error: err.message });
     }
