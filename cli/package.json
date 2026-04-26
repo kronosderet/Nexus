@@ -1,6 +1,6 @@
 {
   "name": "nexus-cli",
-  "version": "4.6.1",
+  "version": "4.6.2",
   "description": "Nexus CLI -- talk to mission control from any project",
   "type": "module",
   "bin": {

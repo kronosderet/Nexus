@@ -49,8 +49,12 @@ const PROJECTS_ROOT = process.env.NEXUS_CC_PROJECTS_DIR || join(homedir(), '.cla
 // project names into the module; now we scan the encoded dir + content through
 // the same pattern set the rest of Nexus uses.
 const DIR_HINTS: Array<{ project: string; patterns: RegExp[] }> = [
-  { project: 'Nexus',       patterns: [/C--Projects$/i] }, // Windows-encoded C:\Projects path
-  { project: 'claude-md',   patterns: [/Claude-MD$/i] },   // top-level Claude-MD dir
+  { project: 'Nexus', patterns: [
+    /C--Projects$/i,    // Windows-encoded C:\Projects path
+    /Claude-MD/i,       // v4.6.2 — was 'claude-md' (synthetic project leak); maps to Nexus
+                        // since the Claude-MD memories function as Nexus reference notes.
+                        // Older imports landed under 'claude-md' before; v4.6.2-D1 migrates them.
+  ] },
 ];
 
 function inferProject(encodedDir: string, content: string): string | null {

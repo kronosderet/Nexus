@@ -320,6 +320,146 @@ export class NexusStore {
       markApplied('v4.5.7-E1');
     }
 
+    // v4.6.2 D1 — knowledge-graph hygiene migration. Re-applies the v4.5.8
+    // phantom-project cleanup at code level so the store-reload race can't
+    // undo it. Pattern-based (not ID-based) so it's safe for any user's
+    // store: only mutates entries whose content matches the documented signals.
+    //
+    // Three concerns:
+    //   1. project='claude' renames to 'family-coop' when decision text
+    //      mentions Alpha/Beta agent protocol (the original rename intent).
+    //   2. project='claude-md' renames to 'Nexus' (DIR_HINTS leaked a
+    //      synthetic project from the C--Users-kronos-Claude-MD dir; in
+    //      v4.6.2 the hint maps to Nexus directly so future imports don't
+    //      repeat).
+    //   3. project='general' decisions get content-classified into their
+    //      real homes when the content carries an unambiguous prefix
+    //      ('SR3'/'Shadowrun', 'Firewall-Godot:', 'Noosphere'), or moved
+    //      to 'Nexus' when they're cc-memory imports.
+    //   4. Tags matching /^[A-Z]--/ (Windows-encoded path leaks from
+    //      importCCMemory's old behavior) are stripped from all decisions.
+    //
+    // Sessions + thoughts get the project renames too (same pattern).
+    if (!applied['v4.6.2-D1']) {
+      let renamedClaude = 0, renamedClaudeMd = 0, splitGeneral = 0, scrubbedTags = 0, deletedJunk = 0;
+
+      // Decisions
+      const remaining: Decision[] = [];
+      for (const dec of (this.data.ledger || [])) {
+        const decText = String(dec.decision || '').trim();
+        // 1. claude → family-coop (Alpha/Beta protocol decisions)
+        if (dec.project === 'claude' && /alpha|beta|outbox\.json|agent_alpha|agent_beta|profile\.json|conflict resolution|consent boundary|cooperative agent/i.test(decText)) {
+          dec.project = 'family-coop';
+          renamedClaude++;
+        }
+        // 2. claude-md → Nexus
+        if (dec.project === 'claude-md') {
+          dec.project = 'Nexus';
+          renamedClaudeMd++;
+        }
+        // 3. general split
+        if (dec.project === 'general') {
+          // 3a. junk — exact-match only, conservative on purpose. The `--help`
+          // case is a known artefact from a CLI flag leak in early Nexus.
+          if (decText === '--help') {
+            deletedJunk++;
+            continue; // drop from ledger
+          }
+          // 3b. content-pattern reassignment
+          if (/^SR3\b|^Shadowrun\b/i.test(decText)) {
+            dec.project = 'Shadowrun';
+            splitGeneral++;
+          } else if (/^Firewall-Godot[:\s]|Firewall-Godot:/i.test(decText)) {
+            dec.project = 'Firewall-Godot';
+            splitGeneral++;
+          } else if (/^Noosphere\b/i.test(decText)) {
+            dec.project = 'noosphere';
+            splitGeneral++;
+          } else if ((dec.tags || []).includes('cc-memory')) {
+            // 3c. cc-memory imports that landed in general → Nexus
+            dec.project = 'Nexus';
+            splitGeneral++;
+          }
+          // else leave as general (no clear signal — user can sort manually)
+        }
+        // 4. strip path-encoded tags (e.g. 'C--', 'C--Users-kronos-Claude-MD')
+        if (Array.isArray(dec.tags)) {
+          const before = dec.tags.length;
+          dec.tags = dec.tags.filter((t: string) => !/^[A-Z]--/.test(String(t)));
+          scrubbedTags += before - dec.tags.length;
+        }
+        remaining.push(dec);
+      }
+      this.data.ledger = remaining;
+
+      // Sessions: claude → family-coop (Alpha/Beta sessions)
+      let sessionsRenamed = 0;
+      for (const s of (this.data.sessions || [])) {
+        if (s.project === 'claude' && /alpha|beta|agent.protocol|outbox/i.test(String(s.summary || ''))) {
+          s.project = 'family-coop';
+          sessionsRenamed++;
+        }
+        if (s.project === 'claude-md') {
+          s.project = 'Nexus';
+          sessionsRenamed++;
+        }
+      }
+
+      // Thoughts: same renames
+      let thoughtsRenamed = 0;
+      for (const t of (this.data.thoughts || [])) {
+        if (t.project === 'claude' && /alpha|beta|outbox|agent.protocol/i.test(String(t.text || ''))) {
+          t.project = 'family-coop';
+          thoughtsRenamed++;
+        }
+        if (t.project === 'claude-md') {
+          t.project = 'Nexus';
+          thoughtsRenamed++;
+        }
+      }
+
+      const total = renamedClaude + renamedClaudeMd + splitGeneral + deletedJunk + scrubbedTags + sessionsRenamed + thoughtsRenamed;
+      if (total > 0) {
+        console.error(
+          `◈ Migration v4.6.2 D1: claude→family-coop ${renamedClaude} · ` +
+          `claude-md→Nexus ${renamedClaudeMd} · general split ${splitGeneral} · ` +
+          `junk deleted ${deletedJunk} · path-tags scrubbed ${scrubbedTags} · ` +
+          `sessions renamed ${sessionsRenamed} · thoughts renamed ${thoughtsRenamed}`
+        );
+        changed += total;
+      }
+      markApplied('v4.6.2-D1');
+    }
+
+    // v4.6.2 D2 — pattern expansion for stragglers D1's narrower regex left
+    // behind. The Alpha/Beta protocol decisions sometimes use "agents" /
+    // "relationship-first" / "secrets policy" / "coordination layer" without
+    // saying "alpha" or "beta" literally. Same conservative principle:
+    // pattern-match content only, no ID references.
+    if (!applied['v4.6.2-D2']) {
+      let renamedClaudeBroad = 0, generalToNexus = 0;
+      for (const dec of (this.data.ledger || [])) {
+        const decText = String(dec.decision || '').trim();
+        if (dec.project === 'claude' && /relationship-first|secrets policy|coordination layer is shared|communication translation|agents (?:surface|communicate|preserve)|M:\\claude|\\\\192\.168\.1\.229/i.test(decText)) {
+          dec.project = 'family-coop';
+          renamedClaudeBroad++;
+        }
+        // The "Captain says go bigger" note in general was confirmed Nexus by
+        // the user during v4.5.8 cleanup. Specific-string match so this
+        // doesn't false-positive on other users' stores.
+        if (dec.project === 'general' && /Captain says go bigger.*burn rate is efficient/i.test(decText)) {
+          dec.project = 'Nexus';
+          generalToNexus++;
+        }
+      }
+      const total = renamedClaudeBroad + generalToNexus;
+      if (total > 0) {
+        console.error(`◈ Migration v4.6.2 D2: claude→family-coop (broad) ${renamedClaudeBroad} · general→Nexus (specific) ${generalToNexus}`);
+        changed += total;
+      }
+      markApplied('v4.6.2-D2');
+    }
+
     // v4.6.0 E1 — seed continuous-handover for the Nexus project from the
     // last dated HANDOVER-X.md TL;DR. Idempotent: only seeds if no handover
     // exists yet for "Nexus", so re-running won't clobber user edits.
@@ -858,11 +998,15 @@ export class NexusStore {
     }
 
     // Fresh import — recordDecision with autoLink disabled to avoid graph spam.
+    // v4.6.2 — drop entry.encodedProject from tags. The encoded directory
+    // name (e.g. 'C--Users-kronos-Claude-MD-rts') is path metadata, not a
+    // semantic tag. It still survives in _memoryImports[path] for dedup +
+    // audit, just not as a polluting tag in the graph.
     const decision = this.recordDecision({
       decision: newTitle,
       context: newContext,
       project: entry.project || 'general',
-      tags: ['cc-memory', entry.type, entry.encodedProject],
+      tags: ['cc-memory', entry.type],
       lifecycle: 'reference',
       autoLink: false,
     });

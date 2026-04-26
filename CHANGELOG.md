@@ -9,6 +9,98 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.6.2 — Knowledge Graph Hygiene
+
+Audit of the live decision/tag knowledge graph found 4 issues; this release
+fixes 3 with code-side migrations (so the store-reload race that undid v4.5.8
+can't undo them again) and patches the source code so future imports don't
+re-introduce the problems. **264 → 280 tests (+16) · 29 MCP tools · 2 new
+migrations · no breaking changes.**
+
+**The audit findings**
+
+- **Phantom projects re-emerged after v4.5.8**: `general` had 39 decisions
+  (was 1), `claude` had 9 (was 0 — re-renamed to family-coop), `claude-md`
+  had 5 new (synthetic-project leak from `inferProject` DIR_HINTS).
+  Root cause: v4.5.8 was a one-shot script, not a code migration; the
+  running dashboard's in-memory data later flushed back to disk.
+- **Path-encoded "tags"**: 6 unique × 30 uses of `'C--*'` strings (Windows-
+  encoded directory names) had been added as decision tags by the
+  `importCCMemory` codepath — polluting the tag namespace with metadata.
+- **Edge-graph itself**: PERFECT (0 dangling endpoints, 0 self-loops, 0
+  non-canonical rels, 0 duplicates). v4.5.7-E1 still holding.
+
+**Migration v4.6.2-D1** (idempotent, pattern-based for portability)
+
+- `project='claude'` → `'family-coop'` when content matches Alpha/Beta
+  protocol signals (`alpha|beta|outbox\.json|agent_alpha|agent_beta|
+  profile\.json|conflict resolution|consent boundary|cooperative agent`)
+- `project='claude-md'` → `'Nexus'` (treat as Nexus reference notes)
+- `project='general'`:
+  - `decision === '--help'` → DELETE (junk from CLI flag leak)
+  - Content starts with `SR3`/`Shadowrun` → `'Shadowrun'`
+  - Content matches `Firewall-Godot:` → `'Firewall-Godot'`
+  - Content starts with `Noosphere` → `'noosphere'`
+  - Has `cc-memory` tag → `'Nexus'`
+  - Else: leave (truly miscellaneous, user can sort)
+- All decisions: strip tags matching `/^[A-Z]--/` (path-encoded leakage)
+- Sessions + thoughts: same project renames
+
+**Migration v4.6.2-D2** (pattern expansion for stragglers)
+
+- Broader regex catches Alpha/Beta decisions D1 missed
+  (`relationship-first|secrets policy|coordination layer is shared|
+  communication translation|agents (?:surface|communicate|preserve)|
+  M:\\claude|\\\\192\.168\.1\.229`)
+- Specific-string match: `Captain says go bigger.*burn rate is efficient`
+  → `Nexus` (the v4.5.8-confirmed leftover)
+
+**Source fixes (prevent recurrence)**
+
+- `server/lib/memoryIndex.ts` — `DIR_HINTS` collapses `Claude-MD/i` and
+  `C--Projects$/i` both into project `Nexus`. The synthetic `claude-md`
+  project label is gone.
+- `server/db/store.ts` — `importCCMemory` no longer adds `entry.encodedProject`
+  to `tags`. The encoded path stays in `_memoryImports[path]` for dedup +
+  audit, but doesn't pollute the tag namespace anymore.
+
+**Live-store outcome (verified)**
+
+| Project | Before | After | Δ |
+|---|---|---|---|
+| Nexus | 86 | **113** | +27 |
+| Firewall-Godot | 24 | 30 | +6 |
+| Shadowrun | 18 | 23 | +5 |
+| noosphere | 8 | 13 | +5 |
+| family-coop | 1 | **10** | +9 |
+| general | 39 | **0** | −39 |
+| claude | 9 | **0** | −9 |
+| claude-md | 5 | **0** | −5 |
+| **Path-encoded tags** | 6 unique / 30 uses | **0** | scrubbed |
+
+Plus 1 junk decision (`#81 '--help'`) deleted.
+
+**Test additions**
+
+`tests/graphHygieneMigration.test.ts` — 16 specs covering rename rules,
+content-pattern reassignment, junk deletion, tag scrubbing, session +
+thought renames, migration stamping, and idempotency.
+
+**Out of scope (separate task)**
+
+- The store-reload race itself (in-memory flush overwriting on-disk edits)
+  needs its own fix — file-watcher on `nexus.json` or single-writer lock.
+  Tracked as a follow-up; this release prevents the symptom by making
+  cleanup code-side instead of script-side.
+
+**Files touched**
+
+- `server/db/store.ts` — D1 + D2 migrations, `importCCMemory` tag fix
+- `server/lib/memoryIndex.ts` — `DIR_HINTS` consolidation
+- `tests/graphHygieneMigration.test.ts` — NEW (16 specs)
+- `package.json`, `cli/package.json`, `mcpb/manifest.json`, `CHANGELOG.md`,
+  `ROADMAP.md` — version bumps
+
 ## v4.6.1 — Overseer Sweep + Route Tests
 
 Five-item Overseer-themed batch closing one structural carry-over (#218),
