@@ -194,6 +194,19 @@ export function createImpactRoutes(store: NexusStore) {
       }))
       .filter(s => s.from_decision && s.to_decision);
 
+    // v4.6.5 #311 — active conflict edges for the structured resolution workflow.
+    // A "live" conflict is a rel='contradicts' edge where neither endpoint is
+    // deprecated. The UI uses these to render Deprecate/Evolution/Keep-both
+    // resolution cards.
+    const activeConflicts = contradictsEdges
+      .map((edge: GraphEdge) => ({
+        edge,
+        from_decision: decMap.get(edge.from),
+        to_decision: decMap.get(edge.to),
+      }))
+      .filter((c) => c.from_decision && c.to_decision)
+      .filter((c) => !c.from_decision!.deprecated && !c.to_decision!.deprecated);
+
     res.json({
       contradictions,
       total: contradictions.length,
@@ -203,6 +216,8 @@ export function createImpactRoutes(store: NexusStore) {
       },
       suggestions,
       suggestedCount: suggestions.length,
+      activeConflicts,
+      activeConflictsCount: activeConflicts.length,
     });
   });
 

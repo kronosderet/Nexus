@@ -345,6 +345,32 @@ describe('Impact API', () => {
     expect(res.body.totalFragmented).toBeDefined();
   });
 
+  it('PATCH /api/ledger/link/:id updates rel and note (v4.6.5 #311)', async () => {
+    // Seed two decisions and a contradicts edge between them
+    const a = await request(app).post('/api/ledger').send({ decision: 'Decision A', project: 'X' });
+    const b = await request(app).post('/api/ledger').send({ decision: 'Decision B', project: 'X' });
+    const link = await request(app).post('/api/ledger/link').send({
+      from: a.body.id, to: b.body.id, rel: 'contradicts', note: 'original',
+    });
+    expect(link.status).toBe(201);
+
+    // Update rel from contradicts → replaced (the "Mark as evolution" path)
+    const upd = await request(app).patch(`/api/ledger/link/${link.body.id}`).send({
+      rel: 'replaced', note: 'evolved',
+    });
+    expect(upd.status).toBe(200);
+    expect(upd.body.rel).toBe('replaced');
+    expect(upd.body.note).toBe('evolved');
+
+    // Reject invalid rel
+    const bad = await request(app).patch(`/api/ledger/link/${link.body.id}`).send({ rel: 'banana' });
+    expect(bad.status).toBe(400);
+
+    // 404 for nonexistent edge
+    const missing = await request(app).patch('/api/ledger/link/99999').send({ rel: 'related' });
+    expect(missing.status).toBe(404);
+  });
+
   it('GET /api/impact/holes excludes lifecycle=reference from orphan count (v4.6.3)', async () => {
     // Seed a project with one active decision + one reference (cc-memory).
     // Pre-v4.6.3 the reference would inflate the orphan count to 2; post-fix

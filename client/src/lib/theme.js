@@ -56,12 +56,20 @@ export const LIFECYCLE_COLORS = {
 
 // Edge-type visual styles for the decision graph. Mirrors the 7 rel types from
 // server/types.ts GraphEdge.rel. Keep in sync with server validation.
+// v4.6.5 #282 — `tooltip` field added so legend hover explains semantic meaning.
 export const EDGE_STYLES = {
-  led_to:      { stroke: THEME.amber,  dash: 'none',  label: 'Led to' },
-  depends_on:  { stroke: THEME.blue,   dash: '6,3',   label: 'Depends on' },
-  contradicts: { stroke: THEME.red,    dash: '2,3',   label: 'Contradicts' },
-  replaced:    { stroke: THEME.gray,   dash: '8,4',   label: 'Replaced' },
-  related:     { stroke: THEME.slate,  dash: '2,2',   label: 'Related' },
-  informs:     { stroke: THEME.purple, dash: '4,2',   label: 'Informs' },      // v4.3
-  experimental:{ stroke: THEME.teal,   dash: '1,3',   label: 'Experimental' }, // v4.3
+  led_to:      { stroke: THEME.amber,  dash: 'none',  label: 'Led to',
+    tooltip: 'A causally led to B. Use when one decision directly produced the next (build-on, follow-up).' },
+  depends_on:  { stroke: THEME.blue,   dash: '6,3',   label: 'Depends on',
+    tooltip: 'B requires A to be valid. If A is removed/changed, B is at risk. Strongest dependency edge.' },
+  contradicts: { stroke: THEME.red,    dash: '2,3',   label: 'Contradicts',
+    tooltip: 'A and B oppose each other (different paths chosen, or same question answered two ways). Resolve via Conflicts tab.' },
+  replaced:    { stroke: THEME.gray,   dash: '8,4',   label: 'Replaced',
+    tooltip: 'B supersedes A. Use after a decision is revised — keep the original for history but signal it should not be acted on.' },
+  related:     { stroke: THEME.slate,  dash: '2,2',   label: 'Related',
+    tooltip: 'Weak association — same domain or shared keywords, but no causal/dependency tie. Auto-link uses this by default.' },
+  informs:     { stroke: THEME.purple, dash: '4,2',   label: 'Informs',
+    tooltip: 'A provides context for B without being a hard requirement. Lighter than depends_on.' },      // v4.3
+  experimental:{ stroke: THEME.teal,   dash: '1,3',   label: 'Experimental',
+    tooltip: 'Tentative link, revisit later. Use when you want to capture a hunch without committing to a stronger relation.' }, // v4.3
 };

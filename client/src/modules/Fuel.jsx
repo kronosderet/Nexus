@@ -24,11 +24,21 @@ function barColor(pct) {
   return 'bg-nexus-green';
 }
 
-function Bar({ percent, className = '', height = 'h-2' }) {
+// v4.6.5 #269 — Session History burn bars use INVERTED semantic: higher = worse
+// (more session fuel consumed). Spec from the audit: green < 40%, amber 40–70%,
+// red > 70%. Same thresholds as the fuel-remaining color scale, just flipped.
+function burnBarColor(pct) {
+  if (pct >= 70) return 'bg-nexus-red';
+  if (pct >= 40) return 'bg-nexus-amber';
+  return 'bg-nexus-green';
+}
+
+function Bar({ percent, className = '', height = 'h-2', invert = false }) {
   const c = Math.max(0, Math.min(100, percent ?? 0));
+  const colorFn = invert ? burnBarColor : barColor;
   return (
     <div className={`${height} bg-nexus-bg rounded-full overflow-hidden ${className}`}>
-      <div className={`h-full rounded-full transition-all duration-700 ${barColor(c)}`} style={{ width: `${Math.max(2, c)}%` }} />
+      <div className={`h-full rounded-full transition-all duration-700 ${colorFn(c)}`} style={{ width: `${Math.max(2, c)}%` }} />
     </div>
   );
 }
@@ -565,8 +575,9 @@ export default function FuelModule() {
             {visible.map((s, i) => (
               <div key={i} className="flex items-center gap-3 text-xs font-mono">
                 <span className="text-nexus-text-faint w-20 shrink-0">{s.date}</span>
-                <Bar percent={s.burned} className="flex-1" />
-                <span className={`w-10 text-right tabular-nums ${s.burned > 75 ? 'text-nexus-amber' : 'text-nexus-text-dim'}`}>{s.burned}%</span>
+                {/* v4.6.5 #269 — inverted color scale: high burn = red, low = green */}
+                <Bar percent={s.burned} className="flex-1" invert />
+                <span className={`w-10 text-right tabular-nums ${s.burned >= 70 ? 'text-nexus-red' : s.burned >= 40 ? 'text-nexus-amber' : 'text-nexus-green'}`}>{s.burned}%</span>
                 <span className="text-nexus-text-faint w-12 text-right">{s.duration}h</span>
                 <span className="text-[10px] text-nexus-text-faint w-14 text-right" title={`${s.reports} fuel reading${s.reports !== 1 ? 's' : ''} logged during this session`}>{s.reports}</span>
               </div>

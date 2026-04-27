@@ -9,6 +9,104 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.6.5 — Foundation Fix + Polish Sweep
+
+Final batch before the nexus-driven handover takeover. **Twelve items
+landed**: 1 priority-structural (#399 store-reload race), 1 Tier-3 closer
+(#311 Conflicts resolution workflow), 10 Tier-4 polish wins. **283 tests
+(+1) · 29 tools · no migrations · no breaking changes.**
+
+### #399 Foundation: store-reload race fixed (priority 1)
+
+The bug class that quietly undid v4.5.8's phantom-project cleanup. Root
+cause confirmed: dashboard had a file watcher but **MCPB did not**. Each
+process loaded its own copy of `nexus.json`; whichever wrote last
+won, even with stale data.
+
+Fix: moved the watcher INTO `NexusStore` itself so every process gets it
+for free.
+
+- New private fields: `_lastFlushAt: number`, `_watcher: FSWatcher | null`
+- New constructor step: `_initWatcher()` runs after migrations, skipped
+  when `NODE_ENV=test` or `NEXUS_DISABLE_WATCHER=1`
+- New API: `store.onExternalReload(cb)` for callers (dashboard) to hook
+  the broadcast
+- `_flush()` records `_lastFlushAt = Date.now()`; watcher compares mtime
+  to that + 100ms grace, ignores our own writes
+- `dashboard.ts` simplified: removed manual `fs.watch` block, replaced with
+  `store.onExternalReload(() => broadcast({ type: 'reload', ... }))`
+
+This means the MCPB process now reloads automatically when the dashboard
+writes (fixed the half of the race that was missing) AND the dashboard
+still reloads + broadcasts when the MCPB writes (existing behavior preserved).
+
+### #311 Tier-3 closer: Conflicts structured resolution workflow
+
+The Conflicts tab had a "flag" form but no "resolve" UI. Conflicts
+accumulated.
+
+- **Backend**: `/api/impact/contradictions` now emits `activeConflicts:
+  [{edge, from_decision, to_decision}]` for `rel='contradicts'` edges
+  where neither side is deprecated. New `PATCH /api/ledger/link/:id`
+  accepts `{rel, note}` for in-place edge updates (used by the
+  "Mark as evolution" action).
+- **Frontend**: new `ResolveConflictCard` component renders both
+  decisions side-by-side with five resolution actions:
+  - **Deprecate A** / **Deprecate B** — mark one side `lifecycle: 'deprecated'`
+  - **Evolution: A → B** — change edge `rel` from `contradicts` to `replaced`
+  - **B → A** — same direction flipped (delete + re-create with swapped from/to)
+  - **Keep both** — delete the edge (false positive)
+
+Cards render in a new "Active conflicts (N)" panel above the historical
+counter row in `ContradictionsView`.
+
+### Tier-4 polish wins (10 items)
+
+| # | Where | What |
+|---|---|---|
+| #312 | Conflicts empty-state | Real-codebase example patterns ("REST vs GraphQL", "v3 vs v4 unmarked", cross-project opposing paths) |
+| #324 | Holes copy | "1 have disconnected sub-clusters" → "1 has..." (single-fragment grammar fix) |
+| #255 | Fleet heat tiles | Hover tooltips spell out Active/Recent/Dormant thresholds |
+| #256 | Fleet card sort | New sort pills: Heat (default) / Recency / Decisions / Tasks / A→Z, persisted in localStorage |
+| #269 | Fuel session history | Burn bars now use INVERTED color scale (high burn = red, low = green) — was using the fuel-remaining scale, exact opposite semantic |
+| #281 | Graph Overview By-Project | Sort pills: Count ↓ (default) / A→Z / Count ↑ |
+| #282 | Graph edge-type legend | Hover tooltips explain semantic meaning of each rel type (sourced from new `EDGE_STYLES.tooltip` field) |
+| #291 | Blast Radius | Collapsible "ⓘ What is Blast Radius?" info banner explaining purpose + workflow |
+| #303 | Centrality columns | Sortable headers via new `SortableHeader` component: ID / Centrality / WoW (click to sort, click again to flip direction) |
+| #367 | Log icons | Disambiguation pass: `task_moved` Compass → ArrowRightLeft (was clashing with Command tab nav), `auto_summary` BookOpen → ScrollText, `session` BookOpen → Hourglass, `predict` AlertTriangle → Sparkles. Each type now has a distinct silhouette. |
+
+### Tests
+
+- `tests/routes.test.ts` adds 1 spec for `PATCH /api/ledger/link/:id`
+  (rel update + invalid-rel rejection + 404 for missing edge)
+
+### Files touched
+
+- `server/db/store.ts` — file watcher (init, debounce, mtime guard, hook)
+- `server/dashboard.ts` — removed manual watcher, added hook callback
+- `server/routes/impact.ts` — `activeConflicts` in /contradictions
+- `server/routes/ledger.ts` — `PATCH /link/:id` endpoint
+- `client/src/hooks/useApi.js` — `updateEdge`, `removeEdge`, `updateDecision`
+- `client/src/lib/theme.js` — `EDGE_STYLES.tooltip` per rel type
+- `client/src/modules/Graph.jsx` — `ResolveConflictCard`, examples copy,
+  Holes copy fix, By-Project sort, edge legend tooltips, Blast info
+  banner, sortable Centrality headers
+- `client/src/modules/Fleet.jsx` — heat tooltips, sort-mode pills
+- `client/src/modules/Fuel.jsx` — `burnBarColor`, `Bar` `invert` prop
+- `client/src/modules/Log.jsx` — `TYPE_CONFIG` icon disambiguation
+- `tests/routes.test.ts` — PATCH /link/:id spec
+- version files + this CHANGELOG
+
+### What's next
+
+This is the last traditional dock. The Continuous Handover (v4.6.0 #398)
+is the canonical mechanism going forward — `nexus_update_handover` writes
+the live card; the next instance reads it via `nexus_brief` auto-prepend
+or the Handover tab.
+
+Remaining backlog: 5 deferred Tier-3 (#240, #301, #310, #332, #363), 1
+structural carry-over (#217 split files + #219 Zod), ~13 Tier-4 polish.
+
 ## v4.6.4 — Hotfix: Double-Stringified POST Bodies
 
 User-reported: clicking "Scan for contradictions" on the Conflicts tab 400'd

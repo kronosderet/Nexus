@@ -205,6 +205,28 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
     res.json({ success: true });
   });
 
+  // v4.6.5 #311 — update an edge's rel and/or note. Used by the Conflicts
+  // structured-resolution workflow ("Mark as evolution" promotes a
+  // rel='contradicts' edge to rel='replaced' instead of just deleting it).
+  router.patch('/link/:id', (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    const { rel, note } = req.body ?? {};
+    const ALLOWED: ReadonlySet<GraphEdge['rel']> = new Set([
+      'led_to', 'replaced', 'depends_on', 'contradicts', 'related', 'informs', 'experimental',
+    ] as const);
+    if (rel && !ALLOWED.has(rel)) {
+      return res.status(400).json({ error: `rel must be one of: ${[...ALLOWED].join(', ')}` });
+    }
+    const edges = store.getAllEdges();
+    const edge = edges.find((e: GraphEdge) => e.id === id);
+    if (!edge) return res.status(404).json({ error: 'Edge not found.' });
+    if (rel) edge.rel = rel;
+    if (typeof note === 'string') edge.note = note;
+    store._flush();
+    broadcast({ type: 'edge_update', payload: edge });
+    res.json(edge);
+  });
+
   // Get all connections for a decision
   router.get('/:id/connections', (req: Request, res: Response) => {
     const id = Number(req.params.id);

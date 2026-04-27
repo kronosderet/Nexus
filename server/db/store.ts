@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, renameSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, renameSync, watch, statSync, type FSWatcher } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import type {
@@ -88,6 +88,11 @@ export class NexusStore {
     // v4.3.5 migration — backfill missing fields from schema drift (idempotent).
     // Runs on every load; does nothing if data is already migrated.
     this._runMigrations();
+
+    // v4.6.5 #399 — start the file watcher AFTER migrations + initial load
+    // so we don't trigger spurious reloads during startup. Skipped in tests
+    // via NEXUS_DISABLE_WATCHER=1 / NODE_ENV=test.
+    this._initWatcher();
   }
 
   /** Idempotent schema migrations — inspect data and backfill missing fields.
@@ -537,6 +542,70 @@ export class NexusStore {
 
   private _flushing = false;
   private _pendingSemanticLinks = 0;
+  // v4.6.5 #399 — store-reload race fix. Track when WE last wrote so the
+  // file watcher can distinguish our own writes from external ones (other
+  // processes editing nexus.json). Without this, MCPB-side writes would
+  // be picked up by the dashboard but NOT vice versa, leading to the
+  // v4.5.8 cleanup regression where MCPB held stale in-memory data and
+  // overwrote dashboard's edits.
+  private _lastFlushAt = 0;
+  private _watcher: FSWatcher | null = null;
+  private _reloadDebounce: ReturnType<typeof setTimeout> | null = null;
+  private _onExternalReload: (() => void) | null = null;
+
+  /** Register a callback that fires when an external write triggers a reload.
+   *  Used by dashboard.ts to broadcast "reload" to WebSocket clients so the
+   *  UI refreshes when MCPB writes to the store underneath us. */
+  onExternalReload(cb: () => void): void {
+    this._onExternalReload = cb;
+  }
+
+  /** Stop the file watcher (used by tests and graceful shutdown). */
+  closeWatcher(): void {
+    if (this._watcher) {
+      try { this._watcher.close(); } catch {}
+      this._watcher = null;
+    }
+    if (this._reloadDebounce) {
+      clearTimeout(this._reloadDebounce);
+      this._reloadDebounce = null;
+    }
+  }
+
+  /** Initialize fs.watch on the DB path. Called from constructor unless
+   *  NEXUS_DISABLE_WATCHER=1 (tests) or NODE_ENV=test. */
+  private _initWatcher(): void {
+    if (process.env.NEXUS_DISABLE_WATCHER === '1' || process.env.NODE_ENV === 'test') return;
+    try {
+      const dbPath = getDbPath();
+      if (!existsSync(dbPath)) return;
+      this._watcher = watch(dbPath, (eventType) => {
+        if (eventType !== 'change') return;
+        // Debounce — _flush writes .tmp then renames, generating multiple events.
+        if (this._reloadDebounce) return;
+        this._reloadDebounce = setTimeout(() => {
+          this._reloadDebounce = null;
+          // Skip our own writes by checking mtime vs _lastFlushAt + small grace.
+          try {
+            const mtime = statSync(dbPath).mtimeMs;
+            if (mtime <= this._lastFlushAt + 100) return;
+          } catch { return; }
+          if (this._flushing) return; // belt-and-suspenders
+          if (this.reload()) {
+            console.error('◈ Store: external write detected, reloaded from disk');
+            if (this._onExternalReload) {
+              try { this._onExternalReload(); } catch {}
+            }
+          }
+        }, 300);
+      });
+    } catch (err) {
+      // Watcher setup failure is non-fatal — store still works, just without
+      // cross-process sync. Log so operators can see it.
+      console.error('◈ Store: file watcher setup failed:', (err as Error).message);
+    }
+  }
+
   _flush(): void {
     // Write mutex: skip if already flushing (prevents concurrent truncation)
     if (this._flushing) return;
@@ -567,6 +636,9 @@ export class NexusStore {
         try { writeFileSync(getDbPath(), json); } catch {}
         throw err;
       }
+      // v4.6.5 #399 — record our flush timestamp so the watcher can ignore
+      // events from this write.
+      this._lastFlushAt = Date.now();
     } finally {
       this._flushing = false;
     }

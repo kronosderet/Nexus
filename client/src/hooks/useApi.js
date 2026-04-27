@@ -105,6 +105,12 @@ export const api = {
   // not an object), 400'ing at the body-parser layer.
   linkDecisions: ({ from, to, rel = 'related', note = '' }) =>
     request('/ledger/link', { method: 'POST', body: { from, to, rel, note } }),
+  // v4.6.5 #311 — update an existing edge (rel + note) for the conflict
+  // resolution "Mark as evolution" path (contradicts → replaced).
+  updateEdge: (id, { rel, note }) =>
+    request(`/ledger/link/${id}`, { method: 'PATCH', body: { rel, note } }),
+  removeEdge: (id) => request(`/ledger/link/${id}`, { method: 'DELETE' }),
+  updateDecision: (id, body) => request(`/ledger/${id}`, { method: 'PATCH', body }),
   // v4.4.8 #307 — Overseer contradiction scan + accept/dismiss endpoints.
   // v4.6.4 — same fix: pass object, not string.
   scanContradictions: (opts = {}) => request('/overseer/scan-contradictions', {

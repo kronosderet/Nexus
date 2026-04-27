@@ -8,6 +8,7 @@ import {
   FileEdit, AlertTriangle, Tag, ChevronDown, ChevronRight, Search, Filter,
   Clock, MapPin, Lightbulb, Brain, MessageSquare, Network, GitCommit,
   Download, Rocket, BookMarked, EyeOff, Eye, ArrowUp,
+  Sparkles, ArrowRightLeft, Hourglass,
 } from 'lucide-react';
 
 // ── Activity type config ────────────────────────────────
@@ -18,20 +19,24 @@ import {
 // thought uses Brain, prompt uses MessageSquare. Compass kept for command/navigation
 // actions only.
 
+// v4.6.5 #367 — icon disambiguation pass. Previously: BookOpen used by both
+// auto_summary AND session; AlertTriangle used by both error AND predict;
+// task_moved + Compass clashed with the Command tab nav icon. Each type
+// now gets a distinct shape so rows scan by silhouette, not just color.
 const TYPE_CONFIG = {
   task_created: { icon: MapPin, color: 'text-nexus-amber', label: 'Plotted', module: 'command' },
   task_done: { icon: CheckCircle2, color: 'text-nexus-green', label: 'Landmark', module: 'command' },
-  task_moved: { icon: Compass, color: 'text-nexus-blue', label: 'Course adjusted', module: 'command' },
+  task_moved: { icon: ArrowRightLeft, color: 'text-nexus-blue', label: 'Course adjusted', module: 'command' },
   task_deleted: { icon: Trash2, color: 'text-nexus-red', label: 'Removed', module: 'command' },
   system: { icon: Settings, color: 'text-nexus-purple', label: 'System', module: null },
   file_change: { icon: FileEdit, color: 'text-nexus-amber', label: 'Terrain shift', module: null },
   error: { icon: AlertTriangle, color: 'text-nexus-red', label: 'Uncharted', module: null },
-  auto_summary: { icon: BookOpen, color: 'text-nexus-green', label: 'Auto-summary', module: 'log' },
+  auto_summary: { icon: ScrollText, color: 'text-nexus-green', label: 'Auto-summary', module: 'log' },
   thought: { icon: Brain, color: 'text-nexus-purple', label: 'Thought', module: null },
   prompt: { icon: MessageSquare, color: 'text-nexus-blue', label: 'Prompt', module: null },
-  session: { icon: BookOpen, color: 'text-nexus-green', label: 'Session', module: 'log' },
+  session: { icon: Hourglass, color: 'text-nexus-green', label: 'Session', module: 'log' },
   decision: { icon: Lightbulb, color: 'text-nexus-amber', label: 'Decision', module: 'graph' },
-  predict: { icon: AlertTriangle, color: 'text-nexus-blue', label: 'Predict', module: 'overseer' },
+  predict: { icon: Sparkles, color: 'text-nexus-blue', label: 'Predict', module: 'overseer' },
   deploy: { icon: Rocket, color: 'text-nexus-green', label: 'Deploy', module: null },
   graph: { icon: Network, color: 'text-nexus-purple', label: 'Graph', module: 'graph' },
   git_commit: { icon: GitCommit, color: 'text-nexus-green', label: 'Commit', module: null },

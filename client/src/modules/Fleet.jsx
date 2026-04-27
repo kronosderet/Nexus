@@ -303,6 +303,18 @@ export default function Fleet({ onNavigate }) {
   const projects = fleetSlice.data?.projects || [];
   const fleet = fleetSlice.data?.overview || null;
   const loading = fleetSlice.loading;
+  // v4.6.5 #256 — sort override. Default 'heat' keeps the prior heat-grouped
+  // layout. Other modes give power users a quick way to scan by recency,
+  // decision count, task count without leaving the view. Persisted in
+  // localStorage so the choice survives reloads.
+  const SORT_KEY = 'nexus:fleet:sort';
+  const [sortMode, setSortMode] = useState(() => {
+    try { return window.localStorage.getItem(SORT_KEY) || 'heat'; } catch { return 'heat'; }
+  });
+  const setSort = (m) => {
+    setSortMode(m);
+    try { window.localStorage.setItem(SORT_KEY, m); } catch {}
+  };
 
   if (loading) {
     return (
@@ -341,17 +353,29 @@ export default function Fleet({ onNavigate }) {
         </p>
       </div>
 
-      {/* Fleet summary */}
+      {/* Fleet summary — v4.6.5 #255: hover tooltips document the heat thresholds
+          (Active = activity today OR commit < 24h ago; Recent = activity < 7d
+          OR commit < 7d ago; Dormant = older than that). Spec lives on
+          server/routes/pulse.ts:101-103. */}
       <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="bg-nexus-surface border border-nexus-border rounded-xl p-4 text-center">
+        <div
+          className="bg-nexus-surface border border-nexus-border rounded-xl p-4 text-center"
+          title="Active = activity today OR commit within last 24 hours."
+        >
           <p className="text-2xl font-light text-nexus-green">{hot.length}</p>
           <p className="text-[10px] font-mono text-nexus-text-faint">Active</p>
         </div>
-        <div className="bg-nexus-surface border border-nexus-border rounded-xl p-4 text-center">
+        <div
+          className="bg-nexus-surface border border-nexus-border rounded-xl p-4 text-center"
+          title="Recent = activity within last 7 days OR commit within last 7 days. Excludes today's hot projects."
+        >
           <p className="text-2xl font-light text-nexus-amber">{warm.length}</p>
           <p className="text-[10px] font-mono text-nexus-text-faint">Recent</p>
         </div>
-        <div className="bg-nexus-surface border border-nexus-border rounded-xl p-4 text-center">
+        <div
+          className="bg-nexus-surface border border-nexus-border rounded-xl p-4 text-center"
+          title="Dormant = no activity AND no commit in the last 7 days."
+        >
           <p className="text-2xl font-light text-nexus-text-faint">{cold.length}</p>
           <p className="text-[10px] font-mono text-nexus-text-faint">Dormant</p>
         </div>
@@ -388,10 +412,50 @@ export default function Fleet({ onNavigate }) {
         </div>
       )}
 
+      {/* v4.6.5 #256 — sort override pills. Heat keeps the original
+          hot/warm/cold grouping. Recency = git lastCommitDate desc.
+          Decisions / Tasks = count desc. Alpha = name. */}
+      <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+        <span className="text-[9px] font-mono text-nexus-text-faint mr-1 uppercase tracking-wider">Sort:</span>
+        {[
+          { key: 'heat', label: 'Heat' },
+          { key: 'recency', label: 'Recency' },
+          { key: 'decisions', label: 'Decisions' },
+          { key: 'tasks', label: 'Tasks' },
+          { key: 'alpha', label: 'A → Z' },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setSort(key)}
+            className={`text-[10px] font-mono px-2 py-0.5 rounded-full border transition-colors ${
+              sortMode === key
+                ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/30'
+                : 'border-nexus-border text-nexus-text-faint hover:text-nexus-text'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* Project cards — v4.4.3 #250: onNavigate passed so card title click jumps to Command.
-          v4.5.0 — staggered reveal; 30ms per card capped at 180ms. */}
+          v4.5.0 — staggered reveal; 30ms per card capped at 180ms.
+          v4.6.5 #256 — sort mode applied here. */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {[...hot, ...warm, ...cold].map((p, i) => (
+        {(() => {
+          const heatOrder = { hot: 0, warm: 1, cold: 2 };
+          const sorted = [...projects];
+          if (sortMode === 'heat') sorted.sort((a, b) => (heatOrder[a.heat] ?? 3) - (heatOrder[b.heat] ?? 3));
+          else if (sortMode === 'recency') sorted.sort((a, b) => {
+            const aT = a.git?.lastCommitDate ? new Date(a.git.lastCommitDate).getTime() : 0;
+            const bT = b.git?.lastCommitDate ? new Date(b.git.lastCommitDate).getTime() : 0;
+            return bT - aT;
+          });
+          else if (sortMode === 'decisions') sorted.sort((a, b) => (b.decisions || 0) - (a.decisions || 0));
+          else if (sortMode === 'tasks') sorted.sort((a, b) => ((b.tasks?.open || 0) - (a.tasks?.open || 0)));
+          else if (sortMode === 'alpha') sorted.sort((a, b) => a.name.localeCompare(b.name));
+          return sorted;
+        })().map((p, i) => (
           <div
             key={p.name}
             className="animate-row-reveal"

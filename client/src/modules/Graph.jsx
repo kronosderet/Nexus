@@ -338,6 +338,50 @@ function setAutolinkThreshold(v) {
   if (typeof window !== 'undefined') window.localStorage.setItem(AUTOLINK_THRESHOLD_KEY, String(v));
 }
 
+// v4.6.5 #281 — By-Project list with sort-mode toggle. Defaults to count-desc
+// (most-decisions-first) but lets users switch to alphabetical or count-asc
+// for finding small/dormant projects.
+function ByProjectPanel({ projects }) {
+  const [sortMode, setSortMode] = useState('countDesc');
+  const entries = Object.entries(projects);
+  if (sortMode === 'alpha') entries.sort((a, b) => a[0].localeCompare(b[0]));
+  else if (sortMode === 'countAsc') entries.sort((a, b) => a[1] - b[1]);
+  else entries.sort((a, b) => b[1] - a[1]); // countDesc default
+  const max = Math.max(...Object.values(projects), 1);
+  return (
+    <div className="col-span-2 bg-nexus-surface border border-nexus-border rounded-xl p-4">
+      <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+        <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">By Project</span>
+        <div className="flex gap-1">
+          {[
+            { key: 'countDesc', label: 'Count ↓' },
+            { key: 'alpha', label: 'A → Z' },
+            { key: 'countAsc', label: 'Count ↑' },
+          ].map(({ key, label }) => (
+            <button key={key} onClick={() => setSortMode(key)}
+              className={`text-[9px] font-mono px-1.5 py-0.5 rounded border transition-colors ${
+                sortMode === key
+                  ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/30'
+                  : 'border-nexus-border text-nexus-text-faint hover:text-nexus-text'
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="space-y-1">
+        {entries.map(([proj, count]) => (
+          <div key={proj} className="flex items-center gap-2">
+            <span className="text-xs font-mono text-nexus-text-dim w-24">{proj}</span>
+            <div className="flex-1 h-1.5 bg-nexus-bg rounded-full"><div className="h-full bg-nexus-purple/50 rounded-full" style={{ width: `${(count / max) * 100}%` }} /></div>
+            <span className="text-xs font-mono text-nexus-text-faint w-8 text-right">{count}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function OverviewView({ graph, centrality, contradictions, holes, onSwitchView }) {
   // v4.5.10 #279 — orphan count card links to Holes tab. Card is clickable
   // (matches Conflicts card pattern) so users can jump straight to the
@@ -423,19 +467,8 @@ function OverviewView({ graph, centrality, contradictions, holes, onSwitchView }
         </div>
       </div>
 
-      {/* Projects */}
-      <div className="col-span-2 bg-nexus-surface border border-nexus-border rounded-xl p-4">
-        <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">By Project</span>
-        <div className="mt-2 space-y-1">
-          {Object.entries(projects).sort((a, b) => b[1] - a[1]).map(([proj, count]) => (
-            <div key={proj} className="flex items-center gap-2">
-              <span className="text-xs font-mono text-nexus-text-dim w-24">{proj}</span>
-              <div className="flex-1 h-1.5 bg-nexus-bg rounded-full"><div className="h-full bg-nexus-purple/50 rounded-full" style={{ width: `${(count / (Math.max(...Object.values(projects)) || 1)) * 100}%` }} /></div>
-              <span className="text-xs font-mono text-nexus-text-faint w-8 text-right">{count}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Projects — v4.6.5 #281: sort-mode toggle (count desc default · alpha · count asc) */}
+      <ByProjectPanel projects={projects} />
 
       {/* v4.5.10 #280 — auto-link similarity threshold setting. UI-side for now;
           localStorage persists the value. Future server hookup will read this. */}
@@ -538,6 +571,27 @@ function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, Deci
 
   return (
     <div>
+      {/* v4.6.5 #291 — "What is Blast Radius?" info popover. Renders as a
+          dismissible help banner at the top of the view (always-visible —
+          no localStorage dismiss, the feature is small enough that it just
+          stays out of the way without being annoying). */}
+      <details className="mb-3 group">
+        <summary className="cursor-pointer text-[10px] font-mono text-nexus-text-faint hover:text-nexus-text inline-flex items-center gap-1.5">
+          <span className="text-nexus-blue">ⓘ</span> What is Blast Radius?
+        </summary>
+        <div className="mt-2 px-3 py-2 rounded-lg bg-nexus-blue/5 border border-nexus-blue/20 text-[11px] font-mono text-nexus-text-dim leading-relaxed">
+          <p className="mb-1.5">
+            <strong className="text-nexus-blue">Blast Radius</strong> traces every decision connected to a starting decision via typed edges (`led_to`, `depends_on`, `informs`, etc.) up to N hops out.
+          </p>
+          <p className="mb-1.5">
+            <strong>Use it to answer:</strong> "If I deprecate or change this decision, what else is affected?" The result is a depth-ordered tree of downstream decisions, with the blast count colored by severity (green &lt; 2, amber 2-5, red &gt; 5).
+          </p>
+          <p>
+            <strong>Pick a decision:</strong> the textbox accepts an ID or free-text search. The "Latest" button auto-targets the most recent decision. The "Highly connected" chips below feed off the Centrality view — those are the architectural hubs where blast radius matters most.
+          </p>
+        </div>
+      </details>
+
       {/* v4.4.1 #285 — DecisionPicker replaces plain numeric input. Type-search by ID,
           text, project, or tag; dropdown shows top-8 matches; Enter or click to select. */}
       <div className="flex gap-2 mb-4 flex-wrap">
@@ -709,6 +763,23 @@ function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, Deci
   );
 }
 
+// v4.6.5 #303 — sortable column helper. Click a header to set sort key;
+// click again to flip direction; click a third time to reset to default
+// (centrality desc).
+function SortableHeader({ label, sortKey, currentKey, currentDir, onSort, className = '', title }) {
+  const active = currentKey === sortKey;
+  const arrow = active ? (currentDir === 'desc' ? '↓' : '↑') : '';
+  return (
+    <button
+      onClick={() => onSort(sortKey)}
+      className={`text-[9px] font-mono uppercase tracking-wider hover:text-nexus-amber transition-colors text-left ${active ? 'text-nexus-amber' : 'text-nexus-text-faint'} ${className}`}
+      title={title}
+    >
+      {label} {arrow && <span className="ml-0.5">{arrow}</span>}
+    </button>
+  );
+}
+
 function CentralityView({ data, onPickBlast, onPickVisual }) {
   // v4.4.3 #298 — pagination beyond the top-15 cap. Most users care about top hubs, but
   // scrolling through the long tail matters for orphan-hunting and validation work.
@@ -724,12 +795,33 @@ function CentralityView({ data, onPickBlast, onPickVisual }) {
     }
     return Array.from(set).sort();
   }, [data]);
+  // v4.6.5 #303 — sortable columns. Default centrality desc (count of edges).
+  // Click a header to switch sort key + flip direction.
+  const [sortKey, setSortKey] = useState('total');
+  const [sortDir, setSortDir] = useState('desc');
+  const onSort = (key) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  };
   const filtered = useMemo(() => {
     if (!data?.centrality) return [];
-    return projectFilter === 'all'
+    let list = projectFilter === 'all'
       ? data.centrality
       : data.centrality.filter(c => (c.project || '').toLowerCase() === projectFilter.toLowerCase());
-  }, [data, projectFilter]);
+    list = [...list].sort((a, b) => {
+      const dir = sortDir === 'desc' ? -1 : 1;
+      if (sortKey === 'id') return (a.id - b.id) * dir;
+      if (sortKey === 'wow') return ((a.weeklyDelta ?? 0) - (b.weeklyDelta ?? 0)) * dir;
+      if (sortKey === 'project') return ((a.project || '').localeCompare(b.project || '')) * dir;
+      // default: total
+      return ((a.total ?? 0) - (b.total ?? 0)) * dir;
+    });
+    return list;
+  }, [data, projectFilter, sortKey, sortDir]);
 
   return (
     <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
@@ -764,13 +856,13 @@ function CentralityView({ data, onPickBlast, onPickVisual }) {
           ))}
         </div>
       )}
-      {/* v4.3.10 #293 + v4.5.10 #300/#302 — column header updated for new cells */}
+      {/* v4.3.10 #293 + v4.5.10 #300/#302 + v4.6.5 #303 — sortable column headers */}
       <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-nexus-border">
         <span className="w-1 shrink-0" />{/* color bar spacer */}
-        <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-8">ID</span>
-        <span className="flex-1 text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider">Centrality</span>
+        <SortableHeader label="ID" sortKey="id" currentKey={sortKey} currentDir={sortDir} onSort={onSort} className="w-8" title="Sort by decision ID" />
+        <SortableHeader label="Centrality" sortKey="total" currentKey={sortKey} currentDir={sortDir} onSort={onSort} className="flex-1" title="Sort by edge count (default)" />
         <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-6 text-right">Edges</span>
-        <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-10 text-right" title="Change vs 7 days ago">WoW</span>
+        <SortableHeader label="WoW" sortKey="wow" currentKey={sortKey} currentDir={sortDir} onSort={onSort} className="w-10 text-right" title="Sort by week-over-week edge delta" />
         <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-12" title="Edge types: typed (amber) · keyword-auto (cyan) · semantic-auto (purple) · manual (gray)">Types</span>
         <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-48">Decision</span>
       </div>
@@ -893,12 +985,109 @@ function CentralityView({ data, onPickBlast, onPickVisual }) {
   );
 }
 
+// v4.6.5 #311 — Structured resolution card for an active rel='contradicts' edge.
+// Three actions: Deprecate (mark one side deprecated), Mark as evolution
+// (change edge to rel='replaced' showing B supersedes A), Keep both (delete
+// the edge — false positive). All write through existing /api/ledger routes.
+function ResolveConflictCard({ conflict, onResolved }) {
+  const [busy, setBusy] = useState(null);
+  const [err, setErr] = useState(null);
+  const a = conflict.from_decision;
+  const b = conflict.to_decision;
+  const edgeId = conflict.edge.id;
+
+  const deprecate = async (which) => {
+    setBusy('deprecate-' + which); setErr(null);
+    try {
+      const target = which === 'a' ? a.id : b.id;
+      await api.updateDecision(target, { lifecycle: 'deprecated', deprecated: true });
+      if (onResolved) onResolved();
+    } catch (e) { setErr(e.message); } finally { setBusy(null); }
+  };
+  const markEvolution = async (direction) => {
+    setBusy('evolution'); setErr(null);
+    try {
+      // direction='a-to-b': edge from→to stays, rel becomes replaced (a was replaced by b)
+      // direction='b-to-a': we'd need to flip from/to. Simplest: delete + recreate.
+      if (direction === 'a-to-b') {
+        await api.updateEdge(edgeId, { rel: 'replaced', note: `Marked as evolution (${a.id} → ${b.id})` });
+      } else {
+        await api.removeEdge(edgeId);
+        await api.linkDecisions({ from: b.id, to: a.id, rel: 'replaced', note: `Marked as evolution (${b.id} → ${a.id})` });
+      }
+      if (onResolved) onResolved();
+    } catch (e) { setErr(e.message); } finally { setBusy(null); }
+  };
+  const keepBoth = async () => {
+    if (!window.confirm('Delete this conflict edge? Both decisions stay active.')) return;
+    setBusy('keep'); setErr(null);
+    try {
+      await api.removeEdge(edgeId);
+      if (onResolved) onResolved();
+    } catch (e) { setErr(e.message); } finally { setBusy(null); }
+  };
+
+  return (
+    <div className="bg-nexus-red/5 border border-nexus-red/20 rounded-lg p-4">
+      <div className="flex items-baseline justify-between mb-2">
+        <span className="text-[10px] font-mono text-nexus-red uppercase tracking-wider">Conflict</span>
+        <span className="text-[9px] font-mono text-nexus-text-faint">edge #{edgeId} · {a.project}</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+        <div className="bg-nexus-bg/40 border border-nexus-border rounded p-2">
+          <p className="text-[9px] font-mono text-nexus-text-faint mb-1">A · #{a.id}</p>
+          <p className="text-xs text-nexus-text-dim leading-snug">{String(a.decision || '').slice(0, 220)}</p>
+        </div>
+        <div className="bg-nexus-bg/40 border border-nexus-border rounded p-2">
+          <p className="text-[9px] font-mono text-nexus-text-faint mb-1">B · #{b.id}</p>
+          <p className="text-xs text-nexus-text-dim leading-snug">{String(b.decision || '').slice(0, 220)}</p>
+        </div>
+      </div>
+      {conflict.edge.note && (
+        <p className="text-[10px] font-mono text-nexus-text-faint italic mb-2">note: {conflict.edge.note}</p>
+      )}
+      <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-nexus-red/10">
+        <span className="text-[9px] font-mono text-nexus-text-faint mr-1">Resolve:</span>
+        <button onClick={() => deprecate('a')} disabled={!!busy}
+          className="text-[10px] font-mono px-2 py-1 rounded border border-nexus-amber/30 text-nexus-amber hover:bg-nexus-amber/10 disabled:opacity-50"
+          title={`Mark #${a.id} as deprecated (B is the surviving choice)`}>
+          {busy === 'deprecate-a' ? '…' : 'Deprecate A'}
+        </button>
+        <button onClick={() => deprecate('b')} disabled={!!busy}
+          className="text-[10px] font-mono px-2 py-1 rounded border border-nexus-amber/30 text-nexus-amber hover:bg-nexus-amber/10 disabled:opacity-50"
+          title={`Mark #${b.id} as deprecated (A is the surviving choice)`}>
+          {busy === 'deprecate-b' ? '…' : 'Deprecate B'}
+        </button>
+        <span className="w-px h-4 bg-nexus-border mx-1" />
+        <button onClick={() => markEvolution('a-to-b')} disabled={!!busy}
+          className="text-[10px] font-mono px-2 py-1 rounded border border-nexus-blue/30 text-nexus-blue hover:bg-nexus-blue/10 disabled:opacity-50"
+          title={`Change edge to rel=replaced (#${a.id} was replaced by #${b.id})`}>
+          {busy === 'evolution' ? '…' : 'Evolution: A → B'}
+        </button>
+        <button onClick={() => markEvolution('b-to-a')} disabled={!!busy}
+          className="text-[10px] font-mono px-2 py-1 rounded border border-nexus-blue/30 text-nexus-blue hover:bg-nexus-blue/10 disabled:opacity-50"
+          title={`Change edge to rel=replaced (#${b.id} was replaced by #${a.id})`}>
+          B → A
+        </button>
+        <span className="w-px h-4 bg-nexus-border mx-1" />
+        <button onClick={keepBoth} disabled={!!busy}
+          className="text-[10px] font-mono px-2 py-1 rounded border border-nexus-border text-nexus-text-faint hover:text-nexus-text disabled:opacity-50"
+          title="False positive — remove the conflict edge, both decisions stay active.">
+          {busy === 'keep' ? '…' : 'Keep both'}
+        </button>
+        {err && <span className="text-[9px] font-mono text-nexus-red ml-2">{err}</span>}
+      </div>
+    </div>
+  );
+}
+
 function ContradictionsView({ data, onRefresh }) {
   // v4.4.4 #309 — lifetime counter row. Even when active=0, show how many conflicts
   // have ever been flagged and how many resolved (one side marked deprecated) so the
   // tab communicates state instead of looking dead. `historical` is computed server-side.
   const hist = data?.historical;
   const suggestions = data?.suggestions || [];
+  const activeConflicts = data?.activeConflicts || [];
   return (
     <div className="space-y-4">
       {/* v4.4.8 #307 — Overseer scan panel. Async runs the LLM contradiction scan,
@@ -926,6 +1115,24 @@ function ContradictionsView({ data, onRefresh }) {
               >
                 <SuggestedContradictionCard suggestion={s} onDecision={onRefresh} />
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* v4.6.5 #311 — Active conflict resolution. Lists rel='contradicts'
+          edges where neither side is deprecated, with three resolution actions
+          per conflict (Deprecate A/B, Mark as evolution A→B/B→A, Keep both). */}
+      {activeConflicts.length > 0 && (
+        <div className="bg-nexus-surface border border-nexus-red/30 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle size={14} className="text-nexus-red" />
+            <h3 className="text-xs font-mono text-nexus-red uppercase tracking-wider">Active conflicts ({activeConflicts.length})</h3>
+            <span className="text-[10px] font-mono text-nexus-text-faint ml-auto">resolve to clear</span>
+          </div>
+          <div className="space-y-2">
+            {activeConflicts.map((c) => (
+              <ResolveConflictCard key={c.edge.id} conflict={c} onResolved={onRefresh} />
             ))}
           </div>
         </div>
@@ -980,6 +1187,20 @@ function ContradictionsView({ data, onRefresh }) {
                   Use the form below to flag a conflict — pick the two decisions, optionally add a note explaining the contradiction. The counter row above tracks
                   lifetime flags and resolutions. Useful when: you changed direction, two projects took opposing paths, or a decision was superseded without being marked deprecated.
                 </p>
+              </div>
+
+              {/* v4.6.5 #312 — example patterns from real codebases. Helps users
+                  recognize what counts as a conflict in practice, not just abstract theory. */}
+              <div>
+                <p className="text-nexus-text-dim mb-1">In this codebase, conflicts look like:</p>
+                <ul className="list-none space-y-0.5 ml-1">
+                  <li>· two projects took opposing paths (REST vs GraphQL, monolith vs microservice)</li>
+                  <li>· a v3 decision and v4 decision answer the same question two ways without `replaced` linking them</li>
+                  <li>· an early "rough" choice (e.g. "use SQLite") and a later refinement ("Postgres for prod") that left the rough one un-deprecated</li>
+                  <li>· cross-project: SR3 picks server-authoritative dice while another project chose client-side roll-and-verify</li>
+                  <li>· two architects answered the same async question independently (different fuel models, different fuel countdowns)</li>
+                </ul>
+                <p className="text-[10px] mt-1 italic">When you spot one, flag it below. Once flagged, the panel above offers Deprecate / Mark as evolution / Keep both.</p>
               </div>
             </div>
           </div>
@@ -1355,7 +1576,8 @@ function HolesView({ data, onLinkOrphan, onJumpToVisual, onRefresh, DecisionPick
             {data.totalFragmented || 0}
           </p>
           <p className="text-[10px] font-mono text-nexus-text-faint mt-1">
-            {data.totalFragmented > 0 ? 'have disconnected sub-clusters' : 'all decision graphs connected'}
+            {/* v4.6.5 #324 — copy fix: "1 have" → "1 has" / "N have" so single-fragment case doesn't read like a typo */}
+            {data.totalFragmented > 0 ? `${data.totalFragmented === 1 ? 'has' : 'have'} disconnected sub-clusters` : 'all decision graphs connected'}
           </p>
         </div>
         <div className="bg-nexus-surface border border-nexus-border rounded-xl p-4">
@@ -2122,12 +2344,17 @@ function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocu
             )}
           </svg>
 
-          {/* Edge type legend */}
+          {/* Edge type legend — v4.6.5 #282: hover tooltip explains the semantic
+              meaning of each rel type (sourced from EDGE_STYLES.tooltip). */}
           <div className="mt-2 flex flex-wrap gap-3">
             {Object.entries(EDGE_STYLES).map(([key, s]) => (
-              <div key={key} className="flex items-center gap-1.5">
+              <div
+                key={key}
+                className="flex items-center gap-1.5 cursor-help"
+                title={s.tooltip ? `${s.label} — ${s.tooltip}` : s.label}
+              >
                 <svg width="20" height="8"><line x1="0" y1="4" x2="20" y2="4" stroke={s.stroke} strokeWidth="1.5" strokeDasharray={s.dash} /></svg>
-                <span className="text-[9px] font-mono text-nexus-text-faint">{s.label}</span>
+                <span className="text-[9px] font-mono text-nexus-text-faint border-b border-dashed border-nexus-text-faint/40">{s.label}</span>
               </div>
             ))}
           </div>
