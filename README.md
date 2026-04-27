@@ -41,20 +41,22 @@ Or use slash commands directly: `/nexus-brief`, `/nexus-status`, `/nexus-plan`
 Nexus solves the biggest problem with AI-assisted development: **Claude forgets everything between conversations.** Nexus doesn't.
 
 - **Session Memory** — every conversation is automatically logged with decisions, blockers, and outcomes
-- **Knowledge Graph** — 160+ architectural decisions with 7 typed edges (led_to, depends_on, contradicts, replaced, related, informs, experimental), blast-radius analysis, and cross-tab navigation (Centrality → Blast Radius, Visual focused on node)
+- **Continuous Handover** — live per-project markdown card stored in Nexus replaces dated handover files. Each instance updates before docking; the next reads via `nexus_brief` auto-prepend or the Handover dashboard tab. Two MCP tools (`nexus_read_handover` / `nexus_update_handover`) + dedicated dashboard module.
+- **Knowledge Graph** — 320+ architectural decisions with 7 typed edges (led_to, depends_on, contradicts, replaced, related, informs, experimental), blast-radius analysis, and cross-tab navigation. Conflicts tab includes a structured resolution workflow (Deprecate / Mark as evolution / Keep both).
 - **Thought Stack** — push context before interruptions, pop when you return. Works across Claude instances.
 - **Decision Guard** — checks for redundant work before you start
-- **Fuel Intelligence** — tracks Claude usage, burn rates, and session planning
+- **Fuel Intelligence** — sliding session + weekly windows that match Anthropic's actual model. Tracks burn rates, projects empty-time, and surfaces fuel risks proactively.
 - **Self-Critique** — identifies slow tasks, stuck items, completion patterns
-- **Local AI Overseer** (optional) — strategic analysis via LM Studio with up to 200k context
+- **Local AI Overseer** (optional) — strategic analysis via LM Studio with up to 200k context. Per-response metadata (latency / tokens / VRAM peak) so you can see what each call cost.
+- **Cross-process sync** — file-watcher in NexusStore means dashboard + MCPB stay in sync on external writes; no more lost edits across processes.
 
 ## 29 Native MCP Tools
 
 After installing, Claude Code can call these directly — no shell-outs, no CLI:
 
-**Read:** `nexus_brief`, `nexus_get_plan`, `nexus_check_guard`, `nexus_search`, `nexus_get_critique`, `nexus_predict_gaps`, `nexus_get_blast_radius`, `nexus_ask_overseer`, `nexus_version`
+**Read:** `nexus_brief`, `nexus_get_plan`, `nexus_check_guard`, `nexus_search`, `nexus_get_critique`, `nexus_predict_gaps`, `nexus_get_blast_radius`, `nexus_ask_overseer`, `nexus_version`, `nexus_read_handover`
 
-**Write:** `nexus_create_task`, `nexus_complete_task`, `nexus_log_activity`, `nexus_log_session`, `nexus_log_usage`, `nexus_record_decision`, `nexus_update_decision`, `nexus_link_decisions`, `nexus_push_thought`, `nexus_pop_thought`, `nexus_import_cc_memories`
+**Write:** `nexus_create_task`, `nexus_complete_task`, `nexus_delete_task`, `nexus_log_activity`, `nexus_log_session`, `nexus_log_usage`, `nexus_record_decision`, `nexus_update_decision`, `nexus_link_decisions`, `nexus_push_thought`, `nexus_pop_thought`, `nexus_import_cc_memories`, `nexus_update_handover`
 
 **Async AI:** `nexus_ask_overseer_start`, `nexus_get_overseer_result`, `nexus_propose_edges`
 
@@ -71,17 +73,18 @@ npm install && cd server && npm install && cd ../client && npm install && npm ru
 npm run dashboard
 ```
 
-Open [http://localhost:3001](http://localhost:3001). Seven modules:
+Open [http://localhost:3001](http://localhost:3001). Eight modules:
 
 | Module | Key | What it shows |
 |---|---|---|
 | **Command** | ^1 | Strategic view (Now/Next/Later/Done) + Kanban board with drag-drop |
 | **Dashboard** | ^2 | System pulse, GPU telemetry, calendar, digest |
-| **Fleet** | ^3 | Per-project cards: health, git, tasks, staleness, cross-project priority |
-| **Fuel** | ^4 | Plan-aware session + weekly gauges, usage intensity, forecast, insights |
-| **Graph** | ^5 | Knowledge Graph: blast radius, centrality, conflicts, holes, interactive visual |
-| **Overseer** | ^6 | Local AI strategist with chat history + scheduled scans |
-| **Log** | ^7 | Activity stream + Session history + Timeline view |
+| **Fleet** | ^3 | Per-project cards: health, sparklines, inline git actions, sort modes |
+| **Fuel** | ^4 | Plan-aware sliding session + weekly gauges, burn forecast, insights |
+| **Graph** | ^5 | Knowledge Graph: blast radius, centrality (sortable), conflicts (with structured resolution), holes, interactive visual with side panel |
+| **Overseer** | ^6 | Local AI strategist with per-response metadata, ↑-arrow history, risk legend |
+| **Log** | ^7 | Activity stream + 24h heat strip + live-tail indicator + CSV/JSON/MD export |
+| **Handover** | ^8 | Continuous per-project handover cards (replaces dated HANDOVER-X.md files) |
 
 Plus: `Ctrl+K` search, `Ctrl+T` thought stack, `Ctrl+/` keyboard shortcuts.
 
@@ -112,7 +115,7 @@ Install hooks: `nexus hooks install` (from the CLI).
 
 For AI-powered features (Overseer, session plan, code audit), install [LM Studio](https://lmstudio.ai) and load a model. Tested with Gemma 4 31B and Gemma 4 26B A4B (Q4_K_M). Nexus auto-detects LM Studio at `localhost:1234`. GPU-aware inference with AI semaphore — adapts to any hardware.
 
-Without LM Studio, all 22 non-AI tools work normally (4 AI-dependent tools: `nexus_ask_overseer`, `nexus_ask_overseer_start`, `nexus_get_overseer_result`, `nexus_propose_edges` require a local model).
+Without LM Studio, all 25 non-AI tools work normally (4 AI-dependent tools: `nexus_ask_overseer`, `nexus_ask_overseer_start`, `nexus_get_overseer_result`, `nexus_propose_edges` require a local model).
 
 ## Architecture
 
@@ -125,7 +128,8 @@ Without LM Studio, all 22 non-AI tools work normally (4 AI-dependent tools: `nex
 | AI | LM Studio / Ollama (optional, auto-detected, GPU-aware) |
 | Scheduler | Risk scan (6h) + digest (24h), automated |
 | Hooks | SessionStart ambient telemetry (12+ context injections), <100ms latency |
-| Tests | 189 Vitest (store, routes, graph, CC scaffolding, estimator, memory bridge, hygiene migrations) |
+| Sync | NexusStore-internal file watcher syncs MCPB + dashboard processes on external writes |
+| Tests | 283 Vitest (store, routes, graph, CC scaffolding, estimator, memory bridge, hygiene migrations, route coverage for github/overseer/webhooks) |
 
 ## Data & Privacy
 
