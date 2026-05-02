@@ -49,6 +49,7 @@ Nexus solves the biggest problem with AI-assisted development: **Claude forgets 
 - **Self-Critique** — identifies slow tasks, stuck items, completion patterns
 - **Local AI Overseer** (optional) — strategic analysis via LM Studio with up to 200k context. Per-response metadata (latency / tokens / VRAM peak) so you can see what each call cost.
 - **Cross-process sync** — file-watcher in NexusStore means dashboard + MCPB stay in sync on external writes; no more lost edits across processes.
+- **Multi-source Memory Bridge** *(v4.7.0)* — `nexus_import_cc_memories` reads from every configured source (default: `~/.claude/projects/*/memory/*.md`; add Cowork-sandbox or cross-machine paths via `_memoryBridge.sources[]` in `~/.nexus/nexus.json`). Per-source try/catch, optional content-hash dedup so the same memory across machines is one Decision. Use `source_filter` to scope a scan to one source for debugging.
 
 ## 29 Native MCP Tools
 
@@ -129,7 +130,7 @@ Without LM Studio, all 25 non-AI tools work normally (4 AI-dependent tools: `nex
 | Scheduler | Risk scan (6h) + digest (24h), automated |
 | Hooks | SessionStart ambient telemetry (12+ context injections), <100ms latency |
 | Sync | NexusStore-internal file watcher syncs MCPB + dashboard processes on external writes |
-| Tests | 283 Vitest (store, routes, graph, CC scaffolding, estimator, memory bridge, hygiene migrations, route coverage for github/overseer/webhooks) |
+| Tests | 300 Vitest (store, routes, graph, CC scaffolding, estimator, memory bridge, hygiene migrations, route coverage for github/overseer/webhooks, multi-source memory bridge) |
 
 ## Data & Privacy
 

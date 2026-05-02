@@ -37,12 +37,14 @@ export function createMemoryRoutes(store: NexusStore, broadcast: BroadcastFn) {
   });
 
   // v4.3.8 #200 — Memory Bridge import endpoint.
+  // v4.7.0-M1 — accepts source_filter to limit scan to one configured source by name.
   router.post('/import', (req: Request, res: Response) => {
-    const { project, dry_run, force } = req.body ?? {};
+    const { project, dry_run, force, source_filter } = req.body ?? {};
     const result = store.importAllCCMemories({
       project: typeof project === 'string' ? project : undefined,
       dryRun: !!dry_run,
       force: !!force,
+      sourceFilter: typeof source_filter === 'string' ? source_filter : undefined,
     });
     // Only log to activity on actual writes (skip for dry_run)
     if (!result.dryRun && (result.imported > 0 || result.updated > 0)) {

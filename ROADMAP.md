@@ -96,7 +96,21 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.6.5 (Foundation Fix + Polish Sweep · shipped 2026-04-27)
+## Current — v4.7.0 (Multi-source CC memory bridge · shipped 2026-05-02)
+
+Memory bridge becomes config-driven. The pre-v4.7 single-path scanner
+(`~/.claude/projects/*/memory/*.md`) is now one entry in
+`_memoryBridge.sources[]`. Append a Cowork-sandbox path or any other glob
+to scan multiple surfaces in one call. Optional content-hash dedup collapses
+the same persona/feedback file across machines into one Decision while
+tracking every source path. Per-source try/catch — a missing sandbox dir
+just yields an empty list and a `sourceErrors[]` entry rather than crashing
+the import. 17 new tests, 300 total. Spec:
+`v4.7.0-M1_multi_source_memory_bridge.md`. Triggered by Nalira's TUL-sandbox
+session 2026-05-02 — 19 TUL-project memories that were invisible to the
+home-PC bridge are now reachable via a single config edit.
+
+## Previous — v4.6.5 (Foundation Fix + Polish Sweep · shipped 2026-04-27)
 
 v4.5.0 is a theme-wide microanimation pass: list reveals, page-mount fades,
 WS-driven row flashes, number tweening, success flashes, status-change

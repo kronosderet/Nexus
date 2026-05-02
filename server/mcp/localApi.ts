@@ -257,6 +257,7 @@ export async function localApiFetch(path: string, init: LocalApiInit = {}): Prom
       project: typeof body.project === 'string' ? body.project : undefined,
       dryRun: !!body.dry_run,
       force: !!body.force,
+      sourceFilter: typeof body.source_filter === 'string' ? body.source_filter : undefined,
     });
     if (!result.dryRun && (result.imported > 0 || result.updated > 0)) {
       store.addActivity(

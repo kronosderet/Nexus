@@ -8,6 +8,7 @@ import type {
 } from '../types.js';
 import { findSimilar } from '../lib/embeddings.ts';
 import { scanCCMemories, type MemoryEntry } from '../lib/memoryIndex.ts';
+import { getDefaultMemoryBridgeConfig } from '../lib/memoryBridge.ts';
 import { classifyProject } from '../lib/projectConfig.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -497,6 +498,21 @@ export class NexusStore {
         changed++;
       }
       markApplied('v4.6.0-E1');
+    }
+
+    // v4.7.0-M1: populate default `_memoryBridge` config so the multi-source
+    // bridge has something to read on first cold-start. The default keeps the
+    // v4.6.5-equivalent single-source behavior — the user opts into Cowork-
+    // sandbox / cross-machine sources by appending entries to the array
+    // (either via `nexus memory sources` CLI when shipped, or by hand-editing
+    // ~/.nexus/nexus.json under `_memoryBridge.sources`).
+    if (!applied['v4.7.0-M1']) {
+      if (!this.data._memoryBridge) {
+        this.data._memoryBridge = getDefaultMemoryBridgeConfig();
+        console.error('◈ Migration v4.7.0 M1: populated default _memoryBridge config (single source, path-dedup, v4.6.5-compatible).');
+        changed++;
+      }
+      markApplied('v4.7.0-M1');
     }
 
     if (changed > 0) this._flush();
@@ -1091,14 +1107,41 @@ export class NexusStore {
    *  dryRun: report counts + samples without writing.
    *  force: re-import even if already tracked (refresh content).
    *  project: only import memories whose inferred project matches (case-insensitive). */
-  importAllCCMemories(opts: { dryRun?: boolean; force?: boolean; project?: string } = {}): {
+  importAllCCMemories(opts: { dryRun?: boolean; force?: boolean; project?: string; sourceFilter?: string } = {}): {
     imported: number; skipped: number; updated: number; failed: number;
-    totalScanned: number; dryRun: boolean;
-    samples: Array<{ path: string; project: string | null; type: string; name: string; action: string }>;
+    /** Count after every filter (project, source, dedup) — legacy semantics, what got iterated for import. */
+    totalScanned: number;
+    /** v4.7.0-M1: raw files seen across all enabled sources before project/dedup filtering. */
+    totalFilesScanned: number;
+    /** v4.7.0-M1: count after dedup but before project filter. Matches `totalScanned` for path-dedup mode. */
+    uniqueScanned: number;
+    dryRun: boolean;
+    samples: Array<{ path: string; project: string | null; type: string; name: string; action: string; source: string; machineHint?: string }>;
+    sourceErrors: Array<{ source: string; error: string }>;
+    sourcesScanned: number;
   } {
-    const index = scanCCMemories(9999);
-    const baseResult = { imported: 0, skipped: 0, updated: 0, failed: 0, totalScanned: 0, dryRun: !!opts.dryRun, samples: [] as Array<{ path: string; project: string | null; type: string; name: string; action: string }> };
-    if (!index.available) return baseResult;
+    // v4.7.0-M1: read sources + dedup config from the store. Falls back to the
+    // hardcoded default if the migration hasn't run yet (e.g. fresh test stores
+    // built without going through _runMigrations).
+    const config = this.data._memoryBridge ?? getDefaultMemoryBridgeConfig();
+    const baseResult = {
+      imported: 0, skipped: 0, updated: 0, failed: 0,
+      totalScanned: 0, totalFilesScanned: 0, uniqueScanned: 0,
+      dryRun: !!opts.dryRun,
+      samples: [] as Array<{ path: string; project: string | null; type: string; name: string; action: string; source: string; machineHint?: string }>,
+      sourceErrors: [] as Array<{ source: string; error: string }>,
+      sourcesScanned: 0,
+    };
+    if (!config.enabled) return baseResult;
+
+    const index = scanCCMemories({
+      limit: 9999,
+      sources: config.sources,
+      sourceFilter: opts.sourceFilter,
+      dedupStrategy: config.dedup.strategy,
+      trackAllSources: config.dedup.trackAllSources,
+    });
+    if (!index.available) return { ...baseResult, sourceErrors: index.sourceErrors, sourcesScanned: index.sourcesScanned };
 
     let memories = index.memories;
     if (opts.project) {
@@ -1107,7 +1150,7 @@ export class NexusStore {
     }
 
     const counts = { imported: 0, skipped: 0, updated: 0, failed: 0 };
-    const samples: Array<{ path: string; project: string | null; type: string; name: string; action: string }> = [];
+    const samples: Array<{ path: string; project: string | null; type: string; name: string; action: string; source: string; machineHint?: string }> = [];
     const importsMap = this.data._memoryImports || {};
 
     for (const entry of memories) {
@@ -1123,7 +1166,15 @@ export class NexusStore {
         }
         counts[action]++;
         if (samples.length < 8 && action !== 'skipped') {
-          samples.push({ path: entry.path, project: entry.project, type: entry.type, name: entry.name, action });
+          samples.push({
+            path: entry.path,
+            project: entry.project,
+            type: entry.type,
+            name: entry.name,
+            action,
+            source: entry.source,
+            machineHint: entry.machineHint,
+          });
         }
       } catch (err) {
         counts.failed++;
@@ -1133,7 +1184,19 @@ export class NexusStore {
       }
     }
 
-    return { ...counts, totalScanned: memories.length, dryRun: !!opts.dryRun, samples };
+    return {
+      ...counts,
+      // Legacy: post-everything count. Tests assert this == `imported` when no skips happen.
+      totalScanned: memories.length,
+      // v4.7.0-M1: raw + dedup intermediates so callers (and the MCP rendering) can surface
+      // "scanned 19 files across 2 sources, 17 unique, 2 imported after project filter".
+      totalFilesScanned: index.totalFiles,
+      uniqueScanned: index.uniqueFiles,
+      dryRun: !!opts.dryRun,
+      samples,
+      sourceErrors: index.sourceErrors,
+      sourcesScanned: index.sourcesScanned,
+    };
   }
 
   /** Auto-link a new decision to existing ones via semantic + keyword similarity. */

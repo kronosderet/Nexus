@@ -1,30 +1,29 @@
 /**
- * Memory Bridge — indexes CC's auto-memory files at ~/.claude/projects/<cwd-hash>/memory/
+ * Memory Bridge — indexes CC's auto-memory files.
  *
- * CC's auto-memory system writes typed markdown files (user / feedback / project /
- * reference / plan) per-project with YAML frontmatter. Nexus READS them (never
- * writes in Phase A) and stitches them into its view.
+ * v4.6.5 and earlier: scanned a single hardcoded path
+ * (~/.claude/projects/<cwd-hash>/memory/, configurable via NEXUS_CC_PROJECTS_DIR).
  *
- * Design notes:
- * - Pure FS read, no store dependency — same adapter pattern as planIndex.ts.
- * - Skips MEMORY.md (that's the per-project index, not a memory entry).
- * - Project inference chains two sources: (1) the encoded CWD path in the dir
- *   name, (2) content-based keyword match. Null fallback when nothing matches —
- *   don't lie about attribution.
+ * v4.7.0-M1: multi-source. Pulls from every source in `MemoryBridgeConfig.sources[]`,
+ * with optional content-hash dedup so the same file content reaching the bridge
+ * over two paths (e.g. shared persona memory across machines) is one Decision
+ * but tracks both source paths.
  *
- * Configure via NEXUS_CC_PROJECTS_DIR env var
- * (defaults to ~/.claude/projects).
+ * Pure FS read, no store dependency — same adapter pattern as planIndex.ts.
+ * Skips MEMORY.md (per-project index file, not a memory entry).
  */
 
-import { homedir } from 'os';
-import { join } from 'path';
-import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
+import { readFileSync, statSync } from 'fs';
+import { basename, dirname } from 'path';
+import { createHash } from 'crypto';
 import { tryClassifyProject } from './projectConfig.ts';
+import { expandGlob, getDefaultMemorySources } from './memoryBridge.ts';
+import type { MemorySource } from '../types.ts';
 
 export interface MemoryEntry {
   filename: string;          // e.g. "feedback_fuel_display.md"
-  path: string;              // absolute path
-  encodedProject: string;    // e.g. "C--Projects" — the CC dir identifier
+  path: string;              // absolute path (canonical / first-seen when content-hash dedup)
+  encodedProject: string;    // e.g. "C--Projects" — the CC dir identifier (or sandbox id)
   project: string | null;    // inferred project name; null if no hint matched
   type: string;              // "user" / "feedback" / "project" / "reference" / "plan" / other
   name: string;              // from frontmatter `name:`, or file stem fallback
@@ -32,38 +31,35 @@ export interface MemoryEntry {
   snippet: string;           // ~200 chars of body preview
   mtime: string;             // ISO timestamp
   ageDays: number;
+  // v4.7.0-M1 — provenance fields
+  source: string;            // source `name` from MemoryBridgeConfig.sources[]
+  machineHint?: string;      // optional informational label, e.g. "domaci-pc"
+  contentHash?: string;      // sha256 (16 hex chars) — populated when dedup is content-hash
+  allSources?: Array<{       // populated when dedup=content-hash AND trackAllSources=true
+    source: string;
+    path: string;
+    machineHint?: string;
+  }>;
 }
 
 export interface MemoriesIndex {
   available: boolean;
   memories: MemoryEntry[];
-  totalFiles: number;        // total .md files scanned (excl. MEMORY.md)
-  projectDirs: number;       // number of project memory dirs seen
-  memoriesDir: string;       // resolved root, useful for debugging
+  totalFiles: number;        // total .md files scanned (excl. MEMORY.md), pre-dedup
+  uniqueFiles: number;       // post-dedup count (same as totalFiles when dedup=path)
+  projectDirs: number;       // number of distinct memory-containing dirs seen across all sources
+  memoriesDir: string;       // legacy field — set to first source path for back-compat
+  // v4.7.0-M1
+  sourcesScanned: number;    // count of enabled sources actually iterated
+  sourceErrors: Array<{ source: string; error: string }>;  // per-source failures (e.g. unreachable sandbox)
 }
 
-const PROJECTS_ROOT = process.env.NEXUS_CC_PROJECTS_DIR || join(homedir(), '.claude', 'projects');
-
-// v4.5.3 — project inference deferred to the user-configurable patterns in
-// projectConfig.ts. Directory/content hints previously baked one developer's
-// project names into the module; now we scan the encoded dir + content through
-// the same pattern set the rest of Nexus uses.
-const DIR_HINTS: Array<{ project: string; patterns: RegExp[] }> = [
-  { project: 'Nexus', patterns: [
-    /C--Projects$/i,    // Windows-encoded C:\Projects path
-    /Claude-MD/i,       // v4.6.2 — was 'claude-md' (synthetic project leak); maps to Nexus
-                        // since the Claude-MD memories function as Nexus reference notes.
-                        // Older imports landed under 'claude-md' before; v4.6.2-D1 migrates them.
-  ] },
-];
-
-function inferProject(encodedDir: string, content: string): string | null {
-  for (const h of DIR_HINTS) {
-    if (h.patterns.some(p => p.test(encodedDir))) return h.project;
-  }
-  // Delegate content-based inference to the shared classifier so users can
-  // extend via ~/.nexus/projects.json instead of editing this file.
-  return tryClassifyProject(content);
+export interface ScanOptions {
+  limit?: number;
+  sources?: MemorySource[];                       // overrides config; default = getDefaultMemorySources()
+  sourceFilter?: string;                          // limit to one source by name
+  dedupStrategy?: 'path' | 'content-hash';        // default 'path'
+  trackAllSources?: boolean;                      // only meaningful with content-hash
 }
 
 /** Parse a minimal YAML frontmatter block from the top of a markdown file. */
@@ -86,75 +82,171 @@ function parseFrontmatter(content: string): { fields: Record<string, string>; bo
 function typeFromFilename(filename: string): string {
   const stem = filename.replace(/\.md$/, '');
   const prefix = stem.split('_')[0];
-  const known = ['user', 'feedback', 'project', 'reference', 'plan', 'system'];
+  const known = ['user', 'feedback', 'project', 'reference', 'plan', 'system', 'persona'];
   return known.includes(prefix) ? prefix : 'other';
 }
 
-export function scanCCMemories(limit = 50): MemoriesIndex {
-  if (!existsSync(PROJECTS_ROOT)) {
-    return { available: false, memories: [], totalFiles: 0, projectDirs: 0, memoriesDir: PROJECTS_ROOT };
+const DIR_HINTS: Array<{ project: string; patterns: RegExp[] }> = [
+  { project: 'Nexus', patterns: [
+    /C--Projects$/i,
+    /Claude-MD/i,
+  ] },
+];
+
+function inferProject(encodedDir: string, content: string): string | null {
+  for (const h of DIR_HINTS) {
+    if (h.patterns.some((p) => p.test(encodedDir))) return h.project;
   }
+  return tryClassifyProject(content);
+}
 
-  const now = Date.now();
-  const entries: MemoryEntry[] = [];
+function sha256short(s: string): string {
+  return createHash('sha256').update(s).digest('hex').slice(0, 16);
+}
+
+/**
+ * Build a `MemoryEntry` from one absolute file path. Returns null if the file
+ * is unreadable or is `MEMORY.md` (per-project index, not an entry).
+ */
+function buildEntry(filePath: string, source: MemorySource): MemoryEntry | null {
+  const filename = basename(filePath);
+  if (filename === 'MEMORY.md') return null;
+  if (!filename.endsWith('.md')) return null;
+
+  let stat;
+  try { stat = statSync(filePath); } catch { return null; }
+  if (!stat.isFile()) return null;
+
+  let content = '';
+  try { content = readFileSync(filePath, 'utf-8').slice(0, 6000); } catch { return null; }
+
+  const { fields, bodyStart } = parseFrontmatter(content);
+  const type = fields.type || typeFromFilename(filename);
+  const name = (fields.name || filename.replace(/^[a-z]+_/, '').replace(/\.md$/, '').replace(/_/g, ' ')).slice(0, 80);
+  const description = (fields.description || '').slice(0, 200);
+  const body = content.slice(bodyStart).replace(/\s+/g, ' ').trim();
+  const snippet = body.slice(0, 220);
+
+  // The "encoded project" is conventionally the parent of the memory dir
+  // for CC's layout: ~/.claude/projects/<encoded>/memory/file.md → <encoded>.
+  // For sandbox layouts (/sessions/<id>/mnt/.auto-memory/file.md) the same
+  // logic still gives a useful identifier: the second-to-last segment of
+  // the parent dir is the unique session/sandbox id.
+  const memoryDir = dirname(filePath);          // .../memory  OR  .../.auto-memory
+  const encodedProject = basename(dirname(memoryDir)); // .../<encoded>/memory → <encoded>
+
+  const project = inferProject(encodedProject, content);
+  const mtime = stat.mtime.toISOString();
+  const ageDays = Math.max(0, Math.round((Date.now() - stat.mtime.getTime()) / 86400000));
+
+  return {
+    filename,
+    path: filePath,
+    encodedProject,
+    project,
+    type,
+    name,
+    description,
+    snippet,
+    mtime,
+    ageDays,
+    source: source.name,
+    machineHint: source.machineHint,
+  };
+}
+
+/**
+ * Multi-source scan. The legacy single-arg form `scanCCMemories(50)` still
+ * works (treated as `{ limit: 50 }`) — keeps existing callers in
+ * /api/cc-memory and the brief-injection path compiling.
+ */
+export function scanCCMemories(optsOrLimit: number | ScanOptions = 50): MemoriesIndex {
+  const opts: ScanOptions = typeof optsOrLimit === 'number' ? { limit: optsOrLimit } : optsOrLimit;
+  const limit = opts.limit ?? 50;
+  const dedupStrategy = opts.dedupStrategy ?? 'path';
+  const trackAllSources = opts.trackAllSources ?? false;
+  const sourceFilter = opts.sourceFilter;
+
+  const allSources = (opts.sources ?? getDefaultMemorySources()).filter((s) => s.enabled);
+  const sources = sourceFilter ? allSources.filter((s) => s.name === sourceFilter) : allSources;
+
+  const allEntries: MemoryEntry[] = [];
+  const sourceErrors: Array<{ source: string; error: string }> = [];
+  const seenDirs = new Set<string>();
   let totalFiles = 0;
-  let projectDirs = 0;
+  let sourcesScanned = 0;
 
-  let projectDirNames: string[] = [];
-  try { projectDirNames = readdirSync(PROJECTS_ROOT); } catch { return { available: false, memories: [], totalFiles: 0, projectDirs: 0, memoriesDir: PROJECTS_ROOT }; }
-
-  for (const dirName of projectDirNames) {
-    const memoryDir = join(PROJECTS_ROOT, dirName, 'memory');
-    let dirStat;
-    try { dirStat = statSync(memoryDir); } catch { continue; }
-    if (!dirStat.isDirectory()) continue;
-    projectDirs++;
-
+  for (const src of sources) {
+    sourcesScanned++;
     let files: string[] = [];
-    try { files = readdirSync(memoryDir).filter(f => f.endsWith('.md') && f !== 'MEMORY.md'); } catch { continue; }
+    try {
+      files = expandGlob(src.path);
+    } catch (err) {
+      sourceErrors.push({ source: src.name, error: (err as Error).message });
+      continue;
+    }
 
-    for (const file of files) {
+    for (const filePath of files) {
+      const entry = buildEntry(filePath, src);
+      if (!entry) continue;
       totalFiles++;
-      const fullPath = join(memoryDir, file);
-      let stat;
-      try { stat = statSync(fullPath); } catch { continue; }
-
-      let content = '';
-      try { content = readFileSync(fullPath, 'utf-8').slice(0, 6000); } catch {}
-
-      const { fields, bodyStart } = parseFrontmatter(content);
-      const type = fields.type || typeFromFilename(file);
-      const name = (fields.name || file.replace(/^[a-z]+_/, '').replace(/\.md$/, '').replace(/_/g, ' ')).slice(0, 80);
-      const description = (fields.description || '').slice(0, 200);
-      const body = content.slice(bodyStart).replace(/\s+/g, ' ').trim();
-      const snippet = body.slice(0, 220);
-
-      const project = inferProject(dirName, content);
-      const mtime = stat.mtime.toISOString();
-      const ageDays = Math.max(0, Math.round((now - stat.mtime.getTime()) / 86400000));
-
-      entries.push({
-        filename: file,
-        path: fullPath,
-        encodedProject: dirName,
-        project,
-        type,
-        name,
-        description,
-        snippet,
-        mtime,
-        ageDays,
-      });
+      seenDirs.add(dirname(filePath));
+      if (dedupStrategy === 'content-hash') {
+        try {
+          // For dedup, hash the FULL file (not the truncated 6 KB read used for the snippet).
+          // Same content across machines should always hash identically.
+          entry.contentHash = sha256short(readFileSync(filePath, 'utf-8'));
+        } catch {
+          // Fall back to path-based identity if the hash read fails
+          entry.contentHash = sha256short(filePath);
+        }
+      }
+      allEntries.push(entry);
     }
   }
 
-  entries.sort((a, b) => new Date(b.mtime).getTime() - new Date(a.mtime).getTime());
+  // Dedup
+  const deduped = dedupEntries(allEntries, dedupStrategy, trackAllSources);
+
+  deduped.sort((a, b) => new Date(b.mtime).getTime() - new Date(a.mtime).getTime());
 
   return {
-    available: true,
-    memories: entries.slice(0, Math.max(1, limit)),
+    available: sources.length > 0,
+    memories: deduped.slice(0, Math.max(1, limit)),
     totalFiles,
-    projectDirs,
-    memoriesDir: PROJECTS_ROOT,
+    uniqueFiles: deduped.length,
+    projectDirs: seenDirs.size,
+    memoriesDir: sources[0]?.path ?? '',  // legacy field; first source for back-compat
+    sourcesScanned,
+    sourceErrors,
   };
+}
+
+function dedupEntries(
+  entries: MemoryEntry[],
+  strategy: 'path' | 'content-hash',
+  trackAllSources: boolean
+): MemoryEntry[] {
+  const seen = new Map<string, MemoryEntry>();
+  for (const entry of entries) {
+    const key = strategy === 'content-hash' ? (entry.contentHash || entry.path) : entry.path;
+    const existing = seen.get(key);
+    if (!existing) {
+      const merged: MemoryEntry = trackAllSources && strategy === 'content-hash'
+        ? { ...entry, allSources: [{ source: entry.source, path: entry.path, machineHint: entry.machineHint }] }
+        : entry;
+      seen.set(key, merged);
+    } else if (trackAllSources && strategy === 'content-hash') {
+      // Already seen this content; record the additional source path.
+      if (!existing.allSources) existing.allSources = [];
+      existing.allSources.push({ source: entry.source, path: entry.path, machineHint: entry.machineHint });
+      // Keep the newest mtime so listings still reflect the latest write
+      if (new Date(entry.mtime).getTime() > new Date(existing.mtime).getTime()) {
+        existing.mtime = entry.mtime;
+        existing.ageDays = entry.ageDays;
+      }
+    }
+    // If !trackAllSources, additional duplicates are silently dropped.
+  }
+  return Array.from(seen.values());
 }

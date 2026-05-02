@@ -185,6 +185,12 @@ export interface NexusData {
   // dated HANDOVER-YYYY-MM-DD.md file workflow. Each instance updates before
   // docking; next instance reads via nexus_brief / Handover dashboard tab.
   _handovers?: Record<string, HandoverEntry>;
+  // v4.7.0-M1 — multi-source memory bridge config. Drives nexus_import_cc_memories.
+  // Each source has its own glob pattern, optional machine hint, and enable flag,
+  // so the same Nexus instance can pull memories from CC dev sessions on this
+  // machine AND from a Cowork sandbox path the same user reaches over a different
+  // surface. See server/lib/memoryBridge.ts for the default population logic.
+  _memoryBridge?: MemoryBridgeConfig;
 }
 
 // v4.6.0 #398 — handover card payload.
@@ -192,6 +198,38 @@ export interface HandoverEntry {
   content: string;          // markdown body (~500-word soft cap)
   updated_at: string;       // ISO timestamp of last write
   updated_by?: string;      // optional source — instance label, MCP tool, dashboard, etc.
+}
+
+// v4.7.0-M1 — memory bridge config.
+//
+// Each `MemorySource` is a named glob pattern Nexus walks for CC auto-memory
+// .md files. Path supports `~` (home expansion) and `*` segments. `machineHint`
+// is purely informational — surfaced in nexus_import_cc_memories output so the
+// user can tell which machine a given memory originated from when the same
+// content lives on multiple machines.
+//
+// `dedup.strategy`:
+//   - 'path' (default, v4.6.5-compatible) — one entry per absolute file path
+//   - 'content-hash' — same file content across multiple sources is collapsed
+//     into one Decision; all source paths recorded in `_allSources`
+//
+// `dedup.trackAllSources` (only meaningful with content-hash) — when true, the
+// import response carries every source path that produced an identical hash so
+// the user can see all the machines a shared memory was found on.
+export interface MemorySource {
+  name: string;                // unique identifier, e.g. "cc-dev"
+  path: string;                // glob pattern, e.g. "~/.claude/projects/*/memory/*.md"
+  machineHint?: string;        // optional informational label, e.g. "domaci-pc"
+  enabled: boolean;
+}
+
+export interface MemoryBridgeConfig {
+  enabled: boolean;
+  sources: MemorySource[];
+  dedup: {
+    strategy: 'path' | 'content-hash';
+    trackAllSources: boolean;
+  };
 }
 
 export interface SuggestedContradiction {

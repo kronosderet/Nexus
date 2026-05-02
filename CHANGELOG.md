@@ -9,6 +9,65 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.7.0 — Multi-source CC memory bridge
+
+Spec: `v4.7.0-M1_multi_source_memory_bridge.md` (Nalira's proposal from a
+TUL-sandbox session, 2026-05-02). Problem in one sentence: pre-v4.7
+`nexus_import_cc_memories` only knew about a single hardcoded path
+(`~/.claude/projects/*/memory/*.md`), so memories written by Cowork sessions
+from other machines (sandbox-internal paths like
+`/sessions/<id>/mnt/.auto-memory/*.md`) never reached the Ledger. Same user,
+two surfaces, no continuity between them.
+
+### Added
+- **`MemoryBridgeConfig`** in `NexusData._memoryBridge` — array of named
+  sources, each with its own glob pattern, optional `machineHint`, and enable
+  flag. Edit `~/.nexus/nexus.json` to append a Cowork-sandbox source or a
+  custom path; restart Nexus and the next import sees them.
+- **`server/lib/memoryBridge.ts`** — minimal cross-platform glob expander
+  (`*` segments + intra-segment `*.md` patterns), `~` expansion via `HOME`/
+  `USERPROFILE`, default-source factory.
+- **Per-source try/catch** in `scanCCMemories` — an unreachable source (e.g.
+  a Cowork sandbox path that doesn't exist on the home PC) yields an empty
+  list and a `sourceErrors[]` entry instead of crashing the whole import.
+- **Content-hash dedup** (opt-in via `_memoryBridge.dedup.strategy =
+  'content-hash'`) — the same persona/feedback memory file replicated across
+  two machines collapses into one Decision; with `trackAllSources: true` the
+  entry's `allSources[]` records every path it was found at.
+- **`source_filter` parameter** on `nexus_import_cc_memories` — scope a scan
+  to one named source for debugging (e.g. `source_filter: 'cowork-sandbox'`).
+- **Provenance in import samples** — every sample line now ends with
+  `← <source-name>/<machine-hint>` so you can tell at a glance which surface
+  each memory came from.
+
+### Changed
+- `nexus_import_cc_memories` response gains `totalFilesScanned`,
+  `uniqueScanned`, `sourcesScanned`, and `sourceErrors[]` alongside the
+  existing `totalScanned` (which still means "post-filter, ready to import"
+  — backward-compatible).
+- MCP tool description updated; tool count unchanged at 29.
+
+### Migration
+- **`v4.7.0-M1`** runs at the next cold start. If `_memoryBridge` doesn't
+  exist yet, populates a single-source default exactly equivalent to the
+  v4.6.5 hardcoded path. Honors `NEXUS_CC_PROJECTS_DIR`. Idempotent — a
+  user-edited config is left untouched (the migration only writes when the
+  field is absent).
+
+### Tests
+- New `tests/memoryBridgeMultiSource.test.js` — 17 specs covering
+  `expandHome` cross-platform behavior, `expandGlob` walks (including
+  unreachable-path resilience and intra-segment globs), multi-source
+  aggregation, `sourceFilter`, disabled sources, content-hash dedup,
+  `trackAllSources`, and the v4.7.0-M1 migration's idempotence.
+- **300 active tests green** (was 283 + 17 new).
+
+### Compatibility
+- No breaking changes. Existing v4.6.5 installs migrate automatically and
+  see identical behavior unless they edit `_memoryBridge.sources[]`.
+- The `glob` npm package was *not* added — the small built-in
+  `expandGlob` covers the documented patterns and avoids a new dependency.
+
 ## v4.6.5 — Foundation Fix + Polish Sweep
 
 Final batch before the nexus-driven handover takeover. **Twelve items

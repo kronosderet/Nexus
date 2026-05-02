@@ -956,11 +956,14 @@ const TOOLS: Tool[] = [
     name: 'nexus_import_cc_memories',
     description:
       'Import Claude Code\'s auto-memory files as reference decisions in The Ledger. ' +
-      'Scans ~/.claude/projects/*/memory/*.md (what CC writes automatically) and inserts each ' +
-      'as a decision with lifecycle=\'reference\' and tag \'cc-memory\'. Dedup by file path — ' +
-      'safe to re-run; skips already-imported memories and refreshes ones whose content changed. ' +
-      'Use dry_run first to preview what would be imported. References don\'t pollute getActiveDecisions ' +
-      'or test-gap analysis but ARE searchable via nexus_search and linkable via nexus_link_decisions.',
+      'v4.7.0+ scans every source configured in `_memoryBridge.sources[]` (default: ' +
+      '~/.claude/projects/*/memory/*.md, identical to v4.6.x behavior). Add Cowork-sandbox / ' +
+      'cross-machine paths by appending entries to that array in ~/.nexus/nexus.json. Each memory ' +
+      'becomes a decision with lifecycle=\'reference\' and tag \'cc-memory\'. Safe to re-run; skips ' +
+      'already-imported memories and refreshes ones whose content changed. Use dry_run first to ' +
+      'preview what would be imported. References don\'t pollute getActiveDecisions or test-gap ' +
+      'analysis but ARE searchable via nexus_search and linkable via nexus_link_decisions. ' +
+      'Set source_filter to a source name (e.g. "cowork-sandbox") to scan just one source for debugging.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -975,6 +978,10 @@ const TOOLS: Tool[] = [
         force: {
           type: 'boolean',
           description: 'If true, re-import even already-tracked memories (refreshes their decision content). Default false.',
+        },
+        source_filter: {
+          type: 'string',
+          description: 'v4.7.0+: limit scan to one configured source by name (e.g. "cowork-sandbox"). Useful for debugging a specific source. Default: scan all enabled sources.',
         },
       },
     },
@@ -1786,33 +1793,59 @@ async function handleTool(name: string, args: any): Promise<string> {
 
     case 'nexus_import_cc_memories': {
       // v4.3.8 #200 — Memory Bridge first-run import.
+      // v4.7.0-M1 — multi-source: respects `_memoryBridge.sources[]` config; supports `source_filter`.
       const body = JSON.stringify({
         project: args?.project,
         dry_run: !!args?.dry_run,
         force: !!args?.force,
+        source_filter: args?.source_filter,
       });
       type ImportResult = {
         imported: number; skipped: number; updated: number; failed: number;
-        totalScanned: number; dryRun: boolean;
-        samples: Array<{ path: string; project: string | null; type: string; name: string; action: string }>;
+        totalScanned: number; totalFilesScanned?: number; uniqueScanned?: number; dryRun: boolean;
+        samples: Array<{ path: string; project: string | null; type: string; name: string; action: string; source?: string; machineHint?: string }>;
+        sourceErrors?: Array<{ source: string; error: string }>;
+        sourcesScanned?: number;
       };
       const result = await nexusFetch('/api/import-cc-memories', { method: 'POST', body }) as ImportResult;
 
+      const filterTags: string[] = [];
+      if (args?.project) filterTags.push(`project: ${args.project}`);
+      if (args?.source_filter) filterTags.push(`source: ${args.source_filter}`);
+      const filterSuffix = filterTags.length ? ` (filtered to ${filterTags.join(', ')})` : '';
+
       const header = result.dryRun ? '◈ Memory Bridge import — dry run' : '◈ Memory Bridge import complete';
+      // v4.7.0-M1 — show raw-files / unique / post-filter counts when they differ
+      // (multi-source scan or content-hash dedup making the numbers diverge).
+      const rawFiles = result.totalFilesScanned ?? result.totalScanned;
+      const unique = result.uniqueScanned ?? result.totalScanned;
+      const sourcesN = result.sourcesScanned ?? 1;
+      const scanLine =
+        rawFiles === result.totalScanned
+          ? `  ${result.totalScanned} memor${result.totalScanned === 1 ? 'y' : 'ies'} scanned across ${sourcesN} source${sourcesN === 1 ? '' : 's'}${filterSuffix}`
+          : `  ${rawFiles} files seen across ${sourcesN} source${sourcesN === 1 ? '' : 's'} → ${unique} unique → ${result.totalScanned} after filters${filterSuffix}`;
       const lines = [
         header,
-        `  ${result.totalScanned} memor${result.totalScanned === 1 ? 'y' : 'ies'} scanned${args?.project ? ` (filtered to project: ${args.project})` : ''}`,
+        scanLine,
         `  · ${result.imported} new${result.dryRun ? ' (would import)' : ''}`,
         `  · ${result.skipped} already on file (skipped)`,
         `  · ${result.updated} updated${result.dryRun ? ' (would refresh)' : ''}`,
       ];
       if (result.failed > 0) lines.push(`  · ${result.failed} failed — see server logs`);
+      if (result.sourceErrors && result.sourceErrors.length > 0) {
+        lines.push('');
+        lines.push('  Source errors (continuing past these):');
+        for (const se of result.sourceErrors) {
+          lines.push(`    ! [${se.source}] ${se.error}`);
+        }
+      }
       if (result.samples.length > 0) {
         lines.push('');
         lines.push('  Samples:');
         for (const s of result.samples) {
           const projTag = s.project ? ` (${s.project})` : '';
-          lines.push(`    › [${s.type}] ${s.name}${projTag}  ${s.action}`);
+          const srcTag = s.source ? `  ← ${s.source}${s.machineHint ? `/${s.machineHint}` : ''}` : '';
+          lines.push(`    › [${s.type}] ${s.name}${projTag}  ${s.action}${srcTag}`);
         }
       }
       if (result.dryRun && (result.imported > 0 || result.updated > 0)) {
