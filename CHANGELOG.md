@@ -9,6 +9,84 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.7.1 — Graph Layouts + Algorithm Extraction
+
+Rides on top of v4.7.0. Half-session Tier-3 batch closing `#332` from the
+v4.6.5 handover, originally built locally as v4.6.6 and rebased onto v4.7.0
+when the multi-source memory bridge was discovered to have shipped from
+another machine. **331 tests (+31) · 29 tools · no migrations · no breaking
+changes.**
+
+### #332 Tier-3: alternative graph layouts
+
+The Visual decision graph had a single force-directed layout. Adds two
+alternative layouts and a switcher.
+
+- **New** `client/src/lib/graphLayouts.js` — pure-function module exporting
+  `forceDirectedLayout` (the v4.4.x spring-embedder lifted as-is),
+  `circularLayout` (deterministic ring sorted by id, top of canvas anchored at
+  the lowest id), `hierarchicalLayout` (BFS-layered top-to-bottom from each
+  component's highest-degree node, with multiple components allocated
+  proportional horizontal slabs). All three return the same
+  `{ positions, degree, components, nodeComponent }` shape so VisualView's
+  render code is layout-agnostic.
+- **`client/src/modules/Graph.jsx`** — VisualView's `useMemo` shrunk from
+  ~120L to a 9-line dispatch (`LAYOUT_FNS[layoutMode]({...})`). Net file size
+  2495 → 2426L (−69), partial groundwork for `#217` (split oversized files).
+  New layout-pill toolbar mirrors the by-project / by-cluster style.
+- **`localStorage` persistence** — choice saved under
+  `nexus.graph.visual.layout`, validated against the registry on read, silent
+  fallback to `force` when localStorage is unavailable (SSR / sandboxed
+  contexts).
+
+### Why the extraction matters
+
+The handover had `#217` (split oversized files) flagged as the highest
+structural debt — `Graph.jsx` at ~2400L, `cli/nexus.js` 1969L,
+`mcp/index.ts` 1700L+. This release ships a Tier-3 feature *and* demonstrates
+the extraction pattern: pure-function lib with a single dispatch import, no
+React in the lib, render code unchanged. Future `#217` passes can lift
+HolesView / CentralityView / ContradictionsView to `client/src/modules/graph/`
+the same way.
+
+### Tests
+
+`tests/graphLayouts.test.js` adds **31 specs**: 7 shared-contract specs × 3
+layouts (positions present, in-bounds, degree match, components match,
+empty-graph handling, single-node handling, determinism) + geometry checks
+(circular ring radius equality, top-of-ring at lowest id), hierarchical
+layering (chain depth ordering, star hub-on-top, separated component slabs),
+force-directed physics (mean edge length < mean disconnected distance), and a
+registry-sanity block. Total 300 → **331 tests**.
+
+### Files touched
+
+- `client/src/lib/graphLayouts.js` — NEW (~275L)
+- `client/src/modules/Graph.jsx` — useMemo replaced + layout state + selector
+- `tests/graphLayouts.test.js` — NEW (~248L, 31 specs)
+- `package.json`, `cli/package.json`, `mcpb/manifest.json` — version bump
+- `README.md` — test count 300 → 331
+- `CONCEPT.md` — test count synced
+- `CHANGELOG.md` — this entry
+- `ROADMAP.md` — v4.7.1 entry
+
+### What's next
+
+Next batch (preplanned in the Continuous Handover): `#217` Graph.jsx split —
+lift HolesView, CentralityView, ContradictionsView into per-view files under
+`client/src/modules/graph/`. Layout extraction here is the proof of concept;
+the views are bigger and trickier (cross-tab navigation, fetch effects, the
+new ResolveConflictCard). Half- to full-session.
+
+Also queued: `encodedProject` derivation for Cowork sandbox paths in
+`memoryIndex.ts buildEntry()` — `dirname(memoryDir)` returns `mnt`, not the
+sandbox id, when the source is `/sessions/<id>/mnt/.auto-memory/*.md`. Low
+impact (content-pattern fallback still classifies the project), but the
+field name lies. Half-hour fix.
+
+If `#310` (semantic-opposition auto-suggest) is desired sooner, LM Studio
+needs to come up first — Overseer was unavailable at the v4.7.1 dock.
+
 ## v4.7.0 — Multi-source CC memory bridge
 
 Spec: `v4.7.0-M1_multi_source_memory_bridge.md` (Nalira's proposal from a

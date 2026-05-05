@@ -3,7 +3,25 @@ import { GitBranch, Target, AlertTriangle, BarChart3, Link2, RefreshCw, Search, 
 import { api } from '../hooks/useApi.js';
 import { useNexusFleet } from '../context/useNexus.js';
 import { THEME, PROJECT_PALETTE, EDGE_STYLES, LIFECYCLE_COLORS } from '../lib/theme.js';
+import { LAYOUT_FNS, LAYOUTS, DEFAULT_LAYOUT } from '../lib/graphLayouts.js';
 import DecisionPicker from '../components/DecisionPicker.jsx';
+
+// v4.6.6 #332 — layout-mode persistence key. Single source of truth so reads
+// and writes can't drift if we ever rename it.
+const LAYOUT_STORAGE_KEY = 'nexus.graph.visual.layout';
+function readSavedLayout() {
+  try {
+    if (typeof window === 'undefined') return DEFAULT_LAYOUT;
+    const v = window.localStorage.getItem(LAYOUT_STORAGE_KEY);
+    return LAYOUTS.some(l => l.id === v) ? v : DEFAULT_LAYOUT;
+  } catch { return DEFAULT_LAYOUT; }
+}
+function writeSavedLayout(id) {
+  try {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(LAYOUT_STORAGE_KEY, id);
+  } catch { /* localStorage unavailable — silent */ }
+}
 
 // v4.3.5 P4: shared tabs constant so the inline render + keyboard handler agree on order.
 const GRAPH_TABS = [
@@ -1930,6 +1948,11 @@ function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocu
   // v4.4.3 #335 — color mode: 'project' (default) or 'cluster' (connected-component).
   // Cluster mode makes the "5 disconnected clusters" claim visually verifiable.
   const [colorMode, setColorMode] = useState('project');
+  // v4.6.6 #332 — layout mode: 'force' (default) | 'circular' | 'hierarchical'.
+  // Persisted in localStorage so the choice survives reloads. Algorithms live
+  // in `client/src/lib/graphLayouts.js` (extraction also lays groundwork for #217).
+  const [layoutMode, setLayoutMode] = useState(readSavedLayout);
+  useEffect(() => { writeSavedLayout(layoutMode); }, [layoutMode]);
   // v4.5.8 #328 — fetched decision details (full text, connections, linked tasks).
   // Thin loading state so the panel doesn't jitter during slice swaps.
   const [details, setDetails] = useState(null);
@@ -1968,125 +1991,19 @@ function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocu
 
   const WIDTH = containerWidth;
 
-  // Memoized force-directed layout: runs once per graph (and on graph change)
+  // v4.6.6 #332 — layout dispatch. Algorithms live in lib/graphLayouts.js so
+  // VisualView stays focused on rendering. Switching layoutMode re-runs the
+  // memo; same {positions, degree, components, nodeComponent} shape across all
+  // three so the render code below is layout-agnostic.
   const layout = useMemo(() => {
-    if (!graph || !graph.nodes || graph.nodes.length === 0) {
-      return { positions: {}, components: 0 };
-    }
-    const nodes = graph.nodes;
-    const edges = graph.edges || [];
-
-    // Position state — seeded deterministically by id so layout is stable
-    const positions = {};
-    for (const n of nodes) {
-      const seed = n.id * 9301 + 49297;
-      const r1 = ((seed % 233280) / 233280);
-      const r2 = (((seed * 13) % 233280) / 233280);
-      positions[n.id] = {
-        x: WIDTH / 2 + (r1 - 0.5) * WIDTH * 0.7,
-        y: HEIGHT / 2 + (r2 - 0.5) * HEIGHT * 0.7,
-      };
-    }
-
-    // Connection counts (degree)
-    const degree = {};
-    for (const n of nodes) degree[n.id] = 0;
-    for (const e of edges) {
-      if (degree[e.from] !== undefined) degree[e.from]++;
-      if (degree[e.to] !== undefined) degree[e.to]++;
-    }
-
-    // Spring-embedder iterations
-    const ITER = 100;
-    const k = Math.sqrt((WIDTH * HEIGHT) / Math.max(1, nodes.length)) * 0.6;
-    const repel = k * k;
-    const cooling = (i) => Math.max(0.01, 1 - i / ITER) * 6;
-
-    for (let i = 0; i < ITER; i++) {
-      // Reset displacements
-      const disp = {};
-      for (const n of nodes) disp[n.id] = { x: 0, y: 0 };
-
-      // Repulsive forces between all pairs
-      for (let a = 0; a < nodes.length; a++) {
-        for (let b = a + 1; b < nodes.length; b++) {
-          const na = nodes[a];
-          const nb = nodes[b];
-          const dx = positions[na.id].x - positions[nb.id].x;
-          const dy = positions[na.id].y - positions[nb.id].y;
-          const dist = Math.max(0.01, Math.sqrt(dx * dx + dy * dy));
-          const force = repel / dist;
-          const fx = (dx / dist) * force;
-          const fy = (dy / dist) * force;
-          disp[na.id].x += fx;
-          disp[na.id].y += fy;
-          disp[nb.id].x -= fx;
-          disp[nb.id].y -= fy;
-        }
-      }
-
-      // Attractive forces along edges
-      for (const e of edges) {
-        const pa = positions[e.from];
-        const pb = positions[e.to];
-        if (!pa || !pb) continue;
-        const dx = pa.x - pb.x;
-        const dy = pa.y - pb.y;
-        const dist = Math.max(0.01, Math.sqrt(dx * dx + dy * dy));
-        const force = (dist * dist) / k;
-        const fx = (dx / dist) * force;
-        const fy = (dy / dist) * force;
-        disp[e.from].x -= fx;
-        disp[e.from].y -= fy;
-        disp[e.to].x += fx;
-        disp[e.to].y += fy;
-      }
-
-      // Apply with cooling
-      const temp = cooling(i);
-      for (const n of nodes) {
-        const d = disp[n.id];
-        const len = Math.max(0.01, Math.sqrt(d.x * d.x + d.y * d.y));
-        const limited = Math.min(len, temp);
-        positions[n.id].x += (d.x / len) * limited;
-        positions[n.id].y += (d.y / len) * limited;
-        // Keep inside the canvas with margin
-        positions[n.id].x = Math.max(20, Math.min(WIDTH - 20, positions[n.id].x));
-        positions[n.id].y = Math.max(20, Math.min(HEIGHT - 20, positions[n.id].y));
-      }
-    }
-
-    // Connected components (union-find)
-    const parent = {};
-    for (const n of nodes) parent[n.id] = n.id;
-    const find = (x) => {
-      while (parent[x] !== x) {
-        parent[x] = parent[parent[x]];
-        x = parent[x];
-      }
-      return x;
-    };
-    const union = (a, b) => {
-      const ra = find(a);
-      const rb = find(b);
-      if (ra !== rb) parent[ra] = rb;
-    };
-    for (const e of edges) {
-      if (parent[e.from] !== undefined && parent[e.to] !== undefined) {
-        union(e.from, e.to);
-      }
-    }
-    const roots = new Set();
-    const nodeComponent = {};  // v4.4.3 #335 — node id → root (component) id
-    for (const n of nodes) {
-      const root = find(n.id);
-      roots.add(root);
-      nodeComponent[n.id] = root;
-    }
-    const components = roots.size;
-
-    return { positions, degree, components, nodeComponent };
-  }, [graph]);
+    const fn = LAYOUT_FNS[layoutMode] || LAYOUT_FNS[DEFAULT_LAYOUT];
+    return fn({
+      nodes: graph?.nodes || [],
+      edges: graph?.edges || [],
+      width: WIDTH,
+      height: HEIGHT,
+    });
+  }, [graph, layoutMode]);
 
   if (!graph || !graph.nodes || graph.nodes.length === 0) {
     return (
@@ -2210,6 +2127,20 @@ function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocu
           >
             by cluster
           </button>
+        </div>
+        {/* v4.6.6 #332 — layout switcher. Pills mirror by-project/by-cluster style. */}
+        <div className="flex gap-0.5 border border-nexus-border rounded" role="group" aria-label="Graph layout">
+          {LAYOUTS.map(l => (
+            <button
+              key={l.id}
+              onClick={() => setLayoutMode(l.id)}
+              className={`text-[10px] font-mono px-2 py-1 transition-colors ${layoutMode === l.id ? 'bg-nexus-amber/10 text-nexus-amber' : 'text-nexus-text-faint hover:text-nexus-text'}`}
+              title={l.tooltip}
+              aria-pressed={layoutMode === l.id}
+            >
+              {l.label}
+            </button>
+          ))}
         </div>
       </div>
 

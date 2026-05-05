@@ -96,7 +96,25 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.7.0 (Multi-source CC memory bridge · shipped 2026-05-02)
+## Current — v4.7.1 (Graph Layouts + Algorithm Extraction · shipped 2026-05-05)
+
+Rides on top of v4.7.0. Half-session Tier-3 batch closing `#332` from the
+v4.6.5 handover, originally built locally as v4.6.6 and rebased onto v4.7.0
+when the multi-source memory bridge was discovered to have shipped from a
+different machine.
+
+**`#332` alternative graph layouts**: VisualView gains `force` /
+`circular` / `hierarchical` layouts via a switcher pill group, persisted in
+localStorage. Algorithms extracted to `client/src/lib/graphLayouts.js` as
+pure functions — `Graph.jsx` shrinks from 2495L → 2426L, demonstrating the
+extraction pattern that `#217` will need at scale.
+
+**31 new tests** in `tests/graphLayouts.test.js` — shared-contract checks ×
+3 layouts, plus geometry assertions (ring radius equality, hub-at-top in
+hierarchical, component slab separation) and force-directed physics. Total
+300 → **331 tests · 29 tools · no migrations**.
+
+## Previous — v4.7.0 (Multi-source CC memory bridge · shipped 2026-05-02)
 
 Memory bridge becomes config-driven. The pre-v4.7 single-path scanner
 (`~/.claude/projects/*/memory/*.md`) is now one entry in
@@ -110,16 +128,17 @@ the import. 17 new tests, 300 total. Spec:
 session 2026-05-02 — 19 TUL-project memories that were invisible to the
 home-PC bridge are now reachable via a single config edit.
 
-## Previous — v4.6.5 (Foundation Fix + Polish Sweep · shipped 2026-04-27)
+### v4.5.0–v4.6.5 (compressed)
 
-v4.5.0 is a theme-wide microanimation pass: list reveals, page-mount fades,
-WS-driven row flashes, number tweening, success flashes, status-change
-highlights, Overseer scan shimmer. All kinetic polish respects
-`prefers-reduced-motion`. The v4.3 → v4.4 functional arc shipped in v4.4.8
-(Contradiction Scan Engine); v4.5.0 is the visual-polish bookend.
-
-26 MCP tools, 228 tests. See **`CHANGELOG.md`** for full per-release detail
-from v4.3.5 through v4.5.0.
+v4.5.0 kicked off as a theme-wide microanimation pass; the v4.5.x train
+closed Tier 2 (v4.5.9), swept Tier 3 (v4.5.10), and shipped the sliding
+weekly fuel window (v4.5.11/12). v4.6.0 introduced the Continuous Handover
+system that v4.7.1 used end-to-end. v4.6.1 added Overseer Sweep +
+Route Tests (+33 specs), v4.6.2 ran D1+D2 graph-hygiene migrations, v4.6.3
+fixed the orphan metric to exclude reference imports, v4.6.4 hot-fixed
+double-stringified POST bodies, v4.6.5 closed the store-reload race and
+shipped the Conflicts resolution UI. See **`CHANGELOG.md`** for full
+per-release detail.
 
 ### The arc in one paragraph
 v4.3.5 kicked off with an audit shakedown (data/code/dashboard). v4.3.6
@@ -136,9 +155,11 @@ Graph (Visual/Centrality/Holes/Conflicts), Overseer, Log.
 - **Tier 3/4** — longtail polish. Not urgent. `nexus_search "Tier 3"` for list.
 
 ### Non-audit backlog
-- `#217` Split oversized files (`cli/nexus.js` · `mcp/index.ts` · `store.ts`)
-- `#218` Route tests for github / overseer / webhooks
-- `#219` Zod runtime validation at route boundaries
+- `#217` Split oversized files — Graph.jsx layout extraction shipped in v4.6.6;
+  remaining: HolesView/CentralityView/ContradictionsView lift, `cli/nexus.js`
+  (1969L), `mcp/index.ts` (1700L+).
+- `#218` Route tests for github / overseer / webhooks — partial in v4.6.1.
+- `#219` Zod runtime validation at route boundaries — deferred.
 
 ## Historical — v4.3 (in flight at the time)
 
