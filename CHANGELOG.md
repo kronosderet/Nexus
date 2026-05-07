@@ -9,6 +9,87 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.7.4 — Today fusion view
+
+Closes `#240` (Tier-3 UX prototype, deferred since v4.5.10). New dense
+header card on the Command tab that fuses four signals into one glance:
+**fuel · current task · recent activity · top risk**. Visible above both
+strategic and kanban views.
+
+**369 tests (+27) · 29 tools · no migrations · no breaking changes.**
+
+### Why a header card
+
+Pre-v4.7.4 the four signals were scattered across StrategicView panels
+(Now/Next/Later/Done columns + risks bar) and across the Fuel tab. A user
+opening the Command tab to "see where we are" had to read three or four
+sections to assemble the answer. TodayView puts the answer in one row.
+
+### Design
+
+Single bordered card at the top of Command, with a 4-column responsive
+grid (1-col on phones, 2x2 on tablets, 4-col on desktop):
+
+| Column | Shows |
+|---|---|
+| **Fuel**   | session % (color-coded by pressure) · weekly % · runway label |
+| **Now**    | most-recently-touched in-progress task · project tag · elapsed · `+N more` for the rest |
+| **Pulse**  | last 3 activity entries with relative timestamps (`5m`, `2h`, `1d`) |
+| **Signal** | top risk by severity (critical > warning > info) OR "Calm waters." when none |
+
+No new fetches, no new endpoints. Reuses the same `fuel`, `inProgress`,
+`recentActivity`, and `visibleRisks` props that `StrategicView` already
+consumes. Pure additive; the existing risks bar + Now panel still render
+below for the deeper view.
+
+### Pure-logic split
+
+All derivation lives in `client/src/lib/todayView.js`:
+
+- `formatTimeAgo(iso, now?)` — compact relative-time labels
+- `fuelPressure(pct)` — `'critical' | 'low' | 'normal' | null`
+- `formatRunway(minutes)` — minutes / hours / days, with `<1m` floor
+- `topRisk(risks)` — picks highest-severity, ties broken by first-encountered
+- `deriveTodayState({ fuel, inProgress, recentActivity, risks, now })` —
+  single-pass derivation returning the full `{fuel, now, pulse, signal}`
+  block ready to render
+
+The JSX in `client/src/modules/command/TodayView.jsx` is dumb glue. This
+split keeps tests in node-only Vitest (no jsdom / no @testing-library/react
+setup needed) and makes the rendering trivially swappable later.
+
+### Tests
+
+`tests/todayView.test.js` adds **27 specs**:
+
+- `formatTimeAgo` × 5 (null / just-now / minutes / hours / days)
+- `fuelPressure` × 4 (null / critical / low / normal with boundaries)
+- `formatRunway` × 5 (null / sub-minute / minutes / hours / days)
+- `topRisk` × 4 (empty / severity ranking / tie-break / unknown levels)
+- `deriveTodayState` × 9 (empty workspace / estimated > reported / reported
+  fallback / critical pressure / lead-task selection / activity formatting /
+  risk surfacing / four-signal integration / idle + calm-waters)
+
+All deterministic via an injected `now` parameter (no clock-drift flakes
+like the v4.7.2 `store.test.js` bonus fix).
+
+### Files touched
+
+- `client/src/lib/todayView.js` — NEW (~140L, pure)
+- `client/src/modules/command/TodayView.jsx` — NEW (~140L, presentation)
+- `client/src/modules/Command.jsx` — `import TodayView` + 1 render line
+  before the strategic/kanban switch
+- `tests/todayView.test.js` — NEW (27 specs)
+- `package.json`, `cli/package.json`, `mcpb/manifest.json` — version bump
+- `README.md`, `CONCEPT.md` — test count 342 → 369
+- `CHANGELOG.md`, `ROADMAP.md` — this entry
+
+### What's next
+
+With `#240` closed, all v4.5.10-deferred Tier-3 items are shipped. Remaining
+work: structural debt (`#217` part 3 — `cli/nexus.js` split) and the Tier-4
+polish sweep.
+
 ## v4.7.3 — Auto-suggest Contradictions
 
 Closes `#310` (deferred Tier-3 since v4.5.10) — the contradiction scan engine

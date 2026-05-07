@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
 import FuelFreshnessStamp from '../components/FuelFreshnessStamp.jsx';
+import TodayView from './command/TodayView.jsx';
 
 // ── Shared helpers ──────────────────────────────────────
 
@@ -449,6 +450,17 @@ export default function Command({ ws }) {
           )}
         </div>
       </div>
+
+      {/* v4.7.4 #240 — Today fusion view. Always visible above whichever
+          view (strategic / kanban) is active. Single dense card fusing
+          fuel · current task · recent activity · top risk into a glance.
+          Pure presentation; derivation in client/src/lib/todayView.js. */}
+      <TodayView
+        fuel={fuel}
+        inProgress={inProgress}
+        recentActivity={recentActivity}
+        risks={visibleRisks}
+      />
 
       {view === 'strategic' ? (
         <StrategicView

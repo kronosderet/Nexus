@@ -96,7 +96,26 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.7.3 (Auto-suggest Contradictions · shipped 2026-05-07)
+## Current — v4.7.4 (Today fusion view · shipped 2026-05-07)
+
+Closes `#240` (Tier-3 UX prototype, deferred since v4.5.10). Single dense
+header card on the Command tab fusing **fuel · current task · recent
+activity · top risk** into a glance. Visible above both strategic and
+kanban views; reuses the same data props those views already consume — no
+new fetches, no new endpoints.
+
+Pure derivation logic in `client/src/lib/todayView.js` (formatTimeAgo,
+fuelPressure, formatRunway, topRisk, deriveTodayState). JSX in
+`client/src/modules/command/TodayView.jsx` is dumb glue. **27 new specs**
+(node-only Vitest, no jsdom needed) covering every helper plus the full
+derivation. **Total 342 → 369 tests · 29 tools · no migrations · no
+breaking changes.**
+
+With `#240` shipped, **all v4.5.10-deferred Tier-3 items are closed**.
+Remaining work splits cleanly into structural debt (`#217` part 3 —
+`cli/nexus.js` split) and Tier-4 polish.
+
+## Previous — v4.7.3 (Auto-suggest Contradictions · shipped 2026-05-07)
 
 Closes `#310` (deferred Tier-3 since v4.5.10). The v4.4.8 #307 contradiction
 scan engine ran only on manual click; v4.7.3 schedules the same scan
