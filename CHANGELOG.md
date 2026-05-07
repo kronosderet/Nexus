@@ -9,6 +9,93 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.7.3 — Auto-suggest Contradictions
+
+Closes `#310` (deferred Tier-3 since v4.5.10) — the contradiction scan engine
+shipped in v4.4.8 #307 ran only when a human clicked the "Scan for
+contradictions" button in the Conflicts tab. v4.7.3 makes the same scan
+automatic on a 24h cadence so suggestions accumulate while you work.
+
+**342 tests (+9) · 29 tools · no migrations · no breaking changes.**
+
+### What's new
+
+- **`server/watchers/contradictionPoller.ts`** (NEW, ~200L) — `runContradictionScan`
+  performs one full cycle (POST `/scan-contradictions` → poll
+  `/ask/result/:taskId` until done) and reports
+  `{ status, newSuggestions, totalEvaluated, durationMs }`. The pure
+  `shouldRunContradictionScan(lastScan, now, minIntervalMs)` helper is
+  exported for unit tests.
+- **`startContradictionPoller`** — `setInterval` wrapper. Initial run after
+  60s (lets the server + LM Studio settle); subsequent runs every 24h.
+  Skip-if-recent guard prevents a dashboard restart from immediately
+  re-firing.
+- **`server/dashboard.ts`** — wires the poller alongside the existing
+  `runRiskScan` (6h) and `runDigest` (24h) scheduled scans. `port`,
+  `broadcast`, and the `store` are passed through.
+- **Brief surfacing** — `nexus_brief` now fetches
+  `/api/impact/contradictions` and `/api/scans?type=contradiction&limit=1`
+  in its `Promise.all` block. When `pendingContradictions > 0` the brief
+  prints a "Pending Overseer suggestions: N · last scan Xh ago" line with
+  a pointer to the Conflicts tab.
+- **Dashboard toast** — when a scan finds new suggestions, the poller
+  broadcasts `{type: 'notification', payload: {title, message}}` over the
+  WS bridge. `ToastOverlay` already listens for this shape (used by
+  `overseerPoller`'s critical-risk alerts since v4.4.x).
+
+### Why a wrapper, not a refactor of the existing route
+
+The route's async-task pattern (`asyncTasks.set(taskId, ...)` + poll
+endpoint) is HTTP-specific. Refactoring it into a shared core would have
+been ~200L of churn in `overseer.ts`. Instead the poller calls the existing
+route via `localhost` fetch and polls the same `/ask/result/` endpoint the
+frontend uses. Single source of truth (the route) stays as-is; the poller
+is purely additive.
+
+### Budget
+
+- **20 max_pairs per auto-scan** — same as the manual button (Captain
+  pick). Stage 1 (embedding shortlist) is cheap; Stage 2 (Overseer LLM
+  classification) is the cost driver. ~20 pair evaluations × ~500 tokens
+  each = single-digit cents per daily run with Gemma 4 31B locally.
+- **23h skip guard** so dashboard restarts within 24h don't double-fire.
+- **Silent skip when Overseer is down** — no error toast, no scheduled-scan
+  record. The next interval re-attempts.
+
+### Tests
+
+`tests/contradictionPoller.test.ts` adds **9 specs**:
+
+- `shouldRunContradictionScan` × 5: undefined / 1h-ago / boundary / 25h-ago.
+- `runContradictionScan` × 4: skipped-recent (no fetch) · skipped-overseer-
+  down (mock 'No local AI') · completed-with-toast (mock POST + poll, asserts
+  `addScheduledScan` + WS broadcast) · completed-zero-new (asserts NO toast
+  when delta is 0).
+
+End-to-end (real Express + real LM Studio) is covered by the existing
+`/api/overseer/scan-contradictions` route tests in `tests/routes.test.ts`.
+
+### Files touched
+
+- `server/watchers/contradictionPoller.ts` — NEW (~210L)
+- `server/dashboard.ts` — `startContradictionPoller` import + wiring
+- `server/mcp/index.ts` — brief composer fetches `/api/impact/contradictions`
+  + `/api/scans?type=contradiction`; `formatBrief` adds the suggestions line
+- `tests/contradictionPoller.test.ts` — NEW (9 specs)
+- `package.json`, `cli/package.json`, `mcpb/manifest.json` — version bump
+- `README.md`, `CONCEPT.md` — test count 333 → 342
+- `CHANGELOG.md`, `ROADMAP.md` — this entry
+
+### What's next
+
+With `#310` closed, the Tier-3 deferred list from v4.5.10 is fully drained.
+Next priorities (per the v4.7.2 handover):
+
+- **Tier-4 sweep** (~13 polish items) — visible delta, low risk
+- **`#240` "Today" fusion view** — Tier-3 UX prototype
+- **`#217` part 3+** — `cli/nexus.js` (~2049L) + `server/mcp/index.ts`
+  (1700L+) splits
+
 ## v4.7.2 — Graph Splits + Memory Bridge Polish
 
 Stacked batch closing the v4.7.1 handover's top three follow-ups: `#217 part 2`

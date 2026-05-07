@@ -96,7 +96,32 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.7.2 (Graph Splits + Memory Bridge Polish · shipped 2026-05-07)
+## Current — v4.7.3 (Auto-suggest Contradictions · shipped 2026-05-07)
+
+Closes `#310` (deferred Tier-3 since v4.5.10). The v4.4.8 #307 contradiction
+scan engine ran only on manual click; v4.7.3 schedules the same scan
+automatically on a 24h cadence. With this, the Tier-3 deferred list from
+v4.5.10 is fully drained.
+
+**`server/watchers/contradictionPoller.ts`** (NEW): `runContradictionScan()`
+performs one full cycle (POST `/scan-contradictions` → poll
+`/ask/result/:taskId` until done). `startContradictionPoller()` wires it
+into `dashboard.ts` alongside the existing risk/digest scheduled scans.
+20 max_pairs per scan (same as manual), 23h skip-if-recent guard, silent
+skip when Overseer is down.
+
+**Brief surfacing**: `nexus_brief` now shows
+`Pending Overseer suggestions: N contradictions · last scan Xh ago` when
+suggestions are queued, with a pointer to the Conflicts tab. New
+suggestions also fire a WS toast for live dashboard surfacing.
+
+**9 new tests** in `tests/contradictionPoller.test.ts` — pure
+`shouldRunContradictionScan` × 5 (undefined / 1h / boundary / 25h) plus
+`runContradictionScan` × 4 (skipped-recent · skipped-overseer-down ·
+completed-with-toast · completed-zero-new-no-toast). Total 333 → **342
+tests · 29 tools · no migrations · no breaking changes.**
+
+## Previous — v4.7.2 (Graph Splits + Memory Bridge Polish · shipped 2026-05-07)
 
 Stacked batch closing the top three follow-ups from the v4.7.1 handover.
 

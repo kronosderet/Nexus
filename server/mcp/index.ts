@@ -151,6 +151,11 @@ type BriefData = Record<string, unknown> & {
   ccMemories?: Array<{ type: string; description?: string; name?: string; filename?: string }>;
   totalMemories?: number;
   risks?: Array<{ message?: string }>;
+  // v4.7.3 #310 — auto-suggest contradictions surfaced in the brief.
+  // pendingContradictions = count of `_suggestedContradictions` with status='suggested'.
+  // lastContradictionScan = age of the most recent auto-scan (informational).
+  pendingContradictions?: number;
+  lastContradictionScanAgo?: string;
 };
 
 function formatBrief(data: BriefData, project: string): string {
@@ -235,6 +240,17 @@ function formatBrief(data: BriefData, project: string): string {
     for (const r of data.risks) {
       lines.push(`  ! ${r.message || r}`);
     }
+  }
+
+  // v4.7.3 #310 — surface pending contradiction suggestions from the auto-scanner
+  // so they're visible at session start without opening the Conflicts tab.
+  if (data.pendingContradictions && data.pendingContradictions > 0) {
+    lines.push('');
+    const ago = data.lastContradictionScanAgo ? ` · last scan ${data.lastContradictionScanAgo} ago` : '';
+    lines.push(
+      `Pending Overseer suggestions: ${data.pendingContradictions} contradiction${data.pendingContradictions === 1 ? '' : 's'}${ago}`,
+    );
+    lines.push(`  → review in the Conflicts tab (accept → flag, dismiss → hide)`);
   }
 
   return lines.join('\n');
@@ -1003,7 +1019,7 @@ async function handleTool(name: string, args: any): Promise<string> {
       // Per-call 10s timeout via Promise.race to prevent hanging on slow routes
       const withTimeout = <T>(p: Promise<T>, fallback: T) =>
         Promise.race([p, new Promise<T>(r => setTimeout(() => r(fallback), 10000))]);
-      const [tasks, sessions, ledger, fuel, risks, plansIndex, memoriesIndex, handover] = await Promise.all([
+      const [tasks, sessions, ledger, fuel, risks, plansIndex, memoriesIndex, handover, contradictions, scans] = await Promise.all([
         withTimeout(nexusFetch('/api/tasks'), []),
         withTimeout(nexusFetch('/api/sessions'), []),
         withTimeout(nexusFetch('/api/ledger'), []),
@@ -1016,6 +1032,15 @@ async function handleTool(name: string, args: any): Promise<string> {
           nexusFetch(`/api/handover/${encodeURIComponent(project)}`).catch(() => null),
           null
         ) as Promise<null | { project: string; content: string; updated_at: string; updated_by?: string }>,
+        // v4.7.3 #310 — auto-suggest contradictions count + last-scan age.
+        withTimeout(
+          nexusFetch('/api/impact/contradictions').catch(() => null),
+          null
+        ) as Promise<null | { suggestions?: unknown[] }>,
+        withTimeout(
+          nexusFetch('/api/scans?type=contradiction&limit=1').catch(() => null),
+          null
+        ) as Promise<null | Array<{ timestamp: string }>>,
       ]);
 
       const projectLower = project.toLowerCase();
@@ -1072,6 +1097,21 @@ async function handleTool(name: string, args: any): Promise<string> {
       const matchedMemories = allMemories.filter((m) => m.project && m.project.toLowerCase() === projectLower);
       const ccMemories = matchedMemories.length > 0 ? matchedMemories : allMemories.slice(0, 5);
 
+      // v4.7.3 #310 — derive pending count + last-scan age for the brief.
+      const pendingContradictions = Array.isArray((contradictions as { suggestions?: unknown[] } | null)?.suggestions)
+        ? (contradictions as { suggestions: unknown[] }).suggestions.length
+        : 0;
+      let lastContradictionScanAgo: string | undefined;
+      const scansArr = (scans as Array<{ timestamp: string }> | null) || [];
+      if (Array.isArray(scansArr) && scansArr.length > 0 && scansArr[0]?.timestamp) {
+        const ageH = (Date.now() - new Date(scansArr[0].timestamp).getTime()) / 3600000;
+        lastContradictionScanAgo = ageH < 1
+          ? `${Math.round(ageH * 60)}m`
+          : ageH < 24
+            ? `${Math.round(ageH)}h`
+            : `${Math.round(ageH / 24)}d`;
+      }
+
       const briefBody = formatBrief(
         {
           fuel: fuel?.estimated
@@ -1089,6 +1129,8 @@ async function handleTool(name: string, args: any): Promise<string> {
           ccMemories,
           totalMemories: mi.totalFiles ?? 0,
           risks: (risks as { risks?: Array<{ message?: string }> }).risks || [],
+          pendingContradictions,
+          lastContradictionScanAgo,
         },
         project
       );

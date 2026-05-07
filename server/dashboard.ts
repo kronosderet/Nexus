@@ -66,6 +66,8 @@ async function start() {
   const { createMemoryRoutes } = await import('./routes/memory.ts');
   const { createHandoverRoutes } = await import('./routes/handover.ts');
   const { SERVER_VERSION } = await import('./lib/version.ts');
+  // v4.7.3 #310 — auto-scan contradiction poller (24h cadence)
+  const { startContradictionPoller } = await import('./watchers/contradictionPoller.ts');
 
   const store = new NexusStore();
 
@@ -228,6 +230,19 @@ async function start() {
   setInterval(runRiskScan, 6 * 3600000);
   // Digest every 24 hours
   setInterval(runDigest, 24 * 3600000);
+
+  // v4.7.3 #310 — Auto-suggest contradictions every 24h. Runs the same scan
+  // the Conflicts tab "Scan for contradictions" button triggers, but on a
+  // schedule. Skips if Overseer is unavailable; toast fires when new
+  // suggestions are added so the dashboard surfaces them live.
+  startContradictionPoller({
+    store,
+    port: PORT,
+    broadcast,
+    maxPairs: 20,
+    intervalMs: 24 * 3600000,
+    minIntervalMs: 23 * 3600000,
+  });
 
   // ── File watcher: sync external writes (MCP server → disk → dashboard) ──
   // v4.6.5 #399 — watcher moved INTO NexusStore so MCPB process gets it too.
