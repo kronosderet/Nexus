@@ -274,10 +274,15 @@ describe('NexusStore', () => {
     });
 
     it('returns usage sorted newest first', () => {
+      // Use relative timestamps so the test doesn't expire when "today" drifts
+      // beyond logUsage's 30-day retention cutoff (was hardcoded 2026-04-06,
+      // started failing 2026-05-07; v4.7.2 fix).
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const e1 = store.logUsage({ session_percent: 90, weekly_percent: 50 });
-      e1.created_at = '2026-04-06T10:00:00.000Z';
+      e1.created_at = twoHoursAgo;
       const e2 = store.logUsage({ session_percent: 80, weekly_percent: 48 });
-      e2.created_at = '2026-04-06T11:00:00.000Z';
+      e2.created_at = oneHourAgo;
       const usage = store.getUsage();
       expect(usage[0].session_percent).toBe(80); // newer first
       expect(usage[1].session_percent).toBe(90);

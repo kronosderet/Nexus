@@ -96,7 +96,36 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.7.1 (Graph Layouts + Algorithm Extraction · shipped 2026-05-05)
+## Current — v4.7.2 (Graph Splits + Memory Bridge Polish · shipped 2026-05-07)
+
+Stacked batch closing the top three follow-ups from the v4.7.1 handover.
+
+**`#217 part 2` Graph.jsx view extraction**: `CentralityView`,
+`ContradictionsView` (with the v4.6.5 #311 resolution workflow + 4 helpers),
+and `HolesView` (with `ClusterMiniViz`) lift to per-view files under
+`client/src/modules/graph/`. Render dispatch in `GraphModule` unchanged.
+**Graph.jsx 2426L → 1327L (−1099 / −45%)**, beating the v4.7.1 handover's
+~1500L estimate. The v4.7.1 layouts pattern replicates cleanly for stateful
+views with cross-tab navigation and fetch effects.
+
+**`#591` encodedProject sandbox-path bug**: `buildEntry()` in
+`memoryIndex.ts` derived `encodedProject` correctly for CC-dev paths but
+returned `'mnt'` for Cowork sandbox paths (`/sessions/<id>/mnt/.auto-memory/
+file.md`). Fixed by detecting the dot-prefixed memory dir name and walking
+one extra `dirname()` level up. 2 new specs covering both layouts.
+
+**`#592` CLI `nexus memory sources`**: deferred from the v4.7.0-M1 spec;
+ships now. Reads `~/.nexus/nexus.json` directly (no server hop) and prints
+the configured `_memoryBridge.sources[]` with status, machine hints, and
+the dedup strategy.
+
+**Bonus**: fixed a date-expired test in `tests/store.test.js` that started
+silently failing today (2026-05-07 = 31 days after the hardcoded `2026-04-06`,
+past the store's 30-day retention cutoff). Now uses relative timestamps.
+
+**Total 331 → 333 tests · 29 tools · no migrations · no breaking changes.**
+
+## Previous — v4.7.1 (Graph Layouts + Algorithm Extraction · shipped 2026-05-05)
 
 Rides on top of v4.7.0. Half-session Tier-3 batch closing `#332` from the
 v4.6.5 handover, originally built locally as v4.6.6 and rebased onto v4.7.0
@@ -155,9 +184,8 @@ Graph (Visual/Centrality/Holes/Conflicts), Overseer, Log.
 - **Tier 3/4** — longtail polish. Not urgent. `nexus_search "Tier 3"` for list.
 
 ### Non-audit backlog
-- `#217` Split oversized files — Graph.jsx layout extraction shipped in v4.6.6;
-  remaining: HolesView/CentralityView/ContradictionsView lift, `cli/nexus.js`
-  (1969L), `mcp/index.ts` (1700L+).
+- `#217` Split oversized files — Graph.jsx done (v4.7.1 layouts + v4.7.2 views,
+  2495L → 1327L). Remaining: `cli/nexus.js` (~2049L now), `mcp/index.ts` (1700L+).
 - `#218` Route tests for github / overseer / webhooks — partial in v4.6.1.
 - `#219` Zod runtime validation at route boundaries — deferred.
 

@@ -127,13 +127,21 @@ function buildEntry(filePath: string, source: MemorySource): MemoryEntry | null 
   const body = content.slice(bodyStart).replace(/\s+/g, ' ').trim();
   const snippet = body.slice(0, 220);
 
-  // The "encoded project" is conventionally the parent of the memory dir
-  // for CC's layout: ~/.claude/projects/<encoded>/memory/file.md → <encoded>.
-  // For sandbox layouts (/sessions/<id>/mnt/.auto-memory/file.md) the same
-  // logic still gives a useful identifier: the second-to-last segment of
-  // the parent dir is the unique session/sandbox id.
-  const memoryDir = dirname(filePath);          // .../memory  OR  .../.auto-memory
-  const encodedProject = basename(dirname(memoryDir)); // .../<encoded>/memory → <encoded>
+  // The "encoded project" identifies the owning project. Layout depends on the
+  // source:
+  //   CC dev:         ~/.claude/projects/<encoded>/memory/file.md   → <encoded>
+  //   Cowork sandbox: /sessions/<id>/mnt/.auto-memory/file.md       → <id>
+  // The CC-dev shape needs one dirname() walk-up; the Cowork shape needs two
+  // because `mnt` sits between the sandbox id and the dot-prefixed memory dir.
+  // We detect the sandbox shape by spotting the dot-prefixed memoryDir name
+  // (e.g. `.auto-memory`) and the literal `mnt` parent — anything else falls
+  // through to the v4.6.5 single-walk-up path. v4.7.2 #591 fix.
+  const memoryDir = dirname(filePath);                 // .../memory  OR  .../.auto-memory
+  const memoryDirName = basename(memoryDir);
+  let encodedProject = basename(dirname(memoryDir));   // CC dev → <encoded>; sandbox → 'mnt' (raw)
+  if (memoryDirName.startsWith('.') && encodedProject === 'mnt') {
+    encodedProject = basename(dirname(dirname(memoryDir)));  // sandbox → <id>
+  }
 
   const project = inferProject(encodedProject, content);
   const mtime = stat.mtime.toISOString();

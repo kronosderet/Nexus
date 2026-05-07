@@ -9,6 +9,104 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.7.2 — Graph Splits + Memory Bridge Polish
+
+Stacked batch closing the v4.7.1 handover's top three follow-ups: `#217 part 2`
+(Graph.jsx view extraction), `#591` (encodedProject derivation for Cowork
+sandbox paths), `#592` (CLI inspection of the multi-source memory bridge
+config). **333 tests (+2) · 29 tools · no migrations · no breaking changes.**
+
+### #217 part 2: Graph.jsx view extraction
+
+Builds on the v4.7.1 layout-extraction precedent. Three top-level views and
+their private helpers move from `client/src/modules/Graph.jsx` to per-view
+files under `client/src/modules/graph/`. The dispatch in `GraphModule` is
+unchanged — only the imports moved.
+
+- **`client/src/modules/graph/CentralityView.jsx`** (NEW, 238L) — degree-
+  centrality table with sortable columns, project filter, pagination. Co-
+  locates its private `SortableHeader` helper.
+- **`client/src/modules/graph/ContradictionsView.jsx`** (NEW, 497L) — the
+  whole Conflicts tab. Bundles `ResolveConflictCard` (v4.6.5 #311 resolution
+  workflow), `ScanContradictionsPanel`, `SuggestedContradictionCard`, and
+  `FlagContradictionForm` — all 5 components in one cohesive file.
+- **`client/src/modules/graph/HolesView.jsx`** (NEW, 435L) — fragmentation
+  detection, orphan listing, batch auto-link, cross-project drill-down.
+  Bundles `ClusterMiniViz` (v4.5.8 #318 deterministic-circle mini-diagram).
+
+**Net result**: `Graph.jsx` shrinks **2426L → 1327L (−1099 / −45%)**. Beats
+the v4.7.1 handover estimate (~1500L target). The pattern from v4.7.1 layouts
+replicated cleanly for stateful views with cross-tab navigation, fetch
+effects, and the new ResolveConflictCard plumbing — all unchanged.
+
+### #591: encodedProject derivation for Cowork sandbox paths
+
+The v4.7.0 multi-source memory bridge's `buildEntry()` derived `encodedProject`
+via `basename(dirname(memoryDir))`. For the CC dev layout (`~/.claude/projects/
+<encoded>/memory/file.md`) this correctly returns `<encoded>`. For Cowork
+sandbox paths (`/sessions/<id>/mnt/.auto-memory/file.md`) the same logic
+returned `'mnt'` — losing the sandbox id. The comment in the code claimed
+otherwise; the comment lied.
+
+Practical impact at v4.7.0/v4.7.1 was low because `inferProject` falls through
+to `tryClassifyProject(content)` content-pattern matching when `DIR_HINTS`
+misses, so memories still classified — but the field was misleading and would
+trip up any downstream code reading `encodedProject` directly.
+
+**Fix** (`server/lib/memoryIndex.ts`): detect the sandbox shape by spotting
+the dot-prefixed `memoryDir` name (`.auto-memory`) AND the literal `mnt`
+parent, and walk one extra `dirname()` level up in that case. CC dev shape
+unchanged (`memoryDir` name `memory` doesn't start with `.`).
+
+**Tests** (`tests/memoryBridgeMultiSource.test.js`): adds 2 specs to the new
+`encodedProject derivation (#591)` block. CC-dev assertion verifies the
+unchanged path; sandbox assertion checks both the negative (`!== 'mnt'`) and
+the positive (`=== 'epic-bold-ptolemy'`).
+
+### #592: CLI `nexus memory sources` subcommand
+
+Listed in the v4.7.0-M1 spec; deferred at v4.7.0 ship. Adds `commands.memory`
+to `cli/nexus.js`. `nexus memory sources` reads `~/.nexus/nexus.json`
+directly (no server hop, works offline) and prints the configured sources
+with status, name, glob, and machine hint, plus the dedup strategy and the
+file path to edit.
+
+`nexus memory` (no args) prints a short usage block pointing at
+`nexus_import_cc_memories` (the MCP tool that runs an actual import) and the
+`_memoryBridge.sources[]` editing path.
+
+### Bonus: store.test.js date-expired test fixed
+
+The "returns usage sorted newest first" spec hardcoded `2026-04-06`
+timestamps inside the store's 30-day retention filter. It started silently
+failing on **2026-05-07** (today, 31 days later — both seeded entries fell
+off the back). Switched to relative timestamps (`Date.now() - 1h/2h`) so
+the test never expires.
+
+### Files touched
+
+- `server/lib/memoryIndex.ts` — #591 fix + comment correction
+- `client/src/modules/Graph.jsx` — three view extractions, 2426L → 1327L
+- `client/src/modules/graph/CentralityView.jsx` — NEW (238L)
+- `client/src/modules/graph/ContradictionsView.jsx` — NEW (497L)
+- `client/src/modules/graph/HolesView.jsx` — NEW (435L)
+- `cli/nexus.js` — #592 `memory` subcommand (+72L)
+- `tests/memoryBridgeMultiSource.test.js` — 2 new specs for #591
+- `tests/store.test.js` — date-expired test fixed
+- `package.json`, `cli/package.json`, `mcpb/manifest.json` — version bump
+- `README.md`, `CONCEPT.md` — test count 331 → 333
+- `CHANGELOG.md`, `ROADMAP.md` — this entry
+
+### What's next
+
+`#310` (semantic-opposition auto-suggest) remains blocked on LM Studio. Tier-4
+sweep (~13 polish items) and `#240` (Today fusion view) are the next visible
+features when Overseer is offline.
+
+Structural debt: `cli/nexus.js` is now 2049L, `server/mcp/index.ts` is still
+1700L+. Same extraction pattern (lib + per-feature file) would work for both,
+but neither has the same per-tab natural seams Graph.jsx had.
+
 ## v4.7.1 — Graph Layouts + Algorithm Extraction
 
 Rides on top of v4.7.0. Half-session Tier-3 batch closing `#332` from the

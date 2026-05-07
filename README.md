@@ -130,7 +130,7 @@ Without LM Studio, all 25 non-AI tools work normally (4 AI-dependent tools: `nex
 | Scheduler | Risk scan (6h) + digest (24h), automated |
 | Hooks | SessionStart ambient telemetry (12+ context injections), <100ms latency |
 | Sync | NexusStore-internal file watcher syncs MCPB + dashboard processes on external writes |
-| Tests | 331 Vitest (store, routes, graph, graph layouts, CC scaffolding, estimator, memory bridge, multi-source memory bridge, hygiene migrations, route coverage for github/overseer/webhooks) |
+| Tests | 333 Vitest (store, routes, graph, graph layouts, CC scaffolding, estimator, memory bridge, multi-source memory bridge, hygiene migrations, route coverage for github/overseer/webhooks) |
 
 ## Data & Privacy
 

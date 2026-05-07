@@ -173,6 +173,38 @@ describe('scanCCMemories — multi-source', () => {
   });
 });
 
+describe('encodedProject derivation (#591)', () => {
+  // Pre-v4.7.2: buildEntry() did `basename(dirname(memoryDir))` for both
+  // layouts. That returns the parent dir of memoryDir, which is correct for
+  // CC dev (~/.claude/projects/<encoded>/memory/file.md → <encoded>) but
+  // returns 'mnt' for Cowork sandbox paths (/sessions/<id>/mnt/.auto-memory/
+  // file.md), losing the sandbox id. The v4.7.2 fix walks one extra level
+  // up when the memoryDir name is dot-prefixed AND the immediate parent is
+  // literally 'mnt'.
+  const SOURCES = [
+    { name: 'cc-dev', path: join(SRC_A, '*', 'memory', '*.md'), machineHint: 'home-pc', enabled: true },
+    { name: 'cowork-sandbox', path: join(SRC_B, '*', 'mnt', '.auto-memory', '*.md'), machineHint: 'school-laptop', enabled: true },
+  ];
+
+  it('CC dev layout — encodedProject is the project encoded dir', () => {
+    const idx = scanCCMemories({ sources: SOURCES, limit: 9999 });
+    const ccDev = idx.memories.filter((m) => m.source === 'cc-dev');
+    expect(ccDev.length).toBeGreaterThan(0);
+    expect(ccDev.every((e) => e.encodedProject === 'C--Projects-Nexus')).toBe(true);
+  });
+
+  it('Cowork sandbox layout — encodedProject is the sandbox id, not "mnt"', () => {
+    const idx = scanCCMemories({ sources: SOURCES, limit: 9999 });
+    const sandbox = idx.memories.filter((m) => m.source === 'cowork-sandbox');
+    expect(sandbox.length).toBeGreaterThan(0);
+    // Pre-fix this would have been 'mnt' for every entry; post-fix it must
+    // be the sandbox id. Asserting the negative explicitly so a regression
+    // is loud.
+    expect(sandbox.every((e) => e.encodedProject !== 'mnt')).toBe(true);
+    expect(sandbox.every((e) => e.encodedProject === 'epic-bold-ptolemy')).toBe(true);
+  });
+});
+
 describe('scanCCMemories — content-hash dedup', () => {
   const SOURCES = [
     { name: 'cc-dev', path: join(SRC_A, '*', 'memory', '*.md'), machineHint: 'home-pc', enabled: true },

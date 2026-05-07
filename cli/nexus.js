@@ -1765,6 +1765,76 @@ ${JSON.stringify(config, null, 2).split('\n').map(l => '    ' + l).join('\n')}
 `);
   },
 
+  // v4.7.2 #592 — inspect the multi-source memory bridge configuration.
+  // Reads ~/.nexus/nexus.json directly (no server hop) so it works when the
+  // dashboard is offline. Listed in the v4.7.0-M1 spec; deferred at v4.7.0.
+  async memory(args) {
+    if (args[0] === 'sources') {
+      const { readFileSync: rf, existsSync: ef } = await import('node:fs');
+      const { homedir } = await import('node:os');
+      const dbPath = process.env.NEXUS_DB_PATH || join(homedir(), '.nexus', 'nexus.json');
+
+      if (!ef(dbPath)) {
+        console.log(`  ${dim('No Nexus store found at')} ${dbPath}`);
+        console.log(`  ${dim('Run any nexus command (or any MCP tool) to initialize.')}`);
+        return;
+      }
+
+      let data = {};
+      try { data = JSON.parse(rf(dbPath, 'utf-8')); }
+      catch (e) {
+        console.error(`  ${red('◈')} Failed to read store at ${dbPath}: ${e.message}`);
+        process.exit(1);
+      }
+
+      const cfg = data._memoryBridge;
+      if (!cfg || !Array.isArray(cfg.sources)) {
+        console.log(`  ${dim('No _memoryBridge config in store yet.')}`);
+        console.log(`  ${dim('It is populated by the v4.7.0-M1 migration on first cold-start.')}`);
+        console.log(`  ${dim('Try: any nexus command, or restart the MCPB process.')}`);
+        return;
+      }
+
+      const enabled = cfg.sources.filter((s) => s.enabled);
+      const disabled = cfg.sources.filter((s) => !s.enabled);
+      console.log(`\n  ${amber('◈')} ${amber('Memory bridge sources')}  ${dim(`(${enabled.length} enabled, ${disabled.length} disabled)`)}\n`);
+
+      if (cfg.sources.length === 0) {
+        console.log(`  ${dim('No sources configured.')}\n`);
+        return;
+      }
+
+      const nameW = Math.max(...cfg.sources.map((s) => s.name.length), 4);
+      for (const s of cfg.sources) {
+        const status = s.enabled ? green('✓') : dim('×');
+        const name = s.name.padEnd(nameW);
+        const machine = s.machineHint ? `  ${dim(`(machine: ${s.machineHint})`)}` : '';
+        console.log(`  ${status} ${amber(name)}  ${dim(s.path)}${machine}`);
+      }
+
+      const dedup = cfg.dedup || {};
+      console.log(`\n  ${dim('Dedup strategy:')} ${dedup.strategy || 'path'}${dedup.trackAllSources ? dim(' (tracks all source paths)') : ''}`);
+      console.log(`  ${dim('Edit at:')}        ${dbPath}\n`);
+      return;
+    }
+
+    // Default: usage. Mirrors the help-style block other multi-arg commands use.
+    console.log(`
+  ${amber('◈')} ${amber('NEXUS MEMORY BRIDGE')} — multi-source CC auto-memory scanner
+
+  ${dim('The bridge walks every glob in _memoryBridge.sources[] and indexes')}
+  ${dim("matching .md files as lifecycle='reference' decisions in The Ledger.")}
+  ${dim('Default config matches v4.6.5 (single source, ~/.claude/projects/*/memory/*.md).')}
+
+  ${amber('Commands:')}
+    ${green('nexus memory sources')}    List configured memory sources
+
+  ${amber('See also:')}
+    ${green('mcp__nexus__nexus_import_cc_memories')}  Run an import (MCP tool, dry_run/force/source_filter)
+    ${dim('~/.nexus/nexus.json → _memoryBridge')}    Edit the source list directly
+`);
+  },
+
   async hooks(args) {
     const { readFileSync: rf, writeFileSync: wf, existsSync: ef } = await import('node:fs');
     const { homedir } = await import('node:os');
