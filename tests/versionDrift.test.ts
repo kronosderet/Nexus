@@ -57,25 +57,32 @@ describe('version drift guard (v4.3.7 F1c)', () => {
     expect(manifest.tools.length).toBe(mod.TOOL_COUNT_EXPECTED);
   });
 
-  it('TOOL_COUNT_EXPECTED matches TOOLS array in server/mcp/index.ts (by source grep)', async () => {
+  it('TOOL_COUNT_EXPECTED matches sum of tools across server/mcp/tools/*.ts (by source grep)', async () => {
     const mod = await import('../server/lib/version.ts');
-    // Count name: entries under TOOLS[]. Grep-based (not importing the MCP module)
-    // because the MCP module's top-level code does stdio setup — importing it from
-    // a test would try to start a server. Source-regex is cheap and reliable here.
-    const mcpSrc = readFileSync(join(REPO, 'server', 'mcp', 'index.ts'), 'utf-8');
-    const toolsStart = mcpSrc.indexOf('const TOOLS: Tool[] = [');
-    const toolsEnd = mcpSrc.indexOf('\n];', toolsStart);
-    expect(toolsStart).toBeGreaterThan(-1);
-    expect(toolsEnd).toBeGreaterThan(toolsStart);
-    const toolsBlock = mcpSrc.slice(toolsStart, toolsEnd);
-    const nameCount = (toolsBlock.match(/^\s{4}name:\s*'nexus_/gm) || []).length;
+    // v4.7.6 (#217 part 4): tools live in per-category files under server/mcp/tools/.
+    // Grep-based (not importing the MCP module) because the entrypoint module's
+    // top-level code does stdio setup — importing it from a test would try to
+    // start a server. Source-regex is cheap and reliable here.
+    const toolFiles = ['read.ts', 'write.ts', 'ai.ts', 'composite.ts'];
+    let nameCount = 0;
+    for (const file of toolFiles) {
+      const src = readFileSync(join(REPO, 'server', 'mcp', 'tools', file), 'utf-8');
+      // Each tool def starts with `    name: 'nexus_…',` (4-space indent inside the
+      // exported array). Same regex as the legacy v4.3.7 test — only the file set changed.
+      const matches = src.match(/^\s{4}name:\s*'nexus_/gm) || [];
+      nameCount += matches.length;
+    }
     expect(nameCount).toBe(mod.TOOL_COUNT_EXPECTED);
   });
 
-  it('every tool name in manifest.json exists in mcp/index.ts source', () => {
-    const mcpSrc = readFileSync(join(REPO, 'server', 'mcp', 'index.ts'), 'utf-8');
+  it('every tool name in manifest.json exists somewhere under server/mcp/tools/', () => {
+    // v4.7.6: union the per-category files; manifest entries must appear in at least one.
+    const toolFiles = ['read.ts', 'write.ts', 'ai.ts', 'composite.ts'];
+    const combinedSrc = toolFiles
+      .map((f) => readFileSync(join(REPO, 'server', 'mcp', 'tools', f), 'utf-8'))
+      .join('\n');
     for (const tool of manifest.tools) {
-      expect(mcpSrc, `tool "${tool.name}" in manifest but not in mcp/index.ts`)
+      expect(combinedSrc, `tool "${tool.name}" in manifest but not in server/mcp/tools/`)
         .toContain(`name: '${tool.name}'`);
     }
   });

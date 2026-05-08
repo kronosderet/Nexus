@@ -9,6 +9,126 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.7.6 — MCP server split (#217 part 4)
+
+Closes the **fourth and biggest** installment of `#217`. The MCP server
+monolith (`server/mcp/index.ts` at 1991L: imports + helpers + 29 tool
+defs + 893-line dispatcher switch + stdio setup) breaks into foundation
+libs + per-category tool modules + a tiny entrypoint. **Same 29 tools, same
+manifest, same wire protocol.**
+
+**402 tests (+22) · 29 tools · no migrations · no breaking changes.**
+
+### Why this was the big one
+
+The CLI split (v4.7.5, 2047L → 1350L) was the warm-up. `mcp/index.ts` was
+the real beast: a single switch statement for 29 tools where every case
+shared the same fetch + format helpers, no natural seams, all in one file.
+The risk was higher (the MCP stdio server is sensitive — any error and
+Claude Desktop breaks) but the impact much greater (per-category files
+make adding/changing a tool straightforward).
+
+### What moved
+
+**Foundation libs** (`server/mcp/lib/`):
+
+| File | Lines | Contents |
+|---|---|---|
+| `config.ts` | 18 | `STANDALONE` · `NEXUS_BASE` · `SERVER_NAME` · `SERVER_STARTED_AT` (+ re-exports `SERVER_VERSION`) |
+| `nexusFetch.ts` | 86 | `nexusFetch()` HTTP/standalone wrapper · `SLOW_TOOLS` set · `HEARTBEAT_INTERVAL_MS`. Top-level `await import('./localApi.ts')` for standalone mode lives here |
+| `format.ts` | 197 | `formatBrief` · `formatPlan` · `formatGuard` + `BriefData` type |
+
+**Tool category modules** (`server/mcp/tools/`):
+
+| File | Tools | Notes |
+|---|---|---|
+| `read.ts` | 10 | `nexus_brief` · `get_plan` · `check_guard` · `search` · `get_critique` · `predict_gaps` · `get_blast_radius` · `ask_overseer` · `version` · `read_handover` |
+| `write.ts` | 13 | `record/update_decision` · `push/pop_thought` · `log_usage` · `create/complete/delete_task` · `log_activity/session` · `link_decisions` · `update_handover` · `import_cc_memories` |
+| `ai.ts` | 3 | `ask_overseer_start` · `get_overseer_result` · `propose_edges` (the async-poll trio) |
+| `composite.ts` | 3 | `bridge_session` · `fleet_overview` · `calendar_runway` |
+
+Each tool module exports `{ <category>Tools, <category>Handlers }`. The
+entrypoint spread-merges into a combined registry, then dispatches via
+`handlers[name](args)` — same shape as the v4.7.5 CLI registry pattern.
+
+### Result
+
+- **`server/mcp/index.ts`: 1991L → 164L (−92%)**. Just imports + the combined
+  registry + the existing heartbeat-aware dispatcher + `main()`.
+- Total MCP surface: 1962L across 8 files (was 1991L in 1 file). Each file
+  18–620L now; the largest is `tools/write.ts` because write tools have the
+  biggest input schemas.
+
+### Compatibility
+
+**Zero wire-protocol changes.** Tool order in `ListTools` is preserved
+(`read → write → ai → composite`); `mcpb/manifest.json` ordering is
+unchanged; every tool's `inputSchema` is byte-for-byte the same. The MCPB
+smoke test exercises 12 tools end-to-end via the bundled stdio server —
+all green on the new structure.
+
+### Test updates
+
+- **`tests/versionDrift.test.ts`** — the v4.3.7 source-grep test was
+  scanning `server/mcp/index.ts` for `name: 'nexus_'` matches; now scans
+  the union of `server/mcp/tools/{read,write,ai,composite}.ts`. Same regex,
+  expanded file set. The "every manifest tool exists in source" test got
+  the same expansion.
+- **`tests/mcpToolsRegistry.test.ts`** (NEW, 22 specs):
+  - Per-group: every tool has a name + description + schema + matching
+    async handler · no orphan handlers · expected category sizes
+    (10 / 13 / 3 / 3 = 29).
+  - Cross-group: no tool name appears twice; total = `TOOL_COUNT_EXPECTED`.
+  - Foundation lib smoke: `config.ts` exports + types · `format.ts`
+    formatters work on empty data · `nexusFetch.ts` exposes
+    `SLOW_TOOLS` correctly populated.
+
+### Patterns codified
+
+- The **"big switch" → handler-map dispatcher** pattern from v4.7.5 (CLI)
+  ports cleanly to TypeScript with proper `Record<string, (args: any) => Promise<string>>`
+  typing. The two registries are now structurally identical (CLI + MCP).
+- **Top-level await in lib modules** (`nexusFetch.ts` loading the
+  standalone adapter) works the same way the entrypoint did, and gets
+  triggered exactly once when the entrypoint imports it.
+- **Drift tests evolve with the structure.** When a file split changes
+  what a regex should scan, the test gets updated as part of the same
+  release — not as a follow-up.
+
+### Files touched
+
+- `server/mcp/lib/config.ts` — NEW (18L)
+- `server/mcp/lib/nexusFetch.ts` — NEW (86L)
+- `server/mcp/lib/format.ts` — NEW (197L)
+- `server/mcp/tools/read.ts` — NEW (505L)
+- `server/mcp/tools/write.ts` — NEW (620L)
+- `server/mcp/tools/ai.ts` — NEW (121L)
+- `server/mcp/tools/composite.ts` — NEW (251L)
+- `server/mcp/index.ts` — 1991L → 164L (registry + dispatcher + main)
+- `tests/versionDrift.test.ts` — drift scans expanded to per-category files
+- `tests/mcpToolsRegistry.test.ts` — NEW (22 specs)
+- `package.json`, `cli/package.json`, `mcpb/manifest.json` — version bump
+- `README.md`, `CONCEPT.md` — test count 380 → 402
+- `CHANGELOG.md`, `ROADMAP.md` — this entry
+
+### What's next
+
+`#217` is **fully shipped**. All four parts done:
+
+| Part | What | Result |
+|---|---|---|
+| 1 | `client/src/lib/graphLayouts.js` extraction (v4.7.1) | Graph.jsx 2495 → 2426L |
+| 2 | `client/src/modules/graph/{Centrality,Contradictions,Holes}View.jsx` (v4.7.2) | Graph.jsx 2426 → 1327L (−47% total) |
+| 3 | `cli/lib/` + `cli/commands/` (v4.7.5) | cli/nexus.js 2047 → 1350L (−34%) |
+| 4 | `server/mcp/lib/` + `server/mcp/tools/` (v4.7.6, this) | mcp/index.ts 1991 → 164L (−92%) |
+
+Remaining structural debt is small: `server/db/store.ts` (~1700L, but the
+seams are less natural — it's a single coherent class). `#219` Zod
+validation at route boundaries is unrelated and can wait.
+
+Next priorities (per handover): **Tier-4 polish sweep** for the visible
+delta, or `Firewall/Godot` slash-form normalization for store hygiene.
+
 ## v4.7.5 — CLI command split (#217 part 3)
 
 Closes the third installment of `#217` (split oversized files). The CLI

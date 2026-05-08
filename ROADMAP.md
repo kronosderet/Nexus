@@ -96,7 +96,28 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.7.5 (CLI command split · shipped 2026-05-07)
+## Current — v4.7.6 (MCP server split · shipped 2026-05-08)
+
+Closes the fourth and biggest installment of `#217`. The MCP server
+monolith (`server/mcp/index.ts` at 1991L: 29 tool defs + 893-line dispatcher
+switch + helpers + stdio setup) breaks into foundation libs
+(`server/mcp/lib/{config,nexusFetch,format}.ts`) plus per-category tool
+modules (`server/mcp/tools/{read,write,ai,composite}.ts`) plus a tiny entry-
+point. **`mcp/index.ts`: 1991L → 164L (−92%).** Same 29 tools, same manifest,
+same wire protocol — MCPB smoke-tested end-to-end on the new structure.
+
+`tests/mcpToolsRegistry.test.ts` adds **22 specs** (per-group tool/handler
+shape, no-duplicates, total-equals-TOOL_COUNT_EXPECTED, foundation lib
+smoke). `tests/versionDrift.test.ts` source-grep updated to scan the new
+per-category files. Total 380 → **402 tests · 29 tools · no migrations ·
+no breaking changes.**
+
+With this, `#217` is **fully shipped** across all four parts:
+v4.7.1 graphLayouts · v4.7.2 graph/ views · v4.7.5 cli/ split · v4.7.6
+mcp/ split. Total delta: Graph.jsx −1168L, cli/nexus.js −697L, mcp/index.ts
+−1827L.
+
+## Previous — v4.7.5 (CLI command split · shipped 2026-05-07)
 
 Closes the third installment of `#217` (split oversized files). The CLI
 monolith (`cli/nexus.js` at 2047L) is broken into foundation libs +
