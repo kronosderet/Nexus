@@ -9,6 +9,115 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.7.5 — CLI command split (#217 part 3)
+
+Closes the third installment of `#217` (split oversized files). The CLI
+monolith (`cli/nexus.js` at 2047L with ~45 commands inline) is broken into
+foundation libs + per-group command files. Same UX, same dispatch, smaller
+files.
+
+**380 tests (+11) · 29 tools · no migrations · no breaking changes.**
+
+### Why now
+
+After v4.7.1's `client/src/lib/graphLayouts.js` and v4.7.2's
+`client/src/modules/graph/` extractions, the client side of `#217` is
+done (Graph.jsx 2495 → 1327L, −47%). v4.7.5 starts the equivalent server-
+side work. Same pattern as v4.7.4's TodayView: pure helpers in `lib/`,
+feature surfaces in dedicated files, registration test catches drops.
+
+### What moved
+
+**Foundation libs** (`cli/lib/`):
+- `cli/lib/format.js` — ANSI color helpers (`dim`, `amber`, `green`,
+  `blue`, `red`), `STATUS_COLORS`, `formatTask`, `timeSince`, `progressBar`.
+  Anything formatting-related used by multiple commands.
+- `cli/lib/api.js` — `BASE`, `NEXUS_VERSION` (read from root
+  `package.json`), and the `api()` HTTP helper with `ECONNREFUSED` →
+  friendly-exit handling. Single source of truth for the dashboard URL.
+
+**Command groups** (`cli/commands/`):
+
+| File | Commands |
+|---|---|
+| `tasks.js` | `task` · `tasks` · `done` · `quick` (4 — task lifecycle + one-glance status) |
+| `sessions.js` | `log` · `note` · `session` · `context` · `summarize` · `digest` · `activity` · `handoff` (8 — session/activity history + end-of-day rituals) |
+| `ledger.js` | `record` · `decisions` · `search` · `impact` · `link` · `graph` · `seek` · `find` (8 — knowledge graph read/write) |
+| `git.js` | `sync` · `commit-all` · `repos` (3 — fleet git workflow) |
+
+23 commands moved. ~22 commands stay inline (status / brief / pulse / mcp /
+hooks / help / planning suite / overseer suite / fuel suite / etc.) —
+they're either small or glue heavy enough that an extraction would mostly
+move boilerplate.
+
+### Result
+
+- **`cli/nexus.js`: 2047L → 1350L** (−697L, −34%)
+- Total CLI surface: 2183L across 7 files (was 2047L in 1 file). Slight
+  growth from imports/exports overhead; each individual file is now
+  56–292L.
+
+### Surgical extraction technique
+
+The big-block deletion used the same guarded Node one-liner pattern from
+v4.7.2 session #247 — assert the line ranges contain what's expected,
+then splice. Approach:
+
+1. Write the new files (`lib/format.js`, `lib/api.js`, four `commands/*.js`)
+   with the extracted bodies copied verbatim.
+2. Run a Node script that reads `cli/nexus.js`, asserts landmark lines
+   (`async quick`, `async task`, `['commit-all']`, `async activity`,
+   dispatcher), drops the moved ranges, and replaces the imports + the
+   `commands` opener + the dispatcher prelude with the new wiring.
+3. Smoke-test 6+ representative CLI commands (`help`, `mcp`, `memory
+   sources`, `hooks`, `status`, `brief`) before committing.
+
+### Tests
+
+`tests/cliCommands.test.js` adds **11 specs**:
+
+- Per-group exports × 4 (`tasks` · `sessions` · `ledger` · `git`) — assert
+  the exact command set per file. Catches accidentally-dropped or renamed
+  commands.
+- Cross-group registry check — no command name appears in two groups.
+- Foundation lib smoke × 2 — `format.js` color helpers + `formatTask` shape
+  + `progressBar` length; `api.js` shape + version regex.
+
+End-to-end CLI behavior is covered by the existing manual smoke tests
+(`node cli/nexus.js help`, etc.) — we verified all extracted command
+groups still work over a real Nexus dashboard.
+
+### Compatibility
+
+Zero user-facing changes. Every `nexus <cmd>` invocation works exactly the
+same as v4.7.4. The dispatcher signature is unchanged (`commands[cmd]
+(args)`). Imports added: `BASE`, `join`, `resolve`, `existsSync`,
+`readFileSync`, `writeFileSync`, `homedir` — all of which were previously
+imported anyway, just now from explicit module sources.
+
+### Files touched
+
+- `cli/lib/format.js` — NEW (~60L)
+- `cli/lib/api.js` — NEW (~60L)
+- `cli/commands/tasks.js` — NEW (~85L)
+- `cli/commands/sessions.js` — NEW (~290L)
+- `cli/commands/ledger.js` — NEW (~265L)
+- `cli/commands/git.js` — NEW (~80L)
+- `cli/nexus.js` — 2047L → 1350L (registry + dispatcher + remaining inline)
+- `tests/cliCommands.test.js` — NEW (11 specs)
+- `package.json`, `cli/package.json`, `mcpb/manifest.json` — version bump
+- `README.md`, `CONCEPT.md` — test count 369 → 380
+- `CHANGELOG.md`, `ROADMAP.md` — this entry
+
+### What's next
+
+`#217` part 4 — `server/mcp/index.ts` split (1700L+). Pattern is now well-
+exercised: pure helpers in `server/mcp/lib/`, tools grouped by category
+(read / write / async-ai / composite). The central `handleTool` switch
+makes it trickier than the CLI split; expect more thinking, less boilerplate.
+
+Tier-4 polish sweep is the safer alternate.
+
 ## v4.7.4 — Today fusion view
 
 Closes `#240` (Tier-3 UX prototype, deferred since v4.5.10). New dense

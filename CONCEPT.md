@@ -51,7 +51,7 @@ Session ends
 | Store | JSON at ~/.nexus/ with atomic writes + 3-gen backup rotation |
 | AI | LM Studio / Ollama (optional, auto-detected, GPU-aware) |
 | Embeddings | nomic-embed-text for semantic auto-linking |
-| Tests | 369 Vitest (store, routes, graph, graph layouts, CC scaffolding, estimator, memory bridge, multi-source memory bridge, contradiction poller, today view, hygiene migrations) |
+| Tests | 380 Vitest (store, routes, graph, graph layouts, CC scaffolding, estimator, memory bridge, multi-source memory bridge, contradiction poller, today view, CLI command registry, hygiene migrations) |
 | Scheduler | Automated risk scans (6h) + digest (24h) |
 
 ## The Name

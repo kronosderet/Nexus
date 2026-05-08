@@ -96,7 +96,25 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.7.4 (Today fusion view · shipped 2026-05-07)
+## Current — v4.7.5 (CLI command split · shipped 2026-05-07)
+
+Closes the third installment of `#217` (split oversized files). The CLI
+monolith (`cli/nexus.js` at 2047L) is broken into foundation libs +
+per-group command files: `cli/lib/{format,api}.js` (helpers) and
+`cli/commands/{tasks,sessions,ledger,git}.js` (23 commands). **`cli/nexus.js`:
+2047L → 1350L (−34%).**
+
+Same UX, same dispatcher, smaller files. The `commands` registry is now a
+spread-merge of inline + per-group registries. Surgical extraction used the
+guarded Node one-liner pattern from v4.7.2 session #247 (assert landmarks,
+splice ranges).
+
+`tests/cliCommands.test.js` adds **11 specs** — per-group export shape ×4,
+cross-group no-duplicates, foundation lib smoke ×2. Catches the most likely
+regression class (silent command drops during the move). Total 369 → **380
+tests · 29 tools · no migrations · no breaking changes.**
+
+## Previous — v4.7.4 (Today fusion view · shipped 2026-05-07)
 
 Closes `#240` (Tier-3 UX prototype, deferred since v4.5.10). Single dense
 header card on the Command tab fusing **fuel · current task · recent

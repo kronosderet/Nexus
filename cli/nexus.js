@@ -16,81 +16,30 @@
  */
 
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+
+// v4.7.5 (#217 part 3) — module split. Foundation helpers moved to cli/lib/,
+// command groups moved to cli/commands/. This file is the registry + dispatcher
+// + the inline commands not (yet) extracted.
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+// existsSync + readFileSync still used by inline commands (e.g. hooks reading
+// ~/.claude/settings.json, mcp reading the manifest path).
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { api, BASE, NEXUS_VERSION } from './lib/api.js';
+import { dim, amber, green, blue, red, formatTask, timeSince, progressBar } from './lib/format.js';
+import { taskCommands } from './commands/tasks.js';
+import { sessionCommands } from './commands/sessions.js';
+import { ledgerCommands } from './commands/ledger.js';
+import { gitCommands } from './commands/git.js';
 
+// __dirname is still needed by inline mcp/hooks commands.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// v4.3.7 F1c — read version from root package.json instead of hardcoding.
-// Falls back if package.json is missing (e.g. when the CLI is bundled standalone).
-let NEXUS_VERSION = 'unknown';
-try {
-  const pkgPath = join(__dirname, '..', 'package.json');
-  if (existsSync(pkgPath)) NEXUS_VERSION = JSON.parse(readFileSync(pkgPath, 'utf-8')).version || 'unknown';
-} catch {}
-
-const BASE = process.env.NEXUS_URL || 'http://localhost:3001';
-
-function timeSince(date) {
-  const s = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
-}
-
-function progressBar(pct, width = 20) {
-  const filled = Math.round((pct / 100) * width);
-  const empty = width - filled;
-  const bar = '█'.repeat(filled) + '░'.repeat(empty);
-  return bar;
-}
-
-async function api(path, options = {}) {
-  const url = `${BASE}/api${path}`;
-  try {
-    const res = await fetch(url, {
-      headers: { 'Content-Type': 'application/json' },
-      ...options,
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    });
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-    return await res.json();
-  } catch (err) {
-    if (err.cause?.code === 'ECONNREFUSED') {
-      console.error('  ◈ Nexus is offline. Start the Nexus server with: nexus-dev.bat or npm run dev');
-      process.exit(1);
-    }
-    throw err;
-  }
-}
-
-// ── Formatting helpers ─────────────────────────────────
-const dim = (s) => `\x1b[2m${s}\x1b[0m`;
-const amber = (s) => `\x1b[33m${s}\x1b[0m`;
-const green = (s) => `\x1b[32m${s}\x1b[0m`;
-const blue = (s) => `\x1b[34m${s}\x1b[0m`;
-const red = (s) => `\x1b[31m${s}\x1b[0m`;
-
-const STATUS_COLORS = {
-  backlog: dim,
-  in_progress: amber,
-  review: blue,
-  done: green,
-};
-
-function formatTask(t) {
-  const color = STATUS_COLORS[t.status] || dim;
-  return `  ${dim(`#${t.id}`)} ${color(`[${t.status}]`)} ${t.title}`;
-}
-
 // ── Commands ───────────────────────────────────────────
-const commands = {
+// ── Inline commands (kept here; future #217 splits may extract more) ─
+const inlineCommands = {
   async status() {
     const data = await api('/status');
     console.log(`  ◈ Nexus is ${green('online')}. ${data.message}`);
@@ -396,64 +345,6 @@ const commands = {
     console.log('');
   },
 
-  async summarize(args) {
-    // Parse project and --commit flag
-    const commit = args.includes('--commit') || args.includes('-c');
-    const projectArg = args.find(a => !a.startsWith('-'));
-    const project = projectArg || process.cwd().split(/[/\\]/).pop();
-
-    console.log(`\n  ${amber('◈')} ${amber('Auto-Summarize')} — ${green(project)}\n`);
-    console.log(`  ${dim('The Overseer is writing the session log...')}\n`);
-
-    const url = `/auto-summary?project=${encodeURIComponent(project)}`;
-    const data = await api(url);
-
-    if (data.error) {
-      console.log(`  ${red('◈')} ${data.error}`);
-      return;
-    }
-
-    const ctx = data.context || {};
-    console.log(`  ${dim('Context:')} ${ctx.completedTasks || 0} tasks done, ${ctx.decisions || 0} decisions, ${ctx.activityEvents || 0} events`);
-    console.log('');
-
-    if (data.parsed) {
-      console.log(`  ${amber('SUMMARY')}`);
-      console.log(`  ${data.parsed.summary}\n`);
-      if (data.parsed.decisions?.length) {
-        console.log(`  ${amber('DECISIONS')}`);
-        for (const d of data.parsed.decisions) console.log(`    · ${d}`);
-        console.log('');
-      }
-      if (data.parsed.blockers?.length) {
-        console.log(`  ${amber('BLOCKERS')}`);
-        for (const b of data.parsed.blockers) console.log(`    ${red('!')} ${b}`);
-        console.log('');
-      }
-      if (data.parsed.tags?.length) {
-        console.log(`  ${dim('Tags:')} ${data.parsed.tags.join(', ')}`);
-        console.log('');
-      }
-    } else {
-      console.log(`  ${dim('Raw (could not parse as JSON):')}`);
-      console.log(data.raw?.split('\n').map(l => `  ${l}`).join('\n'));
-      console.log('');
-    }
-
-    if (commit) {
-      console.log(`  ${dim('Saving as session entry...')}`);
-      const saved = await api('/auto-summary', { method: 'POST', body: { project } });
-      if (saved.session) {
-        console.log(`  ${green('◈')} Saved as session #${saved.session.id}`);
-      } else {
-        console.log(`  ${red('◈')} Save failed: ${saved.error || 'unknown'}`);
-      }
-    } else {
-      console.log(`  ${dim('Preview only. To save:')} nexus summarize ${project} --commit`);
-    }
-    console.log('');
-  },
-
   async plan(args) {
     // Parse --project flag
     let project = null;
@@ -622,144 +513,6 @@ Ritual:  nexus_bridge_session (end-of-work: auto-summary + handoff)
 `);
   },
 
-  async handoff(args) {
-    const project = args[0] || process.cwd().split(/[/\\]/).pop();
-    const p = project.toLowerCase();
-
-    console.log(`\n  ${amber('◈')} ${amber('SESSION HANDOFF')} — ${green(project)}\n`);
-    console.log(`  ${dim('Generated for the next agent. Copy this into the session start.')}\n`);
-    console.log(`  ${dim('─'.repeat(60))}\n`);
-
-    // 1. Fuel state
-    try {
-      const f = await api('/estimator');
-      if (f.tracked) {
-        console.log(`  ${amber('FUEL STATE')}`);
-        console.log(`  Session: ${f.estimated.session}% | Weekly: ${f.estimated.weekly}%`);
-        if (f.session?.resetWindow) console.log(`  Window resets in: ${f.session.resetWindow}m`);
-        console.log('');
-      }
-    } catch {}
-
-    // 2. Active tasks
-    try {
-      const tasks = await api('/tasks');
-      const active = tasks.filter(t => t.status !== 'done');
-      if (active.length > 0) {
-        console.log(`  ${amber('ACTIVE TASKS')} (${active.length})`);
-        const inProgress = active.filter(t => t.status === 'in_progress');
-        const backlog = active.filter(t => t.status === 'backlog');
-        for (const t of inProgress) console.log(`  ${amber('→')} [IN PROGRESS] ${t.title}`);
-        for (const t of backlog.slice(0, 5)) console.log(`  ${dim('·')} [backlog] ${t.title}`);
-        if (backlog.length > 5) console.log(`  ${dim(`  +${backlog.length - 5} more`)}`);
-        console.log('');
-      }
-    } catch {}
-
-    // 3. Last session summary
-    try {
-      const ctx = await api(`/sessions/context/${encodeURIComponent(project)}`);
-      if (ctx.sessions.length > 0) {
-        const last = ctx.sessions[0];
-        console.log(`  ${amber('LAST SESSION')}`);
-        console.log(`  ${last.summary}`);
-        if (last.decisions?.length) console.log(`  Decisions: ${last.decisions.join(', ')}`);
-        if (last.blockers?.length) console.log(`  ${red('Blockers:')} ${last.blockers.join(', ')}`);
-        console.log('');
-      }
-    } catch {}
-
-    // 4. Recent decisions from Ledger
-    try {
-      const decisions = await api(`/ledger?project=${encodeURIComponent(project)}&limit=5`);
-      if (decisions.length > 0) {
-        console.log(`  ${amber('KEY DECISIONS')}`);
-        for (const d of decisions) console.log(`  · ${d.decision}`);
-        console.log('');
-      }
-    } catch {}
-
-    // 5. Risks
-    try {
-      const r = await api('/overseer/risks');
-      if (r.risks.length > 0) {
-        console.log(`  ${amber('RISKS')}`);
-        for (const risk of r.risks.slice(0, 5)) {
-          const c = risk.level === 'critical' ? red : amber;
-          console.log(`  ${c('!')} ${risk.message}`);
-        }
-        console.log('');
-      }
-    } catch {}
-
-    // 6. Git state for this project
-    try {
-      const repos = await api('/git/repos');
-      const repo = repos.find(r => r.name.toLowerCase() === p);
-      if (repo) {
-        console.log(`  ${amber('GIT STATE')}`);
-        console.log(`  Branch: ${repo.branch} | Uncommitted: ${repo.uncommitted}`);
-        if (repo.lastCommit) console.log(`  Last: ${repo.lastCommit.short} ${repo.lastCommit.message}`);
-        if (repo.ahead > 0) console.log(`  ${green(`↑${repo.ahead} ahead`)}`);
-        if (repo.behind > 0) console.log(`  ${red(`↓${repo.behind} behind`)}`);
-        console.log('');
-      }
-    } catch {}
-
-    // 7. Suggested next steps
-    try {
-      const w = await api('/estimator/workload');
-      const cs = w?.currentSession;
-      if (cs?.recommendation) {
-        console.log(`  ${amber('SUGGESTED NEXT')}`);
-        for (const s of cs.recommendation.suggested) console.log(`  ${amber('›')} ${s}`);
-        console.log('');
-      }
-    } catch {}
-
-    console.log(`  ${dim('─'.repeat(60))}`);
-    console.log(`  ${dim('Start next session with:')} nexus brief ${project}`);
-    console.log(`  ${dim('Quick check:')} nexus quick\n`);
-  },
-
-  async quick(args) {
-    const project = args[0] || process.cwd().split(/[/\\]/).pop();
-
-    // Fuel
-    try {
-      const f = await api('/estimator');
-      if (f.tracked) {
-        const sC = f.estimated.session <= 15 ? red : f.estimated.session <= 40 ? amber : green;
-        const wC = f.estimated.weekly <= 15 ? red : f.estimated.weekly <= 40 ? amber : green;
-        const runway = f.session?.minutesRemaining ? `${f.session.minutesRemaining}m runway` : '';
-        const chunks = f.session?.chunksRemaining != null ? `${f.session.chunksRemaining} chunks` : '';
-        console.log(`  ${amber('◈')} ${sC(`S:${f.estimated.session}%`)} ${wC(`W:${f.estimated.weekly}%`)} ${dim(runway)} ${dim(chunks)}`);
-      }
-    } catch {}
-
-    // Risks (count only)
-    try {
-      const r = await api('/overseer/risks');
-      if (r.risks.length > 0) {
-        const critical = r.risks.filter(x => x.level === 'critical').length;
-        const warnings = r.risks.filter(x => x.level === 'warning').length;
-        console.log(`  ${critical > 0 ? red(`${critical} critical`) : ''} ${warnings > 0 ? amber(`${warnings} warnings`) : ''} ${r.risks.length === 0 ? green('clear') : ''}`.trim());
-      } else {
-        console.log(`  ${green('◈ All clear')}`);
-      }
-    } catch {}
-
-    // Top task
-    try {
-      const tasks = await api('/tasks');
-      const inProgress = tasks.find(t => t.status === 'in_progress');
-      const backlog = tasks.filter(t => t.status === 'backlog');
-      if (inProgress) console.log(`  ${amber('→')} ${inProgress.title}`);
-      else if (backlog.length > 0) console.log(`  ${dim('→')} ${backlog[0].title} ${dim(`(+${backlog.length - 1} backlog)`)}`);
-      else console.log(`  ${dim('Calm waters.')}`);
-    } catch {}
-  },
-
   async brief(args) {
     const project = args[0] || process.cwd().split(/[/\\]/).pop();
     const p = project.toLowerCase();
@@ -887,54 +640,6 @@ Ritual:  nexus_bridge_session (end-of-work: auto-summary + handoff)
     console.log('');
   },
 
-  async log(args) {
-    const message = args.join(' ');
-    if (!message) { console.error('  Usage: nexus log "your message"'); return; }
-
-    // Auto-detect project context
-    const cwd = process.cwd();
-    const project = cwd.split(/[/\\]/).pop();
-    const fullMessage = `[${project}] ${message}`;
-
-    await api('/activity', { method: 'POST', body: { type: 'manual', message: fullMessage } });
-    console.log(`  ◈ Logged: ${fullMessage}`);
-  },
-
-  async task(args) {
-    let status = 'backlog';
-    const filtered = [];
-    for (let i = 0; i < args.length; i++) {
-      if ((args[i] === '-s' || args[i] === '--status') && args[i + 1]) {
-        status = args[++i];
-      } else {
-        filtered.push(args[i]);
-      }
-    }
-    const title = filtered.join(' ');
-    if (!title) { console.error('  Usage: nexus task "task title" [-s status]'); return; }
-
-    const task = await api('/tasks', { method: 'POST', body: { title, status } });
-    console.log(`  ◈ Plotted: ${formatTask(task)}`);
-  },
-
-  async tasks() {
-    const tasks = await api('/tasks');
-    const active = tasks.filter(t => t.status !== 'done');
-    if (active.length === 0) {
-      console.log('  ◈ Calm waters. No active missions.');
-      return;
-    }
-    console.log(`  ◈ ${active.length} active bearing${active.length !== 1 ? 's' : ''}:\n`);
-    for (const t of active) console.log(formatTask(t));
-  },
-
-  async done(args) {
-    const id = parseInt(args[0]);
-    if (!id) { console.error('  Usage: nexus done <task-id>'); return; }
-    const task = await api(`/tasks/${id}`, { method: 'PATCH', body: { status: 'done' } });
-    console.log(`  ◈ Landmark reached: ${task.title}`);
-  },
-
   async pulse() {
     const data = await api('/pulse');
     const { system, projects, git } = data;
@@ -947,97 +652,6 @@ Ritual:  nexus_bridge_session (end-of-work: auto-summary + handoff)
       console.log(`  ${dim('Uncommit')}  ${git.uncommittedChanges} changes`);
     }
     console.log(`  ${dim('Projects')}  ${projects.length} surveyed`);
-  },
-
-  async note(args) {
-    const text = args.join(' ');
-    if (!text) { console.error('  Usage: nexus note "your note"'); return; }
-
-    // Log as a quick session note (not scratchpad -- scratchpad is for working scratch)
-    const project = process.cwd().split(/[/\\]/).pop();
-    await api('/sessions', { method: 'POST', body: { project, summary: text, tags: ['note'] } });
-    console.log(`  ◈ Noted for ${green(project)}.`);
-  },
-
-  async session(args) {
-    // Parse flags: --decisions, --blockers, --tags, --files
-    let decisions = [], blockers = [], tags = [], files_touched = [];
-    const textParts = [];
-
-    for (let i = 0; i < args.length; i++) {
-      if (args[i] === '--decisions' || args[i] === '-d') { decisions = args[++i]?.split(',').map(s => s.trim()) || []; }
-      else if (args[i] === '--blockers' || args[i] === '-b') { blockers = args[++i]?.split(',').map(s => s.trim()) || []; }
-      else if (args[i] === '--tags' || args[i] === '-t') { tags = args[++i]?.split(',').map(s => s.trim()) || []; }
-      else if (args[i] === '--files' || args[i] === '-f') { files_touched = args[++i]?.split(',').map(s => s.trim()) || []; }
-      else { textParts.push(args[i]); }
-    }
-
-    const summary = textParts.join(' ');
-    if (!summary) {
-      console.error('  Usage: nexus session "summary of what was done"');
-      console.error('    Options: --decisions "d1,d2"  --blockers "b1"  --tags "tag1,tag2"  --files "f1,f2"');
-      return;
-    }
-
-    const project = process.cwd().split(/[/\\]/).pop();
-    const session = await api('/sessions', {
-      method: 'POST',
-      body: { project, summary, decisions, blockers, files_touched, tags },
-    });
-
-    console.log(`  ◈ Session logged for ${green(project)}:`);
-    console.log(`    ${summary}`);
-    if (decisions.length) console.log(`    ${dim('Decisions:')} ${decisions.join(', ')}`);
-    if (blockers.length) console.log(`    ${amber('Blockers:')} ${blockers.join(', ')}`);
-  },
-
-  async context(args) {
-    const project = args[0] || process.cwd().split(/[/\\]/).pop();
-    const data = await api(`/sessions/context/${encodeURIComponent(project)}`);
-
-    if (data.sessions.length === 0 && data.activeTasks.length === 0) {
-      console.log(`  ◈ No prior context for ${project}. Uncharted territory.`);
-      return;
-    }
-
-    console.log(`  ◈ Context for ${green(project)}:\n`);
-
-    if (data.activeTasks.length > 0) {
-      console.log(`  ${amber('Active tasks:')}`);
-      for (const t of data.activeTasks) console.log(`    ${formatTask(t)}`);
-      console.log('');
-    }
-
-    for (const s of data.sessions.slice(0, 5)) {
-      const date = new Date(s.created_at).toLocaleDateString();
-      console.log(`  ${dim(date)} ${s.summary}`);
-      if (s.decisions.length) console.log(`    ${dim('Decisions:')} ${s.decisions.join(', ')}`);
-      if (s.blockers.length) console.log(`    ${amber('Blockers:')} ${s.blockers.join(', ')}`);
-    }
-  },
-
-  async digest(args) {
-    const range = args[0] || '7d';
-    const data = await api(`/digest?range=${range}`);
-    console.log(`\n  ◈ ${green('Activity Digest')} (${data.rangeLabel})\n`);
-    console.log(`  ${data.summary}\n`);
-    console.log(`  ${dim('Events')}     ${data.stats.totalEvents}`);
-    console.log(`  ${dim('Commits')}    ${data.stats.commits}`);
-    console.log(`  ${dim('Completed')}  ${data.stats.tasksCompleted}`);
-    console.log(`  ${dim('Open')}       ${data.stats.tasksOpen}`);
-    console.log(`  ${dim('Sessions')}   ${data.stats.sessions}`);
-    if (data.busiestDay) console.log(`  ${dim('Busiest')}    ${data.busiestDay.day} (${data.busiestDay.count} events)`);
-    if (data.projectRanking.length > 0) {
-      console.log(`\n  ${amber('Project ranking:')}`);
-      for (const p of data.projectRanking.slice(0, 5)) {
-        console.log(`    ${p.name.padEnd(20)} ${progressBar(Math.round((p.count / data.projectRanking[0].count) * 100), 15)} ${p.count}`);
-      }
-    }
-    if (data.activeBlockers.length > 0) {
-      console.log(`\n  ${red('Blockers:')}`);
-      for (const b of data.activeBlockers) console.log(`    • ${b}`);
-    }
-    console.log('');
   },
 
   async usage(args) {
@@ -1320,71 +934,6 @@ Ritual:  nexus_bridge_session (end-of-work: auto-summary + handoff)
     console.log('');
   },
 
-  async sync() {
-    console.log(`\n  ${amber('◈')} ${amber('Fleet Sync')}\n`);
-    const repos = await api('/git/repos');
-    for (const r of repos) {
-      const dirty = r.uncommitted > 0 ? amber(` +${r.uncommitted}`) : '';
-      const ahead = r.ahead > 0 ? green(` ↑${r.ahead}`) : '';
-      const behind = r.behind > 0 ? red(` ↓${r.behind}`) : '';
-      console.log(`  ${r.name.padEnd(22)} ${dim(r.branch.padEnd(10))}${dirty}${ahead}${behind}`);
-    }
-    // Trigger fetch
-    console.log(`\n  ${dim('Fetching remotes...')}`);
-    const results = await api('/git/sync', { method: 'POST' });
-    for (const r of results) {
-      if (r.newCommits > 0) console.log(`  ${green('↓')} ${r.project}: ${r.newCommits} new commits on remote`);
-    }
-    console.log(`  ${green('◈')} Fleet synced.\n`);
-  },
-
-  async ['commit-all'](args) {
-    const message = args.join(' ') || 'Nexus auto-commit: save all pending work';
-    console.log(`\n  ${amber('◈')} ${amber('Fleet Commit')}: "${message}"\n`);
-    const repos = await api('/git/repos');
-    let committed = 0;
-    for (const r of repos) {
-      if (r.uncommitted === 0) {
-        console.log(`  ${dim(r.name.padEnd(22))} clean`);
-        continue;
-      }
-      try {
-        const result = await api('/remediate/execute', {
-          method: 'POST',
-          body: { action: 'git-status', project: r.name },
-        });
-        // Actually commit via a dedicated endpoint
-        const commitResult = await api('/git/commit', {
-          method: 'POST',
-          body: { project: r.name, message },
-        });
-        if (commitResult.success) {
-          console.log(`  ${green('✓')} ${r.name.padEnd(22)} ${commitResult.files} files committed`);
-          committed++;
-        } else {
-          console.log(`  ${red('!')} ${r.name.padEnd(22)} ${commitResult.error || 'failed'}`);
-        }
-      } catch (err) {
-        console.log(`  ${red('!')} ${r.name.padEnd(22)} ${err.message}`);
-      }
-    }
-    console.log(`\n  ${green('◈')} ${committed} repo${committed !== 1 ? 's' : ''} committed.\n`);
-  },
-
-  async repos() {
-    const repos = await api('/git/repos');
-    if (repos.length === 0) { console.log('  ◈ No git repos found.'); return; }
-    console.log(`\n  ◈ ${amber('Git Fleet')} (${repos.length} repos)\n`);
-    for (const r of repos) {
-      const age = r.lastCommit?.date ? timeSince(new Date(r.lastCommit.date)) : 'unknown';
-      const dirty = r.uncommitted > 0 ? amber(` +${r.uncommitted}`) : '';
-      const sync = r.behind > 0 ? red(` ↓${r.behind}`) : r.ahead > 0 ? green(` ↑${r.ahead}`) : '';
-      console.log(`  ${r.name.padEnd(22)} ${dim(r.branch.padEnd(12))} ${dim(age.padEnd(10))}${dirty}${sync}`);
-      if (r.lastCommit?.message) console.log(`  ${''.padEnd(22)} ${dim(r.lastCommit.short)} ${dim(r.lastCommit.message.slice(0, 50))}`);
-    }
-    console.log('');
-  },
-
   async ai(args) {
     if (args.length === 0 || args[0] === 'status') {
       const status = await api('/ai/status');
@@ -1411,261 +960,6 @@ Ritual:  nexus_bridge_session (end-of-work: auto-summary + handoff)
     const result = await api('/ai/chat', { method: 'POST', body: { prompt } });
     if (result.error) { console.log(`  ${red('◈')} ${result.error}`); return; }
     console.log(`\n  ${result.response.replace(/\n/g, '\n  ')}\n`);
-  },
-
-  async record(args) {
-    let project = process.cwd().split(/[/\\]/).pop();
-    let context = '', alternatives = [], tags = [];
-    const textParts = [];
-
-    for (let i = 0; i < args.length; i++) {
-      if (args[i] === '--context' || args[i] === '-c') { context = args[++i] || ''; }
-      else if (args[i] === '--alt' || args[i] === '-a') { alternatives = (args[++i] || '').split(',').map(s => s.trim()); }
-      else if (args[i] === '--tags' || args[i] === '-t') { tags = (args[++i] || '').split(',').map(s => s.trim()); }
-      else if (args[i] === '--project' || args[i] === '-p') { project = args[++i] || project; }
-      else { textParts.push(args[i]); }
-    }
-
-    const decision = textParts.join(' ');
-    if (!decision) {
-      console.error('  Usage: nexus record "decision text" [--context "why"] [--alt "option1,option2"] [--tags "t1,t2"]');
-      return;
-    }
-
-    const entry = await api('/ledger', { method: 'POST', body: { decision, context, project, alternatives, tags } });
-    console.log(`  ◈ Decision #${entry.id} recorded for ${green(entry.project)}`);
-    console.log(`    ${entry.decision}`);
-    if (alternatives.length) console.log(`    ${dim('Alternatives:')} ${alternatives.join(', ')}`);
-  },
-
-  async decisions(args) {
-    const project = args[0] || null;
-    const params = project ? `?project=${encodeURIComponent(project)}` : '';
-    const entries = await api(`/ledger${params}`);
-
-    if (entries.length === 0) {
-      console.log('  ◈ The Ledger is empty. Record with: nexus record "decision"');
-      return;
-    }
-
-    console.log(`\n  ${amber('◈')} ${amber('The Ledger')} (${entries.length} decisions)\n`);
-    for (const e of entries.slice(0, 15)) {
-      const date = new Date(e.created_at).toLocaleDateString('cs-CZ');
-      console.log(`  ${dim(date)} ${dim(`#${e.id}`)} ${green(`[${e.project}]`)} ${e.decision}`);
-      if (e.context) console.log(`    ${dim(e.context.slice(0, 80))}`);
-      if (e.alternatives.length) console.log(`    ${dim('Alternatives:')} ${e.alternatives.join(', ')}`);
-    }
-    console.log('');
-  },
-
-  async search(args) {
-    const query = args.join(' ');
-    if (!query) { console.error('  Usage: nexus search "query"'); return; }
-
-    console.log(`  ◈ Searching: "${query}"...`);
-    const data = await api(`/smart-search?q=${encodeURIComponent(query)}`);
-    if (data.error) { console.log(`  ${red('◈')} ${data.error}`); return; }
-    if (data.results.length === 0) { console.log('  ◈ Nothing on the charts.'); return; }
-
-    const methodLabel = data.method === 'hybrid' ? `${green('hybrid')} (keyword + semantic)` : amber('keyword-only');
-    console.log(`\n  ${amber('◈')} ${data.results.length} results via ${methodLabel}\n`);
-
-    const typeColors = { decision: green, session: green, task: blue, activity: dim, scratchpad: amber };
-    for (const r of data.results) {
-      const c = typeColors[r.type] || dim;
-      const methods = r.methods.map(m => m === 'keyword' ? 'K' : 'S').join('+');
-      console.log(`  ${dim(methods.padEnd(3))} ${c(`[${r.type}]`)} ${r.display}`);
-    }
-    console.log(`\n  ${dim(`${data.stats.keywordHits} keyword + ${data.stats.semanticHits} semantic → ${data.stats.fusedTotal} fused`)}\n`);
-  },
-
-  async impact(args) {
-    if (args[0] === 'blast' && args[1]) {
-      const id = parseInt(args[1]);
-      const data = await api(`/impact/blast/${id}`);
-      console.log(`\n  ${amber('◈')} ${amber('Blast Radius')} for #${id}: ${data.decision.decision}\n`);
-      console.log(`  ${data.blastRadius > 5 ? red(data.warning) : data.blastRadius > 0 ? amber(data.warning) : green(data.warning)}\n`);
-      if (data.affected.length > 0) {
-        console.log(`  ${dim('Downstream impact:')}`);
-        for (const a of data.affected) console.log(`    ${'  '.repeat(a.depth-1)}${dim('→')} ${green(`#${a.id}`)} ${a.decision} ${dim(`[${a.project}]`)}`);
-      }
-      if (data.related.length > 0) {
-        console.log(`  ${dim('Also related:')}`);
-        for (const r of data.related) console.log(`    ${dim('~')} ${green(`#${r.id}`)} ${r.decision}`);
-      }
-      console.log('');
-      return;
-    }
-
-    if (args[0] === 'contradictions') {
-      const data = await api('/impact/contradictions');
-      if (data.total === 0) { console.log(`  ${green('◈')} No contradictions detected.`); return; }
-      console.log(`\n  ${amber('◈')} ${data.total} potential contradiction${data.total !== 1 ? 's' : ''}:\n`);
-      for (const c of data.contradictions) console.log(`  ${red('!')} ${c.message}`);
-      console.log('');
-      return;
-    }
-
-    if (args[0] === 'centrality') {
-      const data = await api('/impact/centrality');
-      console.log(`\n  ${amber('◈')} ${amber('Decision Centrality')} (avg ${data.averageConnections} connections)\n`);
-      for (const c of data.centrality.slice(0, 10)) {
-        const bar = progressBar(Math.min(100, c.total * 5), 10);
-        console.log(`  ${dim(`#${c.id}`.padEnd(5))} ${bar} ${dim(`${c.total}`.padStart(3))} ${c.decision.slice(0, 50)} ${dim(`[${c.project}]`)}`);
-      }
-      console.log('');
-      return;
-    }
-
-    if (args[0] === 'holes') {
-      const data = await api('/impact/holes');
-      console.log(`\n  ${amber('◈')} ${amber('Structural Holes')}\n`);
-      if (data.holes.length === 0) { console.log(`  ${green('All projects well-connected.')}`); }
-      else {
-        for (const h of data.holes) console.log(`  ${amber('!')} ${h.pair}: ${h.note}`);
-      }
-      console.log(`\n  ${dim('Cross-project links:')}`);
-      for (const [pair, count] of Object.entries(data.crossLinks)) {
-        console.log(`    ${pair.padEnd(30)} ${count}`);
-      }
-      console.log('');
-      return;
-    }
-
-    if (args[0] === 'forecast' && args[1]) {
-      const id = parseInt(args[1]);
-      console.log(`\n  ${amber('◈')} ${amber('Forecasting impact')} for #${id}...\n`);
-      const data = await api(`/impact/forecast/${id}`);
-      console.log(`  ${dim('Decision:')} ${data.decision?.decision}`);
-      console.log(`  ${dim('Project:')}  ${data.decision?.project}`);
-      console.log(`  ${dim('Affected:')} ${data.affectedCount} downstream decision${data.affectedCount === 1 ? '' : 's'} (max depth ${data.depth})\n`);
-      if (data.affected?.length > 0) {
-        console.log(`  ${dim('Downstream:')}`);
-        for (const a of data.affected.slice(0, 10)) {
-          console.log(`    ${'  '.repeat(Math.max(0, a.depth - 1))}${dim('→')} ${green(`#${a.id}`)} ${a.decision} ${dim(`[${a.project}]`)}`);
-        }
-        if (data.affected.length > 10) console.log(`    ${dim(`... and ${data.affected.length - 10} more`)}`);
-        console.log('');
-      }
-      if (data.forecast) {
-        console.log(`  ${amber('Forecast (AI):')}`);
-        const lines = String(data.forecast).split('\n');
-        for (const line of lines) console.log(`    ${line}`);
-        console.log('');
-      } else {
-        console.log(`  ${dim('AI forecast unavailable. Start LM Studio with google/gemma-4-26b-a4b loaded.')}\n`);
-      }
-      return;
-    }
-
-    console.log('  Usage: nexus impact blast <id> | contradictions | centrality | holes | forecast <id>');
-  },
-
-  async link(args) {
-    if (args.length < 3) {
-      console.error('  Usage: nexus link <from_id> <rel> <to_id> ["note"]');
-      console.error('  Relations: led_to, replaced, depends_on, contradicts, related');
-      return;
-    }
-    const from = parseInt(args[0]);
-    const rel = args[1];
-    const to = parseInt(args[2]);
-    const note = args.slice(3).join(' ');
-
-    const edge = await api('/ledger/link', { method: 'POST', body: { from, to, rel, note } });
-    console.log(`  ◈ Linked: #${from} --[${amber(rel)}]--> #${to}`);
-  },
-
-  async graph(args) {
-    if (args[0] && !isNaN(args[0])) {
-      // Traverse from a specific decision
-      const id = parseInt(args[0]);
-      const depth = parseInt(args[1]) || 3;
-      const data = await api(`/ledger/${id}/traverse?depth=${depth}`);
-      if (data.chain.length === 0) { console.log('  ◈ Decision not found.'); return; }
-
-      console.log(`\n  ${amber('◈')} ${amber('Decision Graph')} from #${id} (depth ${depth})\n`);
-      for (const node of data.chain) {
-        const indent = '  '.repeat(node.depth);
-        const arrow = node.depth > 0 ? `${dim(node.path[node.path.length-1]?.edge || '')} → ` : '';
-        console.log(`  ${indent}${arrow}${green(`#${node.id}`)} ${node.decision}`);
-        if (node.context) console.log(`  ${indent}  ${dim(node.context.slice(0, 60))}`);
-      }
-      console.log('');
-      return;
-    }
-
-    // Full graph stats
-    const data = await api('/ledger/graph/full');
-    const connected = new Set();
-    for (const e of data.edges) { connected.add(e.from); connected.add(e.to); }
-    const orphans = data.nodes.filter(n => !connected.has(n.id)).length;
-
-    console.log(`\n  ${amber('◈')} ${amber('Knowledge Graph')}\n`);
-    console.log(`  ${dim('Decisions')}    ${data.nodes.length}`);
-    console.log(`  ${dim('Connections')} ${data.edges.length}`);
-    console.log(`  ${dim('Connected')}   ${connected.size} nodes`);
-    console.log(`  ${dim('Orphans')}     ${orphans} (unlinked)`);
-
-    if (data.edges.length > 0) {
-      const relCounts = {};
-      for (const e of data.edges) relCounts[e.rel] = (relCounts[e.rel] || 0) + 1;
-      console.log(`\n  ${dim('Edge types:')}`);
-      for (const [rel, count] of Object.entries(relCounts).sort((a,b) => b[1] - a[1])) {
-        console.log(`    ${amber(rel.padEnd(15))} ${count}`);
-      }
-    }
-    console.log('');
-  },
-
-  async seek(args) {
-    const query = args.join(' ');
-    if (!query) { console.error('  Usage: nexus seek "semantic search query"'); return; }
-
-    console.log(`  ◈ Seeking: "${query}"...`);
-    const data = await api(`/embed/search?q=${encodeURIComponent(query)}`);
-    if (data.error) { console.log(`  ${red('◈')} ${data.error}`); return; }
-    if (data.results.length === 0) { console.log('  ◈ Nothing on the charts.'); return; }
-
-    console.log(`\n  ${amber('◈')} ${data.results.length} results (semantic):\n`);
-    const typeColors = { session: green, task: blue, activity: dim, scratchpad: amber };
-    for (const r of data.results) {
-      const c = typeColors[r.type] || dim;
-      const score = Math.round(r.score * 100);
-      console.log(`  ${dim(`${score}%`)} ${c(`[${r.type}]`)} ${r.display}`);
-    }
-    console.log('');
-  },
-
-  async find(args) {
-    const query = args.join(' ');
-    if (!query) { console.error('  Usage: nexus find "search query"'); return; }
-
-    const results = await api(`/search?q=${encodeURIComponent(query)}`);
-    if (results.length === 0) {
-      console.log(`  ◈ Nothing on the charts for "${query}".`);
-      return;
-    }
-
-    const typeColors = { task: blue, activity: dim, session: green, scratchpad: amber };
-    console.log(`  ◈ ${results.length} result${results.length !== 1 ? 's' : ''} for "${query}":\n`);
-    for (const r of results) {
-      const colorFn = typeColors[r.type] || dim;
-      console.log(`  ${colorFn(`[${r.type}]`)} ${r.title}`);
-    }
-  },
-
-  async activity() {
-    const entries = await api('/activity?limit=15');
-    if (entries.length === 0) {
-      console.log("  ◈ The log is empty. Calm waters.");
-      return;
-    }
-    console.log("  ◈ Recent activity:\n");
-    for (const e of entries) {
-      const time = new Date(e.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      console.log(`  ${dim(time)} ${e.message}`);
-    }
   },
 
   async mcp(args) {
@@ -2032,6 +1326,15 @@ ${JSON.stringify(config, null, 2).split('\n').map(l => '    ' + l).join('\n')}
 };
 
 // ── Main ───────────────────────────────────────────────
+// ── Combined registry ───────────────────────
+const commands = {
+  ...inlineCommands,
+  ...taskCommands,
+  ...sessionCommands,
+  ...ledgerCommands,
+  ...gitCommands,
+};
+
 const [cmd, ...args] = process.argv.slice(2);
 
 if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h') {
