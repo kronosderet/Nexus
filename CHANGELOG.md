@@ -9,6 +9,88 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.7.8 — Tier-4 closeout (minimap · export · ambient telemetry)
+
+Closes the **last three** Tier-4 polish items deferred from v4.7.7. Graph
+Visual now has a minimap and a screenshot export; SessionStart ambient
+telemetry is project-scoped with session-age stamps on stacked thoughts.
+Plus a small data-sweep side-quest in the store.
+
+**Tier-4 polish backlog: 0.** **402 tests · 29 tools · no migrations · no
+breaking changes.**
+
+### Graph Visual: minimap (#336)
+
+Scaled-down view of the same graph anchored top-right inside the main SVG.
+Hidden filters propagate (`hiddenProjects`, `hideAutoLinked`); cluster vs
+project coloring respects the live mode. Click a node in the minimap to
+select it. Threshold: `graph.nodes.length >= 40` — small graphs don't
+need it; medium and large do. Implemented as a `<g transform>` group
+inside the same SVG so coords stay layout-agnostic — no separate DOM
+positioning layer to maintain.
+
+### Graph Visual: screenshot export (#339)
+
+Two new buttons in the toolbar — **SVG** (vector, keeps editing in
+Inkscape/Figma) and **PNG** (2× DPI raster, easy to paste into docs).
+Both bake in a legend strip at the bottom of the export with all 7 edge
+types + footer (`Nexus · N nodes · M edges · layout <id> · YYYY-MM-DD HH:MM:SS`).
+The live minimap is stripped from the export so it doesn't render twice
+in the corner of the static image. Implementation factors into a shared
+`buildExportSVG()` helper so the SVG and PNG paths stay in sync —
+`exportSVG()` serializes via `XMLSerializer`, `exportPNG()` rasterizes
+via canvas at 2× scale.
+
+### SessionStart hook: ambient telemetry (#370)
+
+The hook now project-scopes the in-progress and backlog task counts so
+cross-project work doesn't pollute the resume context. Tasks without an
+explicit project still surface (treated as shared/legacy). Cross-project
+in-progress count surfaces as a one-line footer when non-zero so the user
+knows there's other work alive elsewhere.
+
+Active thoughts get the same project-scope treatment. Each surfaced
+thought now carries a session-age stamp (`(N sessions ago)` for older
+ones, `(this session)` for fresh) so freshness is obvious — three
+sessions of drift means the context is probably stale.
+
+`plugin/server/hooks/session-start.js` — same single-file change,
+no new dependencies, no schema additions.
+
+### Side-quest: `Firewall/Godot` slash-form normalization
+
+28 occurrences of `"Firewall/Godot"` in `~/.nexus/nexus.json` (project
+keys + tags + references) normalized to the canonical `"Firewall-Godot"`.
+The v4.6.2-D2 hygiene migration's regex didn't catch all of them. Sweep
+done as a one-shot Node script (read whole, regex replace, atomic
+rename); backup at `~/.nexus/nexus.json.preNormalize`. Hyphen-form total
+339 → 389; slash-form 28 → 0.
+
+### Files touched
+
+- `client/src/modules/Graph.jsx` — VisualView gets `buildExportSVG`/
+  `exportSVG`/`exportPNG` callbacks, two new toolbar buttons (Download
+  SVG, Camera PNG), and the minimap `<g>` group inside the main SVG.
+  `Download` and `Camera` icons added to the lucide import.
+- `plugin/server/hooks/session-start.js` — project-scoped task filter,
+  cross-project footer, project-scoped thought filter, session-age stamps.
+- `package.json`, `cli/package.json`, `mcpb/manifest.json` — version bump
+  4.7.7 → 4.7.8.
+- `CHANGELOG.md`, `ROADMAP.md` — this entry.
+
+### What's next
+
+The visible-polish wave is finished. Three real next directions:
+
+1. **Tier-3 deferred (`#301` + `#363`)** — algorithm + design work, not
+   polish. Centrality alternative ranking metrics (betweenness, eigen-
+   vector); Log burst-grouping collapse.
+2. **`server/db/store.ts` split** (~1700L) — last sizable monolith.
+   Less natural seams than the v4.7.x split set; consider extract-
+   method-cluster as the first-pass approach rather than file split.
+3. **Fresh audit pass** — walk the dashboard end-to-end again now that
+   the visible polish is in. Likely turns up small things.
+
 ## v4.7.7 — Tier-4 polish sweep
 
 Closes **12 of the 15** remaining Tier-4 polish items in a single sweep. The

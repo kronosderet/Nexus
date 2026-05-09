@@ -96,7 +96,25 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.7.7 (Tier-4 polish sweep · shipped 2026-05-09)
+## Current — v4.7.8 (Tier-4 closeout — minimap, export, ambient telemetry · shipped 2026-05-09)
+
+Closes the **last three** deferred Tier-4 polish items in a single sweep —
+Graph Visual minimap (`#336`), screenshot export with legend baked in
+(`#339`), and SessionStart ambient telemetry now project-scoped with
+session-age stamps on stacked thoughts (`#370`). Plus a small data-sweep
+side-quest: 28 `Firewall/Godot` slash-form occurrences in the store
+normalized to the canonical `Firewall-Godot` (the v4.6.2-D2 hygiene
+migration didn't catch them; backup at `~/.nexus/nexus.json.preNormalize`).
+
+**Tier-4 polish backlog: 0.** The visible-polish wave is done. What's left
+across the roadmap: Tier-3 deferred (`#301` Centrality alternative ranking
+metrics, `#363` Log burst-grouping), the optional `server/db/store.ts`
+split (~1700L, last sizable monolith), and whatever the next audit pass
+turns up.
+
+**402 tests · 29 tools · no migrations · no breaking changes.**
+
+## Previous — v4.7.7 (Tier-4 polish sweep · shipped 2026-05-09)
 
 Closes 12 of the remaining 15 Tier-4 polish items in one sweep. The
 backlog post-#217 was almost entirely visible polish — tooltips, sort

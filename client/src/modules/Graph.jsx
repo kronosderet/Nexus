@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { GitBranch, Target, AlertTriangle, BarChart3, Link2, RefreshCw, Search, ChevronRight, Network, Check, X, Loader2, Sparkles } from 'lucide-react';
+import { GitBranch, Target, AlertTriangle, BarChart3, Link2, RefreshCw, Search, ChevronRight, Network, Check, X, Loader2, Sparkles, Download, Camera } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
 import { useNexusFleet } from '../context/useNexus.js';
 import { THEME, PROJECT_PALETTE, EDGE_STYLES, LIFECYCLE_COLORS } from '../lib/theme.js';
@@ -923,6 +923,127 @@ function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocu
   const [layoutMode, setLayoutMode] = useState(readSavedLayout);
   useEffect(() => { writeSavedLayout(layoutMode); }, [layoutMode]);
 
+  // v4.7.8 #339 — clone the live SVG, append a baked-in legend strip + footer,
+  // and return the cloned root. Caller serializes for SVG download or rasterizes
+  // via canvas for PNG. Keeping the augmentation in a single helper means SVG
+  // and PNG paths stay in sync.
+  const buildExportSVG = useCallback(() => {
+    if (!containerRef.current) return null;
+    const live = containerRef.current.querySelector('svg');
+    if (!live) return null;
+    const ns = 'http://www.w3.org/2000/svg';
+    const LEGEND_H = 60;
+    const exportH = HEIGHT + LEGEND_H;
+    const clone = live.cloneNode(true);
+    clone.setAttribute('viewBox', `0 0 ${WIDTH} ${exportH}`);
+    clone.setAttribute('width', String(WIDTH));
+    clone.setAttribute('height', String(exportH));
+    clone.setAttribute('xmlns', ns);
+    // Strip the live minimap from the export — it would render twice and crowd
+    // the corner of the static image.
+    const minimaps = clone.querySelectorAll('g[transform^="translate"]');
+    minimaps.forEach((g) => {
+      const rect = g.querySelector('rect');
+      if (rect && rect.getAttribute('rx') === '3') g.parentNode?.removeChild(g);
+    });
+    // Background-fill rect for the legend strip (so it reads as a deliberate band)
+    const bg = document.createElementNS(ns, 'rect');
+    bg.setAttribute('x', '0');
+    bg.setAttribute('y', String(HEIGHT));
+    bg.setAttribute('width', String(WIDTH));
+    bg.setAttribute('height', String(LEGEND_H));
+    bg.setAttribute('fill', THEME.surface);
+    bg.setAttribute('opacity', '1');
+    clone.appendChild(bg);
+    // Edge-type legend, two columns of 4 (last column has 3)
+    let lx = 10;
+    let row = 0;
+    const ly = HEIGHT + 14;
+    Object.entries(EDGE_STYLES).forEach(([, s]) => {
+      const yRow = ly + row * 14;
+      const line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', String(lx));
+      line.setAttribute('y1', String(yRow + 4));
+      line.setAttribute('x2', String(lx + 18));
+      line.setAttribute('y2', String(yRow + 4));
+      line.setAttribute('stroke', s.stroke);
+      line.setAttribute('stroke-width', String(s.width || 1.5));
+      line.setAttribute('stroke-dasharray', s.dash);
+      clone.appendChild(line);
+      const txt = document.createElementNS(ns, 'text');
+      txt.setAttribute('x', String(lx + 22));
+      txt.setAttribute('y', String(yRow + 8));
+      txt.setAttribute('fill', THEME.textFaint);
+      txt.setAttribute('font-size', '9');
+      txt.setAttribute('font-family', 'ui-monospace, monospace');
+      txt.textContent = s.label;
+      clone.appendChild(txt);
+      // Advance: simple column flow — wrap to row 1 after 4 entries
+      lx += 100;
+      if (lx > WIDTH - 120) { lx = 10; row += 1; }
+    });
+    // Footer: timestamp + counts
+    const ts = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const footer = document.createElementNS(ns, 'text');
+    footer.setAttribute('x', '10');
+    footer.setAttribute('y', String(HEIGHT + LEGEND_H - 6));
+    footer.setAttribute('fill', THEME.textFaint);
+    footer.setAttribute('font-size', '8');
+    footer.setAttribute('font-family', 'ui-monospace, monospace');
+    footer.textContent = `Nexus · ${graph.nodes.length} nodes · ${graph.edges?.length || 0} edges · layout ${layoutMode} · ${ts}`;
+    clone.appendChild(footer);
+    return { clone, exportH };
+  }, [graph, layoutMode]);
+
+  const exportSVG = useCallback(() => {
+    const built = buildExportSVG();
+    if (!built) return;
+    const xml = new XMLSerializer().serializeToString(built.clone);
+    const blob = new Blob([`<?xml version="1.0" encoding="UTF-8"?>\n${xml}`], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nexus-graph-${new Date().toISOString().slice(0,10)}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [buildExportSVG]);
+
+  const exportPNG = useCallback(() => {
+    const built = buildExportSVG();
+    if (!built) return;
+    const xml = new XMLSerializer().serializeToString(built.clone);
+    const blob = new Blob([`<?xml version="1.0" encoding="UTF-8"?>\n${xml}`], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const scale = 2; // 2× DPI for print-quality output
+      const canvas = document.createElement('canvas');
+      canvas.width = WIDTH * scale;
+      canvas.height = built.exportH * scale;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { URL.revokeObjectURL(url); return; }
+      ctx.fillStyle = THEME.bg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((pngBlob) => {
+        if (!pngBlob) { URL.revokeObjectURL(url); return; }
+        const pngUrl = URL.createObjectURL(pngBlob);
+        const a = document.createElement('a');
+        a.href = pngUrl;
+        a.download = `nexus-graph-${new Date().toISOString().slice(0,10)}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(pngUrl);
+        URL.revokeObjectURL(url);
+      }, 'image/png');
+    };
+    img.onerror = () => URL.revokeObjectURL(url);
+    img.src = url;
+  }, [buildExportSVG]);
+
   // v4.7.7 #338 — power-user keyboard shortcuts on the Visual tab.
   //   /   focus search
   //   1-3 switch to LAYOUTS[idx]
@@ -1155,6 +1276,25 @@ function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocu
             </button>
           ))}
         </div>
+        {/* v4.7.8 #339 — screenshot export. SVG keeps colors crisp + lets the
+            user keep editing in Inkscape/Figma; PNG is the easy share path.
+            Legend + node/edge counts + layout + timestamp baked into both. */}
+        <div className="flex gap-0.5 border border-nexus-border rounded" role="group" aria-label="Export graph">
+          <button
+            onClick={exportSVG}
+            className="text-[10px] font-mono px-2 py-1 text-nexus-text-faint hover:text-nexus-amber transition-colors flex items-center gap-1"
+            title="Download the current view as SVG (vector, with legend baked in — keeps editing in Inkscape/Figma)"
+          >
+            <Download size={10} /> SVG
+          </button>
+          <button
+            onClick={exportPNG}
+            className="text-[10px] font-mono px-2 py-1 text-nexus-text-faint hover:text-nexus-amber transition-colors flex items-center gap-1"
+            title="Download the current view as 2× PNG (raster, with legend baked in — easy to paste into docs)"
+          >
+            <Camera size={10} /> PNG
+          </button>
+        </div>
       </div>
 
       {/* v4.4.3 #331 — on-screen hint for interactive controls that were previously undocumented. */}
@@ -1290,6 +1430,88 @@ function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocu
                 </text>
               </g>
             )}
+
+            {/* v4.7.8 #336 — minimap overlay. Scaled-down view of the same graph
+                anchored top-right inside the main SVG. Hidden filters propagate.
+                Click a node in the minimap to select it. Threshold: graphs with
+                40+ nodes start to crowd; below that, the main view is plenty.
+                Implemented as a transform group inside the same SVG so coords
+                stay layout-agnostic — no separate DOM layer to position. */}
+            {graph.nodes.length >= 40 && (() => {
+              const MINI_W = 130;
+              const MINI_H = 80;
+              const MINI_X = Math.max(0, WIDTH - MINI_W - 10);
+              const MINI_Y = 10;
+              const sx = MINI_W / WIDTH;
+              const sy = MINI_H / HEIGHT;
+              return (
+                <g transform={`translate(${MINI_X}, ${MINI_Y})`} className="cursor-pointer">
+                  {/* Frame — translucent so nodes underneath aren't fully obscured */}
+                  <rect
+                    x={0} y={0}
+                    width={MINI_W} height={MINI_H}
+                    fill={THEME.surface}
+                    fillOpacity={0.88}
+                    stroke={THEME.border}
+                    strokeWidth={1}
+                    rx={3}
+                    onClick={(ev) => ev.stopPropagation()}
+                  />
+                  {/* Scaled edges — opacity dropped vs main render so the minimap
+                      reads as overview, not detail */}
+                  {(graph.edges || []).map((e) => {
+                    const a = positions[e.from];
+                    const b = positions[e.to];
+                    if (!a || !b) return null;
+                    const nodeA = graph.nodes.find(n => n.id === e.from);
+                    const nodeB = graph.nodes.find(n => n.id === e.to);
+                    if (nodeA && hiddenProjects.has(nodeA.project)) return null;
+                    if (nodeB && hiddenProjects.has(nodeB.project)) return null;
+                    if (hideAutoLinked && e.rel === 'related') {
+                      const note = String(e.note || '');
+                      if (note.startsWith('auto-linked') || note.startsWith('semantic-linked')) return null;
+                    }
+                    const style = EDGE_STYLES[e.rel] || EDGE_STYLES.related;
+                    return (
+                      <line key={`mini-${e.id}`}
+                        x1={a.x * sx} y1={a.y * sy}
+                        x2={b.x * sx} y2={b.y * sy}
+                        stroke={style.stroke}
+                        strokeOpacity={0.3}
+                        strokeWidth={0.4}
+                        pointerEvents="none"
+                      />
+                    );
+                  })}
+                  {/* Scaled nodes — selected node highlighted with white ring */}
+                  {graph.nodes.map((n) => {
+                    const p = positions[n.id];
+                    if (!p) return null;
+                    if (hiddenProjects.has(n.project)) return null;
+                    const color = colorMode === 'cluster' ? clusterColorFor(n.id) : hashProjectColor(n.project);
+                    const isSel = selectedId === n.id;
+                    return (
+                      <circle key={`mini-${n.id}`}
+                        cx={p.x * sx} cy={p.y * sy}
+                        r={isSel ? 2.4 : 1.4}
+                        fill={color.fill}
+                        fillOpacity={isSel ? 1 : 0.65}
+                        stroke={isSel ? THEME.white : 'none'}
+                        strokeWidth={isSel ? 1 : 0}
+                        style={{ cursor: 'pointer' }}
+                        onClick={(ev) => { ev.stopPropagation(); setSelectedId(n.id); }}
+                      >
+                        <title>#{n.id} {String(n.label || n.decision || '').slice(0, 40)}</title>
+                      </circle>
+                    );
+                  })}
+                  {/* Label */}
+                  <text x={4} y={MINI_H - 4} fontSize={7} fill={THEME.textFaint} fontFamily="ui-monospace, monospace" pointerEvents="none">
+                    map · {graph.nodes.length} nodes
+                  </text>
+                </g>
+              );
+            })()}
           </svg>
 
           {/* Edge type legend — v4.6.5 #282: hover tooltip explains the semantic

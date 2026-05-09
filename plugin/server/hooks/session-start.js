@@ -108,16 +108,24 @@ async function main() {
     lines.push(`Fuel: session ${latest.session_percent ?? '?'}% | weekly ${latest.weekly_percent ?? '?'}% (read ${ageStr} ago${staleSuffix})`);
   }
 
-  // Tasks
+  // Tasks — v4.7.8 #370: scope to the detected active project so cross-project
+  // noise stays out of the resume context. Tasks without a project still surface
+  // (treated as shared/legacy). Cross-project in-progress count surfaces as a
+  // one-line footer if non-zero, so the user knows there's other work alive.
   const tasks = data.tasks || [];
-  const inProgress = tasks.filter(t => t.status === 'in_progress');
-  const backlog = tasks.filter(t => t.status === 'backlog');
+  const projectMatches = (t) => !t.project || (project && t.project.toLowerCase() === project.toLowerCase());
+  const inProgress = tasks.filter(t => t.status === 'in_progress' && projectMatches(t));
+  const backlog = tasks.filter(t => t.status === 'backlog' && projectMatches(t));
+  const otherInProgress = tasks.filter(t => t.status === 'in_progress' && !projectMatches(t));
   if (inProgress.length > 0) {
-    lines.push(`In progress (${inProgress.length}):`);
+    lines.push(`In progress (${inProgress.length}, ${project}):`);
     for (const t of inProgress.slice(0, 5)) lines.push(`  #${t.id} ${t.title}`);
   }
   if (backlog.length > 0) {
-    lines.push(`Backlog: ${backlog.length} tasks queued`);
+    lines.push(`Backlog: ${backlog.length} tasks queued (${project})`);
+  }
+  if (otherInProgress.length > 0) {
+    lines.push(`Other projects: ${otherInProgress.length} in-progress task${otherInProgress.length !== 1 ? 's' : ''} elsewhere`);
   }
 
   // Recent sessions (filtered by project)
@@ -143,13 +151,31 @@ async function main() {
     for (const d of decisions) lines.push(`  - ${d.decision.slice(0, 100)}`);
   }
 
-  // Active thoughts — auto-pop the top one as recovery context
-  const thoughts = (data.thoughts || []).filter(t => t.status === 'active');
+  // Active thoughts — auto-pop the top one as recovery context.
+  // v4.7.8 #370 — project-scope so we don't RESUME a Firewall-Godot thought when
+  // the user opens Nexus; legacy thoughts without project still surface (shared).
+  // Each surfaced thought gets a session-age stamp ("from N sessions ago") so
+  // freshness is obvious — three sessions of drift means the context is probably
+  // stale.
+  const projectThoughtMatches = (t) => !t.project || (project && t.project.toLowerCase() === project.toLowerCase());
+  const thoughts = (data.thoughts || []).filter(t => t.status === 'active' && projectThoughtMatches(t));
   if (thoughts.length > 0) {
+    // Project-scoped sessions sorted ascending so we can count "sessions logged
+    // since this thought was pushed" with a single sweep.
+    const projectSessions = (data.sessions || [])
+      .filter(s => !project || s.project?.toLowerCase() === project.toLowerCase())
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const sessionAgeFor = (t) => {
+      const pushedMs = new Date(t.pushed_at || t.created_at || 0).getTime();
+      if (!pushedMs) return null;
+      return projectSessions.filter(s => new Date(s.created_at).getTime() >= pushedMs).length;
+    };
+    const ageStr = (n) => n == null ? '' : n === 0 ? ' (this session)' : ` (${n} session${n !== 1 ? 's' : ''} ago)`;
+
     // Auto-pop the most recent thought (LIFO) and inject as recovery instruction
     const sorted = [...thoughts].sort((a, b) => new Date(b.pushed_at) - new Date(a.pushed_at));
     const top = sorted[0];
-    lines.push(`◈ RESUME: ${top.text}`);
+    lines.push(`◈ RESUME: ${top.text}${ageStr(sessionAgeFor(top))}`);
     if (top.context) lines.push(`  Context: ${top.context}`);
     if (top.project) lines.push(`  Project: ${top.project}`);
     // Auto-pop: mark as resolved so next session gets a fresh stack
@@ -160,7 +186,7 @@ async function main() {
     if (sorted.length > 1) {
       lines.push(`Thought Stack (${sorted.length - 1} remaining):`);
       for (const t of sorted.slice(1, 3)) {
-        lines.push(`  > ${t.text.slice(0, 80)}${t.context ? ` [${t.context.slice(0, 40)}]` : ''}`);
+        lines.push(`  > ${t.text.slice(0, 80)}${t.context ? ` [${t.context.slice(0, 40)}]` : ''}${ageStr(sessionAgeFor(t))}`);
       }
     }
   }
