@@ -9,6 +9,168 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.7.7 — Tier-4 polish sweep
+
+Closes **12 of the 15** remaining Tier-4 polish items in a single sweep. The
+post-`#217` backlog was almost entirely visible polish — tooltips, sort
+controls, keyboard shortcuts, empty-state diagrams, edge-type contrast, and
+the long-running cs/en localization mix. This release lands them together
+so the dashboard reads "finished," not "in progress."
+
+**402 tests · 29 tools · no migrations · no breaking changes.**
+
+### Foundation: cs ↔ en locale toggle
+
+New `client/src/lib/locale.js` carries the cs/en singleton via
+`useSyncExternalStore` + `localStorage` — no Provider rewrite, no context
+plumbing. Default `cs` (Europe/Prague). Sidebar footer carries a small toggle
+button; consuming components re-render reactively when locale flips.
+
+| API | Use |
+|---|---|
+| `useLocale()` | hook returning `'cs' \| 'en'` — subscribes to the singleton |
+| `useLabels()` | hook returning the active label dictionary |
+| `getLocale()` / `setLocale(loc)` | imperative read/write |
+| `formatLocaleDate(d, opts)` / `formatLocaleTime(d, opts)` | locale-aware formatters that read at call time |
+| `LABELS[loc]` | static label dictionary (`today`, `yesterday`, `sessions`, `points`, `thisWeek`, `prior`) |
+
+Surfaces converted: Fuel TaskCostPanel dates (`cs-CZ` literal → `formatLocaleDate`),
+Fuel Session Patterns "this wk · prior" + "sess" abbreviations, Log
+Today/Yesterday/short dates. Closes `#243` (parent toggle), `#268` (Fuel
+mix), `#365` (Log mix).
+
+### Visual: edge-type contrast
+
+`replaced` swapped from `THEME.gray` (#6b7280) to `THEME.cyan` — `gray` and
+`slate` (used for `related`) were nearly identical Tailwind neutrals, hard
+to distinguish on small edges. `experimental` swapped from `THEME.teal` to
+`THEME.lime` to separate it from the blue/purple cluster. New `width` field
+on each `EDGE_STYLES` entry adds a second visual dimension: stronger
+relations (`depends_on`, `contradicts`) render heavier than weak ones
+(`related`, `experimental`). Wired into VisualView main render, the legend,
+and HolesView ClusterMiniViz. Closes `#337`.
+
+### Power-user shortcuts
+
+| View | Key | Action |
+|---|---|---|
+| Graph Visual | `/` | Focus search input |
+| Graph Visual | `1` / `2` / `3` | Switch layout (`LAYOUTS[idx]`) |
+| Log activity | `1`-`9` | Jump to filter chip at `typesPresent[idx]` |
+
+Listeners scope themselves to the active view (Graph subview / Log tab) and
+suppress when typing in inputs/textareas/contenteditable. Chip labels in
+Log carry a small numeric hint for the first 9 chips. Closes `#338`, `#366`.
+
+### Centrality insight callout
+
+Auto-derived one-liner above the table: computes top-8 by edge count,
+clusters by project, classifies as **strong** (≥60% in one project),
+**lean** (≥40%), or **diverse**. Tone-styled box (amber for strong, dim
+for lean/diverse). Recomputes on every fetch so the observation rotates as
+the graph evolves. Closes `#304`.
+
+### Blast Radius empty-state diagram
+
+`BlastEmptyDiagram` — a small SVG of three concentric rings around a
+central decision node, with satellite dots scattered on each ring at
+varying angles, and faint "1/2/3" hop labels. Sits next to the explainer
+copy in the empty state (hidden on narrow screens via `hidden sm:block`).
+Communicates the blast-radius concept at a glance. Closes `#292`.
+
+### Holes sort controls
+
+Three-mode toggle on the fragmented-projects list: **Orphans ↓** (default
+— most actionable surfaces first), **A → Z** (project name), **Recent**
+(max `memberId` per project, descending — proxy for newest decisions
+fragmented). Shown only when `fragmented.length > 1`. Closes `#323`.
+
+### Tooltips
+
+- **#267 Plan tier (Fuel):** `Max 5x` and `2x capacity` were opaque
+  without context. New `planTooltip` derives a one-liner anchored to the
+  Pro baseline: "2× more capacity than the Pro plan · $100/mo · ~88k
+  tokens per 5h window." Attached to both the plan label and the
+  multiplier-capacity span via `title=` + `cursor-help`.
+- **#283 Graph `general` row:** decisions without an explicit project
+  bucket into `general`. The row now renders italic + faint with a
+  `cursor-help` tooltip explaining the dumping-ground semantic ("Decisions
+  recorded without an explicit project assignment. Review and reassign in
+  The Ledger.").
+
+### Freshness stamp on Graph Visual
+
+Small "Graph indexed Ns ago" line above the StatCards, ticking every 5s.
+Pattern lifted from `Log.jsx` `liveState` — re-tick interval drift, no WS
+hookup needed. `indexedAt` advances when the graph reference changes
+(parent refetch). Pairs with the keyboard-shortcut summary line on the
+right (`/ search · 1-3 layout`). Closes `#338`.
+
+### `#270` UI audit — closed
+
+Meta-task to walk Graph/Overseer/Log and queue improvements. Discovery
+happened on 2026-04-18 (when `#283`/`#292`/`#304`/`#323`/`#336`–`#339`/
+`#365`/`#366` were plotted); this sweep was the implementation. Closing
+the meta task now that the queue it spawned is largely cleared.
+
+### Deferred for a future session
+
+- **`#336` Visual minimap** — viewport overlay + click-to-jump; non-
+  trivial SVG/state work.
+- **`#339` Visual screenshot capability** — PNG/SVG export with legend
+  baked in; legend-rendering pass needed.
+- **`#370` Ambient telemetry — in-flight tasks + thoughts** — hook-layer
+  change, different surface from dashboard polish.
+
+### Patterns codified
+
+- **Pure-lib + thin presentation** — `locale.js` follows the
+  `graphLayouts.js` / `todayView.js` / `cli/lib` / `mcp/lib` precedent.
+  Now exercised 5×.
+- **`useSyncExternalStore` for cross-tree localStorage state** — first
+  use in Nexus. Cleaner than a Provider rewrite when the state is a
+  global singleton (locale, theme, etc.). Pattern documented in
+  `client/src/lib/locale.js` header.
+- **Per-type stroke width as second visual encoding** — pairs with color
+  + dash so all 7 edge types are distinguishable through 3 dimensions.
+  Renderers read `style.width || 1` so the field is optional.
+- **Insight derivation from data shape** — Centrality top-N callout
+  follows the v4.5.4 #258 confidence-tagged-recommendation precedent
+  (suppress when sample is too thin, rotate as data evolves).
+
+### Files touched
+
+- `client/src/lib/locale.js` — NEW (~80L)
+- `client/src/lib/theme.js` — `EDGE_STYLES` color + width updates
+- `client/src/components/Sidebar.jsx` — locale toggle button in footer
+- `client/src/modules/Fuel.jsx` — plan tooltip, locale wiring,
+  `labels.sessions/thisWeek/prior` substitutions
+- `client/src/modules/Graph.jsx` — `general` tooltip, freshness stamp,
+  keyboard shortcuts, BlastEmptyDiagram, edge `width` reads in VisualView
+  + legend
+- `client/src/modules/Log.jsx` — `formatDate`/`formatTime` locale-aware,
+  `useLocale()` subscription, 1-9 chip shortcuts + numeric hints
+- `client/src/modules/graph/CentralityView.jsx` — auto-insight callout
+- `client/src/modules/graph/HolesView.jsx` — sort controls, edge `width`
+  in ClusterMiniViz
+- `package.json`, `cli/package.json`, `mcpb/manifest.json` — version bump
+  4.7.6 → 4.7.7
+- `CHANGELOG.md`, `ROADMAP.md` — this entry
+
+### What's next
+
+Tier-4 polish backlog is down to 3 items, all explicitly larger than a
+polish-tier fix:
+
+1. `#336` Visual minimap
+2. `#339` Visual screenshot
+3. `#370` Ambient telemetry hook
+
+Plus the long-standing optional structural item:
+
+4. `server/db/store.ts` split (~1700L) — last sizable monolith, less
+   natural seams than the v4.7.x split set.
+
 ## v4.7.6 — MCP server split (#217 part 4)
 
 Closes the **fourth and biggest** installment of `#217`. The MCP server

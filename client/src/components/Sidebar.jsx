@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Activity, Compass, ScrollText, Search, Brain, GitBranch, Fuel, Ship, Menu, X, BookMarked } from 'lucide-react';
+import { useLocale, setLocale } from '../lib/locale.js';
 
 const ICON_MAP = {
   activity: Activity,
@@ -14,6 +15,7 @@ const ICON_MAP = {
 
 export default function Sidebar({ modules, active, onSelect, connected, onSearchClick }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const locale = useLocale();
 
   // Auto-close drawer when user selects a module
   function handleSelect(key) {
@@ -96,9 +98,19 @@ export default function Sidebar({ modules, active, onSelect, connected, onSearch
       <div className="p-4 border-t border-nexus-border">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${connected ? 'bg-nexus-green animate-nexus-pulse' : 'bg-nexus-red'}`} />
-          <span className="text-xs font-mono text-nexus-text-faint">
+          <span className="text-xs font-mono text-nexus-text-faint flex-1">
             {connected ? 'All instruments nominal' : 'Reconnecting...'}
           </span>
+          {/* v4.7.7 #243 — cs/en locale toggle. Drives formatLocaleDate / useLabels
+              across Fuel + Log via the shared lib. Defaults to cs (Europe/Prague). */}
+          <button
+            onClick={() => setLocale(locale === 'cs' ? 'en' : 'cs')}
+            className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-nexus-border text-nexus-text-faint hover:text-nexus-amber hover:border-nexus-amber/30 transition-colors uppercase tabular-nums"
+            title={locale === 'cs' ? 'Switch to English (en-US dates + labels)' : 'Přepnout na češtinu (cs-CZ datumy + popisky)'}
+            aria-label="Toggle dashboard language"
+          >
+            {locale}
+          </button>
         </div>
       </div>
     </>

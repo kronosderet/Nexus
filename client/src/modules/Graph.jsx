@@ -391,13 +391,22 @@ function ByProjectPanel({ projects }) {
         </div>
       </div>
       <div className="space-y-1">
-        {entries.map(([proj, count]) => (
-          <div key={proj} className="flex items-center gap-2">
-            <span className="text-xs font-mono text-nexus-text-dim w-24">{proj}</span>
-            <div className="flex-1 h-1.5 bg-nexus-bg rounded-full"><div className="h-full bg-nexus-purple/50 rounded-full" style={{ width: `${(count / max) * 100}%` }} /></div>
-            <span className="text-xs font-mono text-nexus-text-faint w-8 text-right">{count}</span>
-          </div>
-        ))}
+        {entries.map(([proj, count]) => {
+          // v4.7.7 #283 — `general` is the catch-all bucket for decisions recorded
+          // without an explicit project. Surface the dumping-ground semantic on hover
+          // so users know it's review/reassign material, not a real project.
+          const isGeneral = proj === 'general';
+          const rowTitle = isGeneral
+            ? 'Decisions recorded without an explicit project assignment. Review and reassign to specific projects in The Ledger.'
+            : undefined;
+          return (
+            <div key={proj} className="flex items-center gap-2" title={rowTitle}>
+              <span className={`text-xs font-mono w-24 ${isGeneral ? 'text-nexus-text-faint italic cursor-help' : 'text-nexus-text-dim'}`}>{proj}</span>
+              <div className="flex-1 h-1.5 bg-nexus-bg rounded-full"><div className="h-full bg-nexus-purple/50 rounded-full" style={{ width: `${(count / max) * 100}%` }} /></div>
+              <span className="text-xs font-mono text-nexus-text-faint w-8 text-right">{count}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -518,6 +527,47 @@ function OverviewView({ graph, centrality, contradictions, holes, onSwitchView }
         </div>
       </div>
     </div>
+  );
+}
+
+// v4.7.7 #292 — concentric-rings empty-state diagram for Blast Radius. Communicates
+// "central decision + 3 hops of connected decisions" at a glance. Decorative; hidden
+// on screens narrower than `sm`.
+function BlastEmptyDiagram() {
+  const W = 200;
+  const H = 110;
+  const cx = W / 2;
+  const cy = H / 2;
+  const rings = [20, 36, 52];
+  const satellites = [
+    { ring: 0, angle: 35 }, { ring: 0, angle: 150 }, { ring: 0, angle: 280 },
+    { ring: 1, angle: 0 }, { ring: 1, angle: 95 }, { ring: 1, angle: 200 }, { ring: 1, angle: 315 },
+    { ring: 2, angle: 50 }, { ring: 2, angle: 130 }, { ring: 2, angle: 220 }, { ring: 2, angle: 300 },
+  ];
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="hidden sm:block shrink-0" role="img" aria-label="Concentric rings — central decision and 3 hops">
+      {rings.map((r, i) => (
+        <circle key={i} cx={cx} cy={cy} r={r}
+          fill="none" stroke={THEME.amber}
+          strokeOpacity={0.18 + 0.05 * (rings.length - 1 - i)}
+          strokeWidth={1} strokeDasharray="2,3" />
+      ))}
+      {satellites.map((s, i) => {
+        const r = rings[s.ring];
+        const rad = (s.angle * Math.PI) / 180;
+        const x = cx + Math.cos(rad) * r;
+        const y = cy + Math.sin(rad) * r;
+        return (
+          <circle key={i} cx={x} cy={y}
+            r={s.ring === 0 ? 3 : 2.5}
+            fill={THEME.amber} fillOpacity={0.65 - s.ring * 0.15} />
+        );
+      })}
+      <circle cx={cx} cy={cy} r={5.5} fill={THEME.amber} fillOpacity={0.9} stroke={THEME.amber} strokeWidth={1.5} />
+      {rings.map((r, i) => (
+        <text key={i} x={cx + r + 2} y={cy - 4} fontSize="7" fill={THEME.textFaint} fontFamily="ui-monospace, monospace">{i + 1}</text>
+      ))}
+    </svg>
   );
 }
 
@@ -708,14 +758,20 @@ function BlastView({ blastId, setBlastId, onRun, result, graph, centrality, Deci
       {/* v4.3.10 #284 — empty-state explainer + suggested chips so users aren't staring at
           a sterile textbox wondering which ID to try.
           v4.5.10 #290 — added "highly connected" strip from Centrality for cross-tab
-          intelligence; users who come to Blast via Centrality don't have to re-pick. */}
+          intelligence; users who come to Blast via Centrality don't have to re-pick.
+          v4.7.7 #292 — concentric-rings diagram communicates the blast-radius concept
+          at a glance. Pairs with the explainer copy. Hidden on narrow screens to keep
+          the empty state compact. */}
       {!result && (
         <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5 mb-2">
-          <p className="text-xs text-nexus-text-dim mb-3">
-            Blast Radius traces all decisions connected to a starting decision, up to 3 hops
-            out. Use it to understand the architectural impact of changing or deprecating a
-            decision.
-          </p>
+          <div className="flex items-start gap-4 mb-3">
+            <BlastEmptyDiagram />
+            <p className="text-xs text-nexus-text-dim flex-1">
+              Blast Radius traces all decisions connected to a starting decision, up to 3 hops
+              out. Use it to understand the architectural impact of changing or deprecating a
+              decision.
+            </p>
+          </div>
           {suggestions.length > 0 && (
             <>
               <span className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider block mb-1.5">
@@ -818,6 +874,18 @@ function hashProjectColor(project) {
 function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocusConsumed }) {
   const HEIGHT = 400;
   const [hoveredId, setHoveredId] = useState(null);
+  // v4.7.7 #338 — search input ref so the `/` shortcut can focus it.
+  const searchInputRef = useRef(null);
+  // v4.7.7 #338 — freshness stamp. `indexedAt` advances when the graph reference
+  // changes (parent refetch); `now` ticks every 5s so the age string drifts visibly
+  // without a WS hookup. Pattern lifted from Log.jsx liveState.
+  const [indexedAt, setIndexedAt] = useState(() => Date.now());
+  useEffect(() => { setIndexedAt(Date.now()); }, [graph]);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, []);
   // v4.4.2 #329 — accept initialSelectedId from parent so cross-tab "focus this node"
   // clicks (from Centrality or Holes) land on the Visual tab with the target already
   // selected + its detail sidebar open.
@@ -854,6 +922,31 @@ function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocu
   // in `client/src/lib/graphLayouts.js` (extraction also lays groundwork for #217).
   const [layoutMode, setLayoutMode] = useState(readSavedLayout);
   useEffect(() => { writeSavedLayout(layoutMode); }, [layoutMode]);
+
+  // v4.7.7 #338 — power-user keyboard shortcuts on the Visual tab.
+  //   /   focus search
+  //   1-3 switch to LAYOUTS[idx]
+  // Suppressed when the user is typing in an input, textarea, or contenteditable
+  // so it never collides with normal typing.
+  useEffect(() => {
+    function onKey(e) {
+      const t = e.target;
+      const tag = t?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || t?.isContentEditable) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === '/') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+      if (e.key >= '1' && e.key <= '9') {
+        const idx = parseInt(e.key, 10) - 1;
+        if (LAYOUTS[idx]) setLayoutMode(LAYOUTS[idx].id);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   // v4.5.8 #328 — fetched decision details (full text, connections, linked tasks).
   // Thin loading state so the panel doesn't jitter during slice swaps.
   const [details, setDetails] = useState(null);
@@ -954,8 +1047,25 @@ function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocu
     return { fill: CLUSTER_PALETTE[idx], stroke: CLUSTER_PALETTE[idx] };
   };
 
+  // v4.7.7 #338 — freshness label. "just now" for <5s, "Ns ago" up to 1m,
+  // "Nm ago" up to 1h, "Nh ago" beyond.
+  const ageS = Math.floor((now - indexedAt) / 1000);
+  const ageLabel = ageS < 5
+    ? 'just now'
+    : ageS < 60 ? `${ageS}s ago`
+    : ageS < 3600 ? `${Math.floor(ageS / 60)}m ago`
+    : `${Math.floor(ageS / 3600)}h ago`;
+
   return (
     <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[9px] font-mono text-nexus-text-faint">
+          Graph indexed {ageLabel}
+        </span>
+        <span className="text-[9px] font-mono text-nexus-text-faint" title="Keyboard shortcuts: / focus search, 1-3 switch layout">
+          ⌨ <span className="text-nexus-text-dim">/</span> search · <span className="text-nexus-text-dim">1-3</span> layout
+        </span>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
         <StatCard label="Nodes" value={graph.nodes.length} sub="Decisions" />
         <StatCard label="Edges" value={graph.edges?.length || 0} sub="Connections" />
@@ -995,9 +1105,11 @@ function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocu
         <div className="relative flex-1 min-w-[200px] max-w-xs">
           <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-nexus-text-faint" />
           <input
+            ref={searchInputRef}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search node by ID / text / project..."
+            placeholder="Search node by ID / text / project... ( / )"
+            title="Press / to focus this field, 1-3 to switch layout"
             className="w-full bg-nexus-bg border border-nexus-border rounded-lg pl-7 pr-2 py-1 text-[10px] text-nexus-text font-mono focus:border-nexus-amber focus:outline-none"
           />
           {searchMatches != null && (
@@ -1078,13 +1190,17 @@ function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocu
               const isHi = hoveredId != null && (e.from === hoveredId || e.to === hoveredId);
               const isSel = selectedId != null && (e.from === selectedId || e.to === selectedId);
               const style = EDGE_STYLES[e.rel] || EDGE_STYLES.related;
+              // v4.7.7 #337 — per-type stroke width adds a second visual dimension
+              // beyond color+dash. Stronger relations (depends_on, contradicts) render
+              // heavier; weak ones (related, experimental) render thinner.
+              const baseW = style.width || 1;
               return (
                 <line
                   key={e.id}
                   x1={a.x} y1={a.y} x2={b.x} y2={b.y}
                   stroke={style.stroke}
                   strokeOpacity={isHi || isSel ? 0.9 : 0.4}
-                  strokeWidth={isHi || isSel ? 2 : 0.8}
+                  strokeWidth={isHi || isSel ? Math.max(2, baseW + 0.5) : baseW * 0.7}
                   strokeDasharray={style.dash}
                 />
               );
@@ -1185,7 +1301,7 @@ function VisualView({ graph, initialSelectedId, onSelected, focusProject, onFocu
                 className="flex items-center gap-1.5 cursor-help"
                 title={s.tooltip ? `${s.label} — ${s.tooltip}` : s.label}
               >
-                <svg width="20" height="8"><line x1="0" y1="4" x2="20" y2="4" stroke={s.stroke} strokeWidth="1.5" strokeDasharray={s.dash} /></svg>
+                <svg width="20" height="8"><line x1="0" y1="4" x2="20" y2="4" stroke={s.stroke} strokeWidth={s.width || 1.5} strokeDasharray={s.dash} /></svg>
                 <span className="text-[9px] font-mono text-nexus-text-faint border-b border-dashed border-nexus-text-faint/40">{s.label}</span>
               </div>
             ))}

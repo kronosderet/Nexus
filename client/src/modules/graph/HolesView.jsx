@@ -54,7 +54,7 @@ function ClusterMiniViz({ cluster, onNodeClick }) {
             x1={a.x} y1={a.y} x2={b.x} y2={b.y}
             stroke={style.stroke}
             strokeOpacity={0.6}
-            strokeWidth={1}
+            strokeWidth={style.width || 1}
             strokeDasharray={style.dash}
           />
         );
@@ -119,10 +119,28 @@ export default function HolesView({ data, onLinkOrphan, onJumpToVisual, onRefres
     finally { setDrillBusy(false); }
   };
 
+  // v4.7.7 #323 — sort controls for the fragmented-projects list. Default
+  // surfaces the most actionable items first (orphan-count desc); alpha and
+  // recency follow the cross-tab pattern (Fleet #256, ByProject #281,
+  // Centrality #303). Recency proxies via max memberId across clusters since
+  // decision IDs grow monotonically.
+  const [sortMode, setSortMode] = useState('orphansDesc');
+
   if (!data) return null;
-  const fragmented = data.fragmented || [];
+  const fragmented = [...(data.fragmented || [])];
   const healthy = (data.projectAnalysis || []).filter((p) => !p.isFragmented);
   const crossLinks = Object.entries(data.crossLinks || {});
+
+  const maxMemberId = (p) => {
+    let best = 0;
+    for (const c of p.clusters || []) {
+      for (const id of c.memberIds || []) if (id > best) best = id;
+    }
+    return best;
+  };
+  if (sortMode === 'alpha') fragmented.sort((a, b) => a.project.localeCompare(b.project));
+  else if (sortMode === 'recent') fragmented.sort((a, b) => maxMemberId(b) - maxMemberId(a));
+  else fragmented.sort((a, b) => (b.orphans || 0) - (a.orphans || 0)); // orphansDesc default
 
   return (
     <div className="space-y-4">
@@ -159,9 +177,29 @@ export default function HolesView({ data, onLinkOrphan, onJumpToVisual, onRefres
       {/* Fragmented projects detail */}
       {fragmented.length > 0 ? (
         <div>
-          <h3 className="text-[10px] font-mono text-nexus-amber uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
-            <AlertTriangle size={11} /> Fragmented decision graphs
-          </h3>
+          <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+            <h3 className="text-[10px] font-mono text-nexus-amber uppercase tracking-[0.2em] flex items-center gap-2">
+              <AlertTriangle size={11} /> Fragmented decision graphs
+            </h3>
+            {fragmented.length > 1 && (
+              <div className="flex gap-1" role="group" aria-label="Sort fragmented projects">
+                {[
+                  { key: 'orphansDesc', label: 'Orphans ↓' },
+                  { key: 'alpha',       label: 'A → Z' },
+                  { key: 'recent',      label: 'Recent' },
+                ].map(({ key, label }) => (
+                  <button key={key} onClick={() => setSortMode(key)}
+                    className={`text-[9px] font-mono px-1.5 py-0.5 rounded border transition-colors ${
+                      sortMode === key
+                        ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/30'
+                        : 'border-nexus-border text-nexus-text-faint hover:text-nexus-text'
+                    }`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="space-y-3">
             {fragmented.map((p) => (
               <div key={p.project} className="bg-nexus-surface border border-nexus-amber/20 rounded-xl p-4">

@@ -96,7 +96,40 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.7.6 (MCP server split · shipped 2026-05-08)
+## Current — v4.7.7 (Tier-4 polish sweep · shipped 2026-05-09)
+
+Closes 12 of the remaining 15 Tier-4 polish items in one sweep. The
+backlog post-#217 was almost entirely visible polish — tooltips, sort
+controls, keyboard shortcuts, empty-state diagrams, edge-type contrast,
+and the long-pending cs/en localization mix. This release lands them
+together so the dashboard feels finished, not in-progress.
+
+**Foundation:** new `client/src/lib/locale.js` (cs ↔ en singleton via
+`useSyncExternalStore` + localStorage; no Provider rewrite). Sidebar
+footer carries the toggle; Fuel TaskCostPanel + Session Patterns and
+Log Today/Yesterday/dates re-render reactively on flip.
+
+**Visual:** edge-type palette diversified — `replaced` gray→cyan and
+`experimental` teal→lime so all 7 rel types are clearly distinct; new
+`width` field per edge type adds a second visual encoding (depends_on/
+contradicts render thicker than related/experimental).
+
+**Power-user:** Graph Visual `/` focus search + 1-3 layout swap +
+freshness stamp ("Graph indexed Ns ago"); Log activity tab 1-9 to jump
+to filter chips with inline numeric hints.
+
+**Insight:** Centrality auto-callout on top-8 project distribution
+(strong / lean / diverse tones); Blast Radius empty-state now shows a
+concentric-rings SVG diagram explaining the concept at a glance.
+
+**Closed:** `#243`, `#267`, `#268`, `#270`, `#283`, `#292`, `#304`,
+`#323`, `#337`, `#338`, `#365`, `#366`. Deferred for follow-up:
+`#336` (Visual minimap), `#339` (screenshot capability), `#370`
+(ambient telemetry hook).
+
+**402 tests · 29 tools · no migrations · no breaking changes.**
+
+## Previous — v4.7.6 (MCP server split · shipped 2026-05-08)
 
 Closes the fourth and biggest installment of `#217`. The MCP server
 monolith (`server/mcp/index.ts` at 1991L: 29 tool defs + 893-line dispatcher

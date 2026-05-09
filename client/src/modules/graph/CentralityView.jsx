@@ -59,6 +59,34 @@ export default function CentralityView({ data, onPickBlast, onPickVisual }) {
       setSortDir('desc');
     }
   };
+  // v4.7.7 #304 — auto-generated insight on top-N project distribution.
+  // Computes from the unfiltered centrality so the callout reflects the true
+  // graph shape regardless of what the user has filtered to. Rotates as the
+  // graph evolves; suppressed when sample is too thin to draw a conclusion.
+  const insight = useMemo(() => {
+    const TOP_N = 8;
+    const all = data?.centrality || [];
+    if (all.length < TOP_N) return null;
+    const sorted = [...all].sort((a, b) => (b.total ?? 0) - (a.total ?? 0));
+    const top = sorted.slice(0, TOP_N);
+    const counts = {};
+    for (const c of top) {
+      const p = c.project || 'general';
+      counts[p] = (counts[p] || 0) + 1;
+    }
+    const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    if (!ranked.length) return null;
+    const [topProj, topCount] = ranked[0];
+    const ratio = topCount / TOP_N;
+    if (ratio >= 0.6) {
+      return { tone: 'strong',  text: `Top-${TOP_N} centrality clusters around ${topProj} (${topCount}/${TOP_N}).` };
+    }
+    if (ratio >= 0.4) {
+      return { tone: 'lean',    text: `Top-${TOP_N} leans toward ${topProj} (${topCount}/${TOP_N}, ${ranked.length - 1} other project${ranked.length - 1 !== 1 ? 's' : ''} represented).` };
+    }
+    return { tone: 'diverse',   text: `Top-${TOP_N} centrality spreads across ${ranked.length} projects.` };
+  }, [data]);
+
   const filtered = useMemo(() => {
     if (!data?.centrality) return [];
     let list = projectFilter === 'all'
@@ -87,6 +115,19 @@ export default function CentralityView({ data, onPickBlast, onPickVisual }) {
           what&rsquo;s this?
         </span>
       </div>
+      {/* v4.7.7 #304 — auto-generated insight callout on top-N project distribution.
+          Rotates as graph structure shifts (recomputes from current data). */}
+      {insight && (
+        <p className={`text-[11px] font-mono leading-relaxed mb-3 px-3 py-1.5 rounded-md border ${
+          insight.tone === 'strong'
+            ? 'text-nexus-amber bg-nexus-amber/5 border-nexus-amber/20'
+            : insight.tone === 'lean'
+              ? 'text-nexus-text-dim bg-nexus-bg/40 border-nexus-border'
+              : 'text-nexus-text-faint bg-nexus-bg/40 border-nexus-border'
+        }`}>
+          ◈ {insight.text}
+        </p>
+      )}
       {/* v4.5.7 #299 — project filter chips. Only rendered when ≥2 projects are
           represented so single-project stores don't see a dead "All" toggle. */}
       {projects.length >= 2 && (

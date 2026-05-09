@@ -10,6 +10,7 @@ import {
 import { useNexusFuel } from '../context/useNexus.js';
 import FuelFreshnessStamp from '../components/FuelFreshnessStamp.jsx';
 import { SESSION_EXPIRED_LONG, SESSION_EXPIRED_TOOLTIP } from '../lib/fuelLabels.js';
+import { formatLocaleDate, formatLocaleTime, useLabels } from '../lib/locale.js';
 
 function color(pct) {
   if (pct == null) return 'text-nexus-text-faint';
@@ -165,8 +166,9 @@ function TaskCostPanel({ entries, maxCost, totalAnalyzed }) {
                   {v.tasks.map((t, i) => (
                     <div key={i} className="flex items-start gap-2 text-[10px] font-mono">
                       <span className="w-10 text-right tabular-nums text-nexus-text-dim shrink-0">{t.cost}%</span>
-                      <span className="w-24 text-nexus-text-faint shrink-0" title={new Date(t.session).toLocaleString('cs-CZ')}>
-                        {new Date(t.session).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}
+                      {/* v4.7.7 #268 — locale-aware date so dashboard cs/en toggle is honored */}
+                      <span className="w-24 text-nexus-text-faint shrink-0" title={`${formatLocaleDate(t.session)} ${formatLocaleTime(t.session)}`}>
+                        {formatLocaleDate(t.session, { day: 'numeric', month: 'numeric' })}
                       </span>
                       <span className="text-nexus-text-dim leading-relaxed">{t.title}</span>
                     </div>
@@ -186,6 +188,8 @@ export default function FuelModule() {
   const { estimator, workload, timing: timingSlice, history: historySlice, fuelIntel } = useNexusFuel();
   const [showAllSessions, setShowAllSessions] = useState(false);
   const [showAllPlans, setShowAllPlans] = useState(false);
+  // v4.7.7 #268 — pull localized short labels for sess / pts / wk / prior
+  const labels = useLabels();
 
   const fuel = estimator.data;
   const wl = workload.data;
@@ -226,6 +230,17 @@ export default function FuelModule() {
   const costs = fuel.costs;
   const capacity = fuel.capacity;
   const forecast = fuel.forecast;
+  // v4.7.7 #267 — plain-language tooltip for the plan tier + capacity multiplier.
+  // Anchors the multiplier to the Pro baseline so "2x" / "5x" stop being opaque.
+  const planTooltip = plan
+    ? plan.multiplier === 0
+      ? 'API plan — pay per token, no session windows'
+      : plan.multiplier === 1
+        ? 'Standard Pro capacity (baseline)'
+        : plan.multiplier < 1
+          ? `Reduced capacity — ${plan.multiplier}× of the Pro baseline`
+          : `${plan.multiplier}× more capacity than the Pro plan${PLAN_PRICING[plan.name] ? ` · ${PLAN_PRICING[plan.name]}` : ''}${plan.description ? ` · ${plan.description}` : ''}`
+    : '';
   return (
     <div className="animate-page-mount">
       {/* Header — v4.3.9 #259: use shared FuelFreshnessStamp so Command view + Dashboard
@@ -248,9 +263,9 @@ export default function FuelModule() {
             <span className="text-[10px] font-mono text-nexus-text-faint uppercase tracking-wider">Your Plan</span>
           </div>
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs font-mono">
-            <span className="text-nexus-amber font-medium">{plan.label}</span>
+            <span className="text-nexus-amber font-medium cursor-help" title={planTooltip}>{plan.label}</span>
             <span className="text-nexus-text-faint">{PLAN_PRICING[plan.name] || ''}</span>
-            <span className="text-nexus-text-faint">{plan.multiplier}x capacity</span>
+            <span className="text-nexus-text-faint cursor-help" title={planTooltip}>{plan.multiplier}x capacity</span>
             <span className="text-nexus-text-faint">5h session windows</span>
             {weeklyReset && <span className="text-nexus-text-faint">Weekly resets {weeklyReset.resetsAt}</span>}
           </div>
@@ -392,7 +407,7 @@ export default function FuelModule() {
               is inherently better). Suppressed when prior-week sample is empty. */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
             <Stat label="Analyzed" value={`${patterns.totalSessions}`} sub={
-              patterns.wow ? `${patterns.wow.thisWeekSessions} this wk · ${patterns.wow.priorWeekSessions} prior` : 'sessions'
+              patterns.wow ? `${patterns.wow.thisWeekSessions} ${labels.thisWeek} · ${patterns.wow.priorWeekSessions} ${labels.prior}` : 'sessions'
             } />
             <Stat label="Avg burn rate" value={`${patterns.avgBurnRate}%/h`}
               sub={patterns.wow?.avgBurnRate != null ? <DeltaBadge delta={patterns.wow.avgBurnRate} unit="%/h" lowerIsBetter={true} /> : null} />
@@ -421,7 +436,7 @@ export default function FuelModule() {
                     <span className="w-36 text-nexus-text-dim shrink-0">{TIME_SLOT_LABELS[key]}</span>
                     <Bar percent={pct} className="flex-1" />
                     <span className="w-12 text-right tabular-nums text-nexus-text-dim">{slot.avgBurn}%</span>
-                    <span className="w-14 text-right text-nexus-text-faint">{slot.sessions} sess</span>
+                    <span className="w-14 text-right text-nexus-text-faint">{slot.sessions} {labels.sessions}</span>
                   </div>
                 );
               });

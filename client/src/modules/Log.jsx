@@ -3,6 +3,7 @@ import { api } from '../hooks/useApi.js';
 import { useNexusCore } from '../context/useNexus.js';
 import Chip from '../components/Chip.jsx';
 import { useWsFlash } from '../hooks/useMotion.js';
+import { formatLocaleDate, formatLocaleTime, getLocale, useLocale, LABELS } from '../lib/locale.js';
 import {
   ScrollText, BookOpen, Compass, CheckCircle2, Trash2, Settings,
   FileEdit, AlertTriangle, Tag, ChevronDown, ChevronRight, Search, Filter,
@@ -53,13 +54,18 @@ function sanitizeMessage(msg) {
   return msg.replace(/\(_project\)/g, '(—)').replace(/\b_project\b/g, '(unknown)');
 }
 
-function formatTime(dateStr) { return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+// v4.7.7 #365 — locale-aware Today/Yesterday + date format. Reads the current
+// locale at call time so day-grouping headers respect the dashboard cs/en toggle
+// (parent #243). `useLocale()` higher up subscribes the consuming component so
+// these values re-render on toggle.
+function formatTime(dateStr) { return formatLocaleTime(dateStr); }
 function formatDate(dateStr) {
   const d = new Date(dateStr); const today = new Date();
-  if (d.toDateString() === today.toDateString()) return 'Today';
+  const labels = LABELS[getLocale()];
+  if (d.toDateString() === today.toDateString()) return labels.today;
   const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  if (d.toDateString() === yesterday.toDateString()) return labels.yesterday;
+  return formatLocaleDate(d, { month: 'short', day: 'numeric' });
 }
 
 // ── Session card ────────────────────────────────────────
@@ -102,6 +108,9 @@ function SessionCard({ session }) {
 
 export default function Log({ onNavigate }) {
   const { activity: activitySlice, sessions: sessionsSlice } = useNexusCore();
+  // v4.7.7 #365 — subscribe to locale so formatDate/formatTime callsites re-render
+  // when the user flips the cs/en toggle in the sidebar.
+  useLocale();
   const [tab, setTab] = useState('activity');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -206,6 +215,26 @@ export default function Log({ onNavigate }) {
 
   // Filtered activity
   const typesPresent = useMemo(() => ['all', ...new Set(entries.map(e => e.type)).values()].sort(), [entries]);
+
+  // v4.7.7 #366 — power-user filter-chip shortcuts on the activity tab.
+  // Press 1 for All, 2 for the first chip, etc. (mirrors typesPresent order).
+  // Suppressed when typing in inputs, on other tabs, or with modifier keys.
+  useEffect(() => {
+    if (tab !== 'activity') return;
+    function onKey(e) {
+      const t = e.target;
+      const tag = t?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || t?.isContentEditable) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key >= '1' && e.key <= '9') {
+        const idx = parseInt(e.key, 10) - 1;
+        const next = typesPresent[idx];
+        if (next) setTypeFilter(next);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [tab, typesPresent]);
   // v4.4.4 #357 — resolve time-range preset to a cutoff ms. `all` skips the check.
   const rangeCutoffMs = useMemo(() => {
     const now = Date.now();
@@ -414,8 +443,8 @@ export default function Log({ onNavigate }) {
         {/* Type chips (activity) or project chips (sessions) */}
         {tab === 'activity' ? (
           <div className="flex items-center gap-1.5 flex-wrap">
-            <Filter size={10} className="text-nexus-text-faint" />
-            {typesPresent.map(type => {
+            <Filter size={10} className="text-nexus-text-faint" title="Press 1-9 to jump to a chip" />
+            {typesPresent.map((type, chipIdx) => {
               // v4.4.4 #358 — each type chip has two states now: click to filter-to-this-type
               // (existing behavior), shift/ctrl-click OR the small eye-toggle to mute/hide.
               // The mute toggle only renders when typeFilter === 'all' (otherwise the user has
@@ -423,11 +452,15 @@ export default function Log({ onNavigate }) {
               const muted = mutedTypes.has(type);
               const active = typeFilter === type;
               const isAll = type === 'all';
+              // v4.7.7 #366 — display 1-9 hint on the first nine chips
+              const shortcutHint = chipIdx < 9 ? chipIdx + 1 : null;
               return (
                 <span key={type} className={`inline-flex items-center rounded-full border transition-colors ${active ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/20' : muted ? 'bg-nexus-bg text-nexus-text-faint border-nexus-border line-through opacity-60' : 'text-nexus-text-faint border-nexus-border hover:text-nexus-text'}`}>
                   <button onClick={() => setTypeFilter(type)}
+                    title={shortcutHint ? `Press ${shortcutHint} to filter` : undefined}
                     className="px-2 py-0.5 text-[10px] font-mono">
                     {isAll ? 'All' : (TYPE_CONFIG[type]?.label || type)}
+                    {shortcutHint && <span className="ml-1 text-[8px] opacity-60 tabular-nums">{shortcutHint}</span>}
                   </button>
                   {!isAll && typeFilter === 'all' && (
                     <button
