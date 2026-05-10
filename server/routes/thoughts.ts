@@ -1,6 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
 import type { Thought } from '../types.ts';
+import { validateBody } from '../lib/validate.ts';
+import { NewThoughtSchema } from '../lib/validators.ts';
 
 /**
  * Thought Stack — interrupt-recovery working memory.
@@ -30,11 +32,18 @@ export function createThoughtRoutes(store: NexusStore, broadcast: (data: unknown
 
   // POST /api/thoughts — push a new thought onto the stack
   router.post('/', (req: Request, res: Response) => {
-    const { text, context, project, related_task_id } = req.body;
-    if (!text?.trim()) return res.status(400).json({ error: 'Thought text required.' });
-    const thought = store.pushThought({ text, context, project, related_task_id });
+    // v4.8.0 #219 — Zod validation. text required (non-empty after trim);
+    // related_task_id, if present, must be a number.
+    const body = validateBody(NewThoughtSchema, req, res);
+    if (!body) return;
+    const thought = store.pushThought({
+      text: body.text,
+      context: body.context,
+      project: body.project,
+      related_task_id: body.related_task_id,
+    });
 
-    const entry = store.addActivity('thought', `Pushed thought: ${text.slice(0, 60)}`);
+    const entry = store.addActivity('thought', `Pushed thought: ${body.text.slice(0, 60)}`);
     broadcast({ type: 'activity', payload: entry });
     res.status(201).json(thought);
   });

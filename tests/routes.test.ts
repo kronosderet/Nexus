@@ -100,6 +100,25 @@ describe('Tasks API', () => {
     const res = await request(app).delete(`/api/tasks/${create.body.id}`);
     expect(res.status).toBe(200);
   });
+
+  // v4.8.0 #219 — Zod validation. Spot-check that invalid enum + range values
+  // fail at the boundary instead of writing nonsense to the store.
+  it('POST /api/tasks rejects invalid status enum', async () => {
+    const res = await request(app).post('/api/tasks').send({ title: 'X', status: 'archived' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/status/);
+  });
+
+  it('POST /api/tasks rejects out-of-range priority', async () => {
+    const res = await request(app).post('/api/tasks').send({ title: 'X', priority: 7 });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/priority/);
+  });
+
+  it('POST /api/tasks rejects non-integer priority', async () => {
+    const res = await request(app).post('/api/tasks').send({ title: 'X', priority: 1.5 });
+    expect(res.status).toBe(400);
+  });
 });
 
 // ── Activity ──────────────────────────────────────────────
@@ -343,6 +362,33 @@ describe('Impact API', () => {
     expect(res.status).toBe(200);
     expect(res.body.projectAnalysis).toBeDefined();
     expect(res.body.totalFragmented).toBeDefined();
+  });
+
+  // v4.8.0 #280 + #219 — auto-link config GET/PATCH with Zod validation.
+  it('GET /api/ledger/autolink-config returns default semantic threshold', async () => {
+    const res = await request(app).get('/api/ledger/autolink-config');
+    expect(res.status).toBe(200);
+    expect(typeof res.body.semanticThreshold).toBe('number');
+    expect(res.body.semanticThreshold).toBeGreaterThanOrEqual(0.4);
+    expect(res.body.semanticThreshold).toBeLessThanOrEqual(0.95);
+  });
+
+  it('PATCH /api/ledger/autolink-config persists a new threshold', async () => {
+    const res = await request(app).patch('/api/ledger/autolink-config').send({ semanticThreshold: 0.65 });
+    expect(res.status).toBe(200);
+    expect(res.body.semanticThreshold).toBe(0.65);
+    const verify = await request(app).get('/api/ledger/autolink-config');
+    expect(verify.body.semanticThreshold).toBe(0.65);
+  });
+
+  it('PATCH /api/ledger/autolink-config rejects out-of-range threshold', async () => {
+    const res = await request(app).patch('/api/ledger/autolink-config').send({ semanticThreshold: 0.99 });
+    expect(res.status).toBe(400);
+  });
+
+  it('PATCH /api/ledger/autolink-config rejects non-numeric threshold', async () => {
+    const res = await request(app).patch('/api/ledger/autolink-config').send({ semanticThreshold: 'high' });
+    expect(res.status).toBe(400);
   });
 
   it('PATCH /api/ledger/link/:id updates rel and note (v4.6.5 #311)', async () => {

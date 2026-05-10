@@ -1,5 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
+import { validateBody } from '../lib/validate.ts';
+import { NewTaskSchema, UpdateTaskSchema } from '../lib/validators.ts';
 
 type BroadcastFn = (data: unknown) => void;
 
@@ -11,10 +13,19 @@ export function createTaskRoutes(store: NexusStore, broadcast: BroadcastFn) {
   });
 
   router.post('/', (req: Request, res: Response) => {
-    const { title, description, status, priority, decision_ids, project } = req.body;
-    if (!title?.trim()) return res.status(400).json({ error: 'Task title required.' });
-    const task = store.createTask({ title: title.trim(), description, status, priority, decision_ids, project });
-    const entry = store.addActivity('task_created', `Plotted -- "${title}"`);
+    // v4.8.0 #219 — Zod validation at the boundary. Catches missing title,
+    // wrong status enum, non-integer priority, etc. before the store sees them.
+    const body = validateBody(NewTaskSchema, req, res);
+    if (!body) return;
+    const task = store.createTask({
+      title: body.title,
+      description: body.description,
+      status: body.status,
+      priority: body.priority,
+      decision_ids: body.decision_ids,
+      project: body.project,
+    });
+    const entry = store.addActivity('task_created', `Plotted -- "${body.title}"`);
     broadcast({ type: 'task_update', payload: task });
     broadcast({ type: 'activity', payload: entry });
     res.status(201).json(task);
@@ -22,7 +33,11 @@ export function createTaskRoutes(store: NexusStore, broadcast: BroadcastFn) {
 
   router.patch('/:id', (req: Request, res: Response) => {
     const id = Number(req.params.id);
-    const result = store.updateTask(id, req.body);
+    // v4.8.0 #219 — patches accept any subset of the task fields; reject
+    // unknown shapes (e.g. status='archived') at the boundary.
+    const body = validateBody(UpdateTaskSchema, req, res);
+    if (!body) return;
+    const result = store.updateTask(id, body);
     if (!result) return res.status(404).json({ error: 'Nothing on the charts.' });
 
     const { task, old, resolvedThoughts } = result;

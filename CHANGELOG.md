@@ -9,6 +9,175 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.8.0 — Structural cleanup
+
+The v4.7.x arc shipped nine point releases over two days. v4.8.0 collects
+what's left of the structural debt and closes a handful of long-pending
+items. **Tier-3 and Tier-4 deferred backlogs are both at zero**, the
+initial JS bundle is **55% smaller**, route boundaries now validate input
+at runtime, and the last sizable monolith dropped 23%.
+
+**423 tests (+7 new for Zod + autolink-config) · 29 MCP tools · no
+migrations · no breaking changes.**
+
+### Vite bundle code-split
+
+Pre-split, the initial bundle was **517.79kB** because every dashboard
+module + modal shipped at startup even though the user only views one at
+a time. Wrapping each module + the rarely-opened modals in `React.lazy +
+Suspense` drops the initial chunk to **232.11kB (−55%)**. Each module is
+its own chunk, loaded on demand:
+
+| Chunk | Size | When |
+|---|---|---|
+| `index` (initial) | 232.11kB | always |
+| `Graph` | 94.27kB | when Graph tab opens |
+| `Command` | 41.45kB | when Command tab opens |
+| `Log` | 29.95kB | when Log tab opens |
+| `Overseer` | 29.74kB | when Overseer tab opens |
+| `Fuel` | 25.99kB | when Fuel tab opens |
+| `Pulse` | 23.72kB | when Dashboard tab opens |
+| `Fleet` | 15.41kB | when Fleet tab opens |
+| `Handover` | 7.57kB | when Handover tab opens |
+| `SearchModal` / `ThoughtStackModal` / `ShortcutHelpModal` | 3-6kB each | when opened |
+
+Suspense fallback uses the Cartographer "◈ Scanning..." style so the
+swap reads as "module thinking" rather than "broken page." `App.jsx` is
+the only file that needed touching.
+
+### Auto-link similarity threshold — server hookup (#280)
+
+The slider has existed since v4.5.10 but only persisted in localStorage —
+the server's `_semanticAutoLink` had its own hardcoded `0.55` threshold
+and never read the UI value. Closed the gap:
+
+- New `data._autolinkConfig: { semanticThreshold: number }` persisted in
+  `~/.nexus/nexus.json`. Defaults to 0.55 (the prior hardcoded value);
+  range clamped 0.4..0.95 to match the UI slider.
+- `NexusStore.getAutolinkConfig()` / `setAutolinkConfig()` accessors.
+- `_semanticAutoLink` reads from store: `findSimilar(query, candidates,
+  5, semanticThreshold)`.
+- New endpoints: `GET /api/ledger/autolink-config` (returns current
+  threshold), `PATCH /api/ledger/autolink-config` (validates + persists,
+  Zod-checked).
+- Client UI in Graph.jsx fetches initial value from server on mount,
+  PATCHes on slider change. `localStorage` kept as offline mirror so
+  refresh-before-fetch shows the right value. Default value bumped 0.7 →
+  0.55 to match server.
+- "syncing…" hint while the PATCH is in flight.
+
+### Zod validation at route boundaries (#219)
+
+Deferred from the v4.3.6 audit — Express routes did ad-hoc input
+validation (`if (!body.title?.trim())`) which left every mutation to
+re-derive shape rules. v4.8.0 introduces:
+
+- New `server/lib/validate.ts` — `validate()` returns a discriminated
+  union; `validateBody()` writes the 400 + returns null on failure so
+  routes can `if (!body) return;` and continue with typed data.
+- New `server/lib/validators.ts` — Zod schemas for the most-used
+  mutation bodies: `NewTaskSchema`, `UpdateTaskSchema`,
+  `NewDecisionSchema`, `NewSessionSchema`, `NewThoughtSchema`,
+  `NewUsageSchema`, `NewActivitySchema`, `AutolinkConfigSchema`.
+- Routes converted: `POST /api/tasks`, `PATCH /api/tasks/:id`,
+  `POST /api/ledger`, `POST /api/sessions`, `POST /api/thoughts`,
+  `POST /api/activity`, `POST /api/usage`, `PATCH /api/ledger/autolink-config`.
+- Manual NaN guards in `POST /api/usage` removed — Zod's range checks
+  cover them, and the route is shorter for it.
+- Validation tests added: rejects invalid status enum, out-of-range
+  priority, non-integer priority, out-of-range threshold, non-numeric
+  threshold.
+
+### `server/db/store.ts` split (#217 follow-up)
+
+Last sizable monolith from the #217 refactor arc. Extracted the
+421-line migrations block (`v4.3.5-C1` through `v4.7.0-M1`, 8 applied
+migrations) into `server/db/storeMigrations.ts` as a pure function:
+
+```ts
+// server/db/storeMigrations.ts
+export function runMigrations(data: NexusData): number { ... }
+
+// server/db/store.ts
+private _runMigrations(): void {
+  const changed = runMigrations(this.data);
+  if (changed > 0) this._flush();
+}
+```
+
+`store.ts`: **1752L → 1341L (−411L, −23%)**. The `_autoLinkDecision` /
+`_semanticAutoLink` cluster could split further but its `this`
+references would force a less natural seam — left for a future pass if
+the file grows again.
+
+### Cross-project task leak hygiene
+
+The brief's standing note ("~15 tasks under `project='Nexus'` actually
+belong elsewhere") finally addressed: 10 tasks reassigned via store
+sweep to their real projects:
+
+- `#75` `#76` `#80` `#81` `#82` → **Firewall-Godot** (Hex / ForceRegistry / Living Strata / Shadow Heptarchy / Eigenforge — game mechanics)
+- `#135` `#138` → **shadowrun** (Sprint 2 Knockdown + Delayed action)
+- `#182` `#183` `#186` → **direwolf** (Phase-3 PDF parser items)
+
+Out-of-tree data sweep; backup at `~/.nexus/nexus.json.preMigrate`.
+
+### #139 closed as obsolete
+
+`Update BACKLOG.md` referenced a file that no longer exists in the repo
+(removed during a prior cleanup commit). Closed.
+
+### Files touched
+
+- NEW `server/db/storeMigrations.ts` (~430L, extracted)
+- NEW `server/lib/validate.ts` (~50L)
+- NEW `server/lib/validators.ts` (~110L)
+- `server/db/store.ts` — `_runMigrations` slimmed to delegating call;
+  `getAutolinkConfig` / `setAutolinkConfig` + `_semanticAutoLink` reads
+  from store. **−411 net lines.**
+- `server/routes/{tasks,ledger,sessions,thoughts,activity,usage}.ts` —
+  Zod validation + `validateBody()` calls; ledger gets the new
+  GET/PATCH `/autolink-config` endpoints.
+- `server/package.json` — `zod` dep added.
+- `client/src/App.jsx` — every module + modal `lazy()`; `<Suspense>`
+  boundaries; Cartographer-style fallback.
+- `client/src/modules/Graph.jsx` — slider fetches from server on mount,
+  PATCHes on change; "syncing…" hint; default 0.7 → 0.55.
+- `tests/routes.test.ts` — +7 specs (Zod rejection, autolink-config
+  GET/PATCH).
+- `package.json`, `cli/package.json`, `mcpb/manifest.json` — version
+  bump 4.7.9 → 4.8.0.
+- `README.md`, `CONCEPT.md`, `CHANGELOG.md`, `ROADMAP.md` — copy +
+  test count update (402 → 423).
+
+### What's next
+
+Both Tier-3 and Tier-4 deferred backlogs are at **zero**. The visible-polish
++ algorithm + structural waves are all done. From here:
+
+1. **Fresh audit pass** — same playbook as v4.7.7/v4.7.8. Now that the
+   bundle is 55% smaller and validation is at boundaries, the next round
+   of "what bugs the eye" will surface different things.
+2. **Optional further `store.ts` extraction** — auto-link + read/write
+   helpers. Less natural seams; only worth it if the file grows again.
+3. **Cross-project work** — fleet overview ranks 200+ tasks across
+   Firewall-Godot, Shadowrun, noosphere, direwolf, etc. Several have
+   priority 2 and 25+ days of staleness.
+
+### Patterns codified
+
+- **Lazy + Suspense for dashboard modules** — `App.jsx` becomes the
+  Suspense boundary; every route-level component splits cleanly.
+  Repeat for any heavy modal added later.
+- **Zod at the boundary, types inferred from schemas** — once a route
+  calls `validateBody(NewXSchema, req, res)`, the rest of the handler
+  has a fully-typed `body`. New routes should follow the same pattern;
+  `server/lib/validators.ts` is the registry.
+- **Pure functions for store hot-paths** — `storeMigrations.ts` shows
+  the seam: read-only on `data`, no `this`, return change-count, caller
+  decides flush. Reusable for any future `_thing` method that doesn't
+  need much class state.
+
 ## v4.7.9 — Tier-3 closeout (alternative centrality · log burst-grouping)
 
 Closes the **last two** Tier-3 deferred items from the v4.5.10 sweep.

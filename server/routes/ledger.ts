@@ -1,6 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
 import type { Decision, GraphEdge } from '../types.ts';
+import { validateBody } from '../lib/validate.ts';
+import { NewDecisionSchema, AutolinkConfigSchema } from '../lib/validators.ts';
 
 type BroadcastFn = (data: unknown) => void;
 
@@ -13,20 +15,37 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
     res.json(store.getLedger({ project: project as string, tag: tag as string, limit: parseInt(limit as string) || 50 }));
   });
 
+  // v4.8.0 #280 — auto-link similarity threshold config. GET reads the current
+  // server-persistent value (defaults to 0.55); PATCH stores a new value clamped
+  // to the slider range [0.4, 0.95]. Closes the long-pending UI ↔ server gap:
+  // the slider has existed since v4.5.10 but only persisted in localStorage and
+  // didn't drive `_semanticAutoLink`'s threshold. Now it does.
+  router.get('/autolink-config', (_req: Request, res: Response) => {
+    res.json(store.getAutolinkConfig());
+  });
+  router.patch('/autolink-config', (req: Request, res: Response) => {
+    // v4.8.0 #219 — Zod validation. semanticThreshold must be a number in [0.4, 0.95].
+    const body = validateBody(AutolinkConfigSchema, req, res);
+    if (!body) return;
+    res.json(store.setAutolinkConfig(body));
+  });
+
   // Record a decision
   router.post('/', (req: Request, res: Response) => {
-    const { decision, context, project, alternatives, tags } = req.body;
-    if (!decision?.trim()) return res.status(400).json({ error: 'Decision text required.' });
+    // v4.8.0 #219 — Zod validation. Decision text required; project + tags
+    // optional; alternatives must be string[] not string.
+    const body = validateBody(NewDecisionSchema, req, res);
+    if (!body) return;
 
     const entry = store.recordDecision({
-      decision,
-      context: context || '',
-      project: project || 'general',
-      alternatives: alternatives || [],
-      tags: tags || [],
+      decision: body.decision,
+      context: body.context || '',
+      project: body.project || 'general',
+      alternatives: body.alternatives || [],
+      tags: body.tags || [],
     });
 
-    const actEntry = store.addActivity('decision', `Decision recorded -- [${entry.project}] ${decision.slice(0, 60)}`);
+    const actEntry = store.addActivity('decision', `Decision recorded -- [${entry.project}] ${body.decision.slice(0, 60)}`);
     broadcast({ type: 'activity', payload: actEntry });
     res.status(201).json(entry);
   });

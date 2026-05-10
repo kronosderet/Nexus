@@ -1,5 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
+import { validateBody } from '../lib/validate.ts';
+import { NewSessionSchema } from '../lib/validators.ts';
 
 type BroadcastFn = (data: unknown) => void;
 
@@ -24,11 +26,24 @@ export function createSessionRoutes(store: NexusStore, broadcast: BroadcastFn) {
   });
 
   router.post('/', (req: Request, res: Response) => {
-    const { project, summary, decisions, blockers, files_touched, tags, completed_task_ids } = req.body;
-    if (!project || !summary) return res.status(400).json({ error: 'Project and summary required.' });
+    // v4.8.0 #219 — Zod validation. project + summary required (non-empty after
+    // trim); arrays must be string[] not arbitrary shapes.
+    const body = validateBody(NewSessionSchema, req, res);
+    if (!body) return;
 
-    const session = store.createSession({ project, summary, decisions, blockers, files_touched, tags, completed_task_ids });
-    const entry = store.addActivity('session', `Session logged -- [${project}] ${summary.slice(0, 60)}${summary.length > 60 ? '...' : ''}`);
+    // completed_task_ids isn't on the schema but the store accepts it; pass
+    // through from raw body so existing callers keep working.
+    const completed_task_ids = req.body?.completed_task_ids;
+    const session = store.createSession({
+      project: body.project,
+      summary: body.summary,
+      decisions: body.decisions,
+      blockers: body.blockers,
+      files_touched: body.files_touched,
+      tags: body.tags,
+      completed_task_ids,
+    });
+    const entry = store.addActivity('session', `Session logged -- [${body.project}] ${body.summary.slice(0, 60)}${body.summary.length > 60 ? '...' : ''}`);
     broadcast({ type: 'activity', payload: entry });
     broadcast({ type: 'session_created', payload: session });
     res.status(201).json(session);

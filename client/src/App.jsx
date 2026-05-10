@@ -1,21 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useWebSocket } from './hooks/useWebSocket.js';
 import Sidebar from './components/Sidebar.jsx';
-import SearchModal from './components/SearchModal.jsx';
-import Command from './modules/Command.jsx';
-import Pulse from './modules/Pulse.jsx';
-import Fleet from './modules/Fleet.jsx';
-import FuelModule from './modules/Fuel.jsx';
-import GraphModule from './modules/Graph.jsx';
-import Overseer from './modules/Overseer.jsx';
-import Log from './modules/Log.jsx';
-import Handover from './modules/Handover.jsx';
 import NexusProvider from './context/NexusProvider.jsx';
 import WelcomeScreen from './components/WelcomeScreen.jsx';
 import ToastOverlay from './components/ToastOverlay.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
-import ThoughtStackModal from './components/ThoughtStackModal.jsx';
-import ShortcutHelpModal from './components/ShortcutHelpModal.jsx';
+
+// v4.8.0 — code-split each dashboard module + the rarely-opened modals into
+// their own chunks via React.lazy. Pre-split the main bundle was 517.79kB
+// because every module shipped at startup even though the user only views
+// one at a time. Graph + Overseer are the heaviest (SVG layout, chat history);
+// splitting them off saves ~150kB from initial load. Suspense fallback uses
+// the same Cartographer "Scanning..." style as in-module loading states so
+// the swap is visually consistent.
+const Command   = lazy(() => import('./modules/Command.jsx'));
+const Pulse     = lazy(() => import('./modules/Pulse.jsx'));
+const Fleet     = lazy(() => import('./modules/Fleet.jsx'));
+const FuelModule = lazy(() => import('./modules/Fuel.jsx'));
+const GraphModule = lazy(() => import('./modules/Graph.jsx'));
+const Overseer  = lazy(() => import('./modules/Overseer.jsx'));
+const Log       = lazy(() => import('./modules/Log.jsx'));
+const Handover  = lazy(() => import('./modules/Handover.jsx'));
+const SearchModal = lazy(() => import('./components/SearchModal.jsx'));
+const ThoughtStackModal = lazy(() => import('./components/ThoughtStackModal.jsx'));
+const ShortcutHelpModal = lazy(() => import('./components/ShortcutHelpModal.jsx'));
 
 const MODULE_KEYS = ['command', 'pulse', 'fleet', 'fuel', 'graph', 'overseer', 'log', 'handover'];
 const MODULES = {
@@ -107,23 +115,43 @@ export default function App() {
                 (e.g. Log entries click-through to Command / Graph). Used in Log.jsx.
                 v4.4.5 #380 — second arg `options` carries hints for the destination
                 module (e.g. { graphView: 'visual', focusProject: 'Nexus' }). */}
-            <ActiveComponent ws={ws} onNavigate={handleNavigate} navOptions={navOptions} />
+            {/* v4.8.0 — Suspense boundary catches first-render of any lazy module.
+                Fallback matches the in-module loading states so the cross-fade reads
+                as "module thinking" rather than "broken page". */}
+            <Suspense fallback={
+              <div className="flex items-center gap-3 h-64 justify-center">
+                <div className="text-2xl animate-compass text-nexus-amber">◈</div>
+                <span className="font-mono text-sm text-nexus-text-dim">Loading {MODULES[activeModule].label}...</span>
+              </div>
+            }>
+              <ActiveComponent ws={ws} onNavigate={handleNavigate} navOptions={navOptions} />
+            </Suspense>
           </ErrorBoundary>
         </NexusProvider>
       </main>
-      <SearchModal
-        open={searchOpen}
-        onClose={() => setSearchOpen(false)}
-        onNavigate={handleSearchNavigate}
-      />
-      <ThoughtStackModal
-        open={thoughtsOpen}
-        onClose={() => setThoughtsOpen(false)}
-      />
-      <ShortcutHelpModal
-        open={helpOpen}
-        onClose={() => setHelpOpen(false)}
-      />
+      {/* v4.8.0 — modals lazy-loaded too. They mount only when opened, so the
+          import doesn't even fire until the user reaches for the modal. */}
+      <Suspense fallback={null}>
+        {searchOpen && (
+          <SearchModal
+            open={searchOpen}
+            onClose={() => setSearchOpen(false)}
+            onNavigate={handleSearchNavigate}
+          />
+        )}
+        {thoughtsOpen && (
+          <ThoughtStackModal
+            open={thoughtsOpen}
+            onClose={() => setThoughtsOpen(false)}
+          />
+        )}
+        {helpOpen && (
+          <ShortcutHelpModal
+            open={helpOpen}
+            onClose={() => setHelpOpen(false)}
+          />
+        )}
+      </Suspense>
       <ToastOverlay ws={ws} />
     </div>
   );

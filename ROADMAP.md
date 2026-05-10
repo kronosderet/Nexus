@@ -96,7 +96,31 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.7.9 (Tier-3 closeout — alternative centrality + burst-grouping · shipped 2026-05-10)
+## Current — v4.8.0 (Structural cleanup · shipped 2026-05-10)
+
+The v4.7.x arc shipped nine point releases — one big refactor (#217 four-part
+file split), two polish sweeps (Tier-4), and two Tier-3 closeouts. v4.8.0
+collects the **structural** debt that survived: server-persistent auto-link
+threshold (closing the long-pending UI ↔ server gap on `#280`), Zod
+validation at route boundaries (closing `#219` deferred from the v4.3.6
+audit), Vite bundle code-split (initial JS dropped 517kB → 232kB, a 55%
+reduction by lazy-loading every dashboard module + the modals), and
+`server/db/store.ts` migrations extracted into their own file (1752L → 1341L,
+−23%). Plus housekeeping: 10 misfiled cross-project tasks reassigned to
+their real homes, `#139` BACKLOG.md task closed as obsolete (the file was
+removed long ago).
+
+**Tier-3 deferred backlog: 0.** **Tier-4 polish backlog: 0.** **Both backlogs
+that v4.5.10 introduced are now empty.** What's left is forward work — fresh
+audits, whatever the next iteration of dashboard usage surfaces — and one
+optional structural item: the rest of `server/db/store.ts` (the auto-link
+helpers + read/write methods could split further, though the seams are less
+natural than migrations).
+
+**423 tests · 30 server endpoints · 29 MCP tools · no migrations · no
+breaking changes.**
+
+## Previous — v4.7.9 (Tier-3 closeout — alternative centrality + burst-grouping · shipped 2026-05-10)
 
 Closes the **last two** Tier-3 deferred items from v4.5.10. Centrality view
 gains betweenness (Brandes' algorithm) and eigenvector (power iteration with

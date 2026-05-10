@@ -342,18 +342,17 @@ function EdgeTypesList({ edgeTypes, graph, relatedBreakdown }) {
   );
 }
 
-// v4.5.10 #280 — auto-link similarity threshold setting. Stored in localStorage
-// so the preference survives reloads. Currently advisory — the server's
-// threshold is still hardcoded; this is a UI control that the future
-// /api/ledger/auto-link will read. For v4.5.10, the value is displayed on the
-// auto-link preview so users know what's in play and can plan for a future
-// server-side hookup. Exposing as a setting now beats shipping no surface.
+// v4.5.10 #280 — auto-link similarity threshold setting.
+// v4.8.0 — server-persistent now. The slider POSTs to /api/ledger/autolink-config
+// and `_semanticAutoLink` reads from store. localStorage is kept as an offline
+// fallback for the initial render before the server fetch lands. Default 0.55
+// (was 0.7) so the client matches the server baseline.
 const AUTOLINK_THRESHOLD_KEY = 'nexus:autolink:similarity';
-const AUTOLINK_THRESHOLD_DEFAULT = 0.7;
+const AUTOLINK_THRESHOLD_DEFAULT = 0.55;
 function getAutolinkThreshold() {
   const raw = typeof window !== 'undefined' ? window.localStorage.getItem(AUTOLINK_THRESHOLD_KEY) : null;
   const n = raw == null ? AUTOLINK_THRESHOLD_DEFAULT : parseFloat(raw);
-  return Number.isFinite(n) && n > 0 && n <= 1 ? n : AUTOLINK_THRESHOLD_DEFAULT;
+  return Number.isFinite(n) && n >= 0.4 && n <= 0.95 ? n : AUTOLINK_THRESHOLD_DEFAULT;
 }
 function setAutolinkThreshold(v) {
   if (typeof window !== 'undefined') window.localStorage.setItem(AUTOLINK_THRESHOLD_KEY, String(v));
@@ -418,8 +417,39 @@ function OverviewView({ graph, centrality, contradictions, holes, onSwitchView }
   // "actionable list" from the stat. When zero, card stays decorative.
   const orphansClickable = (holes?.totalOrphans || 0) > 0 && !!onSwitchView;
   // v4.5.10 #280 — threshold state + handler
+  // v4.8.0 — server-side persistent now. Initial value comes from localStorage
+  // (offline fallback) then a fetch reconciles with the canonical server value.
+  // Saves go to PATCH /api/ledger/autolink-config; localStorage keeps a mirror
+  // so a refresh before the fetch returns still shows the right value.
   const [threshold, setThreshold] = useState(getAutolinkThreshold());
-  const saveThreshold = (v) => { setAutolinkThreshold(v); setThreshold(v); };
+  const [thresholdSyncing, setThresholdSyncing] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/ledger/autolink-config')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled || !data) return;
+        const t = Number(data.semanticThreshold);
+        if (Number.isFinite(t) && t >= 0.4 && t <= 0.95) {
+          setThreshold(t);
+          setAutolinkThreshold(t); // mirror to localStorage
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  const saveThreshold = (v) => {
+    setAutolinkThreshold(v);
+    setThreshold(v);
+    setThresholdSyncing(true);
+    fetch('/api/ledger/autolink-config', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ semanticThreshold: v }),
+    })
+      .catch(() => {}) // server unreachable — UI value still applied locally
+      .finally(() => setThresholdSyncing(false));
+  };
   // Edge type breakdown
   const edgeTypes = {};
   for (const e of graph?.edges || []) edgeTypes[e.rel] = (edgeTypes[e.rel] || 0) + 1;
@@ -500,15 +530,16 @@ function OverviewView({ graph, centrality, contradictions, holes, onSwitchView }
       {/* Projects — v4.6.5 #281: sort-mode toggle (count desc default · alpha · count asc) */}
       <ByProjectPanel projects={projects} />
 
-      {/* v4.5.10 #280 — auto-link similarity threshold setting. UI-side for now;
-          localStorage persists the value. Future server hookup will read this. */}
+      {/* v4.5.10 #280 — auto-link similarity threshold setting.
+          v4.8.0 — server-persistent now. Slider PATCHes /api/ledger/autolink-config;
+          _semanticAutoLink reads the value at decision-record time. */}
       <div className="col-span-4 bg-nexus-surface border border-nexus-border rounded-xl p-4">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="min-w-0 flex-1">
             <span className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider">Auto-link similarity threshold</span>
             <p className="text-[10px] font-mono text-nexus-text-faint mt-1">
               Minimum semantic similarity for auto-linking two decisions. Higher = fewer but more confident links.
-              <span className="text-nexus-text-dim"> Currently advisory — auto-link previews will display this value; server hookup is queued.</span>
+              <span className="text-nexus-text-dim"> Drives the server's `_semanticAutoLink` cosine-similarity gate at decision-record time.</span>
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -520,9 +551,10 @@ function OverviewView({ graph, centrality, contradictions, holes, onSwitchView }
               value={threshold}
               onChange={(e) => saveThreshold(parseFloat(e.target.value))}
               className="w-32"
-              title={`threshold = ${threshold}`}
+              title={`threshold = ${threshold}${thresholdSyncing ? ' (saving…)' : ''}`}
             />
             <span className="text-xs font-mono text-nexus-amber tabular-nums w-10 text-right">{threshold.toFixed(2)}</span>
+            {thresholdSyncing && <span className="text-[9px] font-mono text-nexus-text-faint">syncing…</span>}
           </div>
         </div>
       </div>

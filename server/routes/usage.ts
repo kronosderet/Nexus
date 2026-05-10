@@ -2,6 +2,8 @@ import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
 import type { SessionTiming, UsageEntry, FuelConfig } from '../types.ts';
 import { getFuelConfig, setFuelConfig as saveFuelConfig, nowInTZ as configNowInTZ, getNextWeeklyReset as configGetNextWeeklyReset, PLAN_INFO } from '../lib/fuelConfig.ts';
+import { validate } from '../lib/validate.ts';
+import { NewUsageSchema } from '../lib/validators.ts';
 
 // v4.3.5 P1 — typed local shapes for this route.
 type BroadcastFn = (data: unknown) => void;
@@ -162,7 +164,14 @@ export function createUsageRoutes(store: NexusStore, broadcast: BroadcastFn) {
 
   // Log a usage data point
   router.post('/', (req: Request, res: Response) => {
-    const { session_percent, weekly_percent, sonnet_weekly_percent, extra_usage, note, reset_in_minutes, plan, timezone, weekly_reset_in_hours, weekly_reset_at } = req.body;
+    // v4.8.0 #219 — Zod validation. Type-checks numeric ranges (percents in
+    // [0,100], reset_in_minutes ≥ 0, plan in known enum), so the rest of the
+    // route can drop its manual NaN guards. Composite "at least one of session
+    // or weekly must be present" stays as a separate check below since Zod
+    // refinements would balloon the schema for one cross-field rule.
+    const result = validate(NewUsageSchema, req.body);
+    if (!result.ok) return res.status(400).json({ error: result.error, issues: result.issues });
+    const { session_percent, weekly_percent, sonnet_weekly_percent, extra_usage, note, reset_in_minutes, plan, timezone, weekly_reset_in_hours, weekly_reset_at } = result.data;
 
     if (session_percent == null && weekly_percent == null) {
       return res.status(400).json({ error: 'Provide session_percent and/or weekly_percent.' });
@@ -208,17 +217,13 @@ export function createUsageRoutes(store: NexusStore, broadcast: BroadcastFn) {
       startSession(reset_in_minutes);
     }
 
-    // Guard against NaN from non-numeric input (#163)
-    const parsedSession = session_percent != null ? Number(session_percent) : null;
-    const parsedWeekly = weekly_percent != null ? Number(weekly_percent) : null;
-    if ((parsedSession != null && isNaN(parsedSession)) || (parsedWeekly != null && isNaN(parsedWeekly))) {
-      return res.status(400).json({ error: 'session_percent and weekly_percent must be numbers.' });
-    }
+    // v4.8.0 #219 — Zod already guarantees these are numbers in [0,100] (or undefined),
+    // so the prior NaN/null gymnastics drop. Pass through directly.
     const entry = store.logUsage({
-      session_percent: parsedSession,
-      weekly_percent: parsedWeekly,
-      sonnet_weekly_percent: sonnet_weekly_percent != null ? Number(sonnet_weekly_percent) : undefined,
-      extra_usage: extra_usage != null ? !!extra_usage : undefined,
+      session_percent: session_percent ?? null,
+      weekly_percent: weekly_percent ?? null,
+      sonnet_weekly_percent,
+      extra_usage,
       note,
     });
 
