@@ -9,6 +9,148 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.7.9 — Tier-3 closeout (alternative centrality · log burst-grouping)
+
+Closes the **last two** Tier-3 deferred items from the v4.5.10 sweep.
+Centrality view gets Brandes' betweenness + power-iteration eigenvector
+metrics alongside degree; Log activity gets burst-grouping for bursty
+categories. With this, both Tier-3 and Tier-4 deferred backlogs are at
+**zero**.
+
+**416 tests (+14 new for the centrality algorithms) · 29 tools · no
+migrations · no breaking changes.**
+
+### Centrality: alternative ranking metrics (#301)
+
+The Centrality tab has shown only **degree centrality** since v3.x —
+"who has the most direct edges." That answers _hub-finding_, but two
+other classic metrics answer different questions:
+
+| Metric | Question it answers |
+|---|---|
+| **Degree** (default) | Who has the most direct connections? Hubs. |
+| **Betweenness** | Who sits on the most shortest paths between others? Bridges — removing them cuts the graph. |
+| **Eigenvector** | Who is connected to other influential nodes (recursively)? "Deep core" decisions. |
+
+Both new metrics computed once per `/api/impact/centrality` request over
+the full graph. Performance: ~400-decision graphs land well under 100ms
+(Brandes is O(V·E); power iteration converges in ~30-50 iterations for
+typical structure).
+
+**Server (`server/routes/impact.ts`):**
+
+- `computeBetweennessCentrality()` — Brandes' algorithm (Brandes 2001).
+  Per-source BFS to compute σ_sv (number of shortest paths) and
+  predecessor list, then dependency accumulation in reverse-BFS order.
+  Divide by 2 at end since each undirected pair counts twice.
+- `computeEigenvectorCentrality()` — power iteration with self-loop
+  shift. Pure A·x oscillates on bipartite graphs (consecutive iterates
+  flip between two shadows of the principal eigenvector — a star
+  converges to "everyone equal" rather than "center > leaves"). Adding
+  x_old to each iteration is equivalent to power-iterating (A + I) —
+  same principal eigenvector but eigenvalues shift from ±λ to 1±λ,
+  killing the bipartite sign flip. Standard NetworkX-style fix.
+- Each `centrality[]` entry now carries `betweenness` and `eigenvector`
+  fields.
+- Slice cap raised 20 → 50 so when the user toggles metric, the top-N
+  for that metric actually surfaces (a high-betweenness node may not be
+  in the degree top-20).
+- `?metric=total|betweenness|eigenvector` query param picks the sort key
+  (defaults to `total`).
+- New `_centralityInternals` export so tests can exercise the algorithms
+  directly without the Express harness.
+
+**Client (`client/src/modules/graph/CentralityView.jsx`):**
+
+- "Rank by:" toggle with three pills (Degree · Betweenness · Eigenvector).
+- Selection persisted in localStorage (`nexus.centrality.metric`).
+- Bar fill width + value column reflect the active metric, not just the
+  edge count. Bar color shifts amber → blue when an alternative metric
+  is active so it's visually obvious which view you're in.
+- Column header label tracks the active metric.
+
+**Tests:** new `tests/centralityAlgorithms.test.ts` (14 specs):
+
+- `buildUndirectedAdjacency` symmetry + empty handling
+- `computeBetweennessCentrality` — empty graph, no edges, two-node
+  endpoints, **star** (center has C(n,2) betweenness, leaves zero),
+  **path** (textbook value of 4 for the dead-center of a 5-path),
+  disconnected components.
+- `computeEigenvectorCentrality` — empty graph, no edges (zero vector),
+  two-node equality, **star** (center > leaves, leaves equal by
+  symmetry), L2-normalized 4-cycle.
+
+### Log: burst-grouping (#363)
+
+Bursty categories (Plotted at task-import time, Commit at deploy time,
+session-end auto-summaries) can stack 50+ rows in the same minute and
+bury substantive events. Burst-grouping collapses **≥3 consecutive
+same-type entries within 60s** into a single expandable row.
+
+**Heuristic:** segment per-day arrays after filtering. A burst:
+
+- Same `type` across all entries
+- Each consecutive pair within 60s of the next
+
+Singles render unchanged. Burst rows show: time-span (or single time if
+all within the same minute), type icon, count + label
+(`12× Plotted events bursting in 14:32-14:33`), expand/collapse chevron.
+Expanded state shows the underlying entries indented inside a
+left-border rule.
+
+**Toggle:** a "Group bursts" button sits next to the time-range chips
+(activity tab only). Default ON. State persisted in localStorage
+(`nexus.log.bursts`). Off → original firehose render.
+
+**Doesn't span date boundaries:** the segmenter operates on per-day
+arrays inside `groupedActivity`, so a burst can't cross "Today →
+Yesterday."
+
+### Files touched
+
+- `server/routes/impact.ts` — algorithm helpers (Brandes' +
+  power-iteration), `CentralityEntry` shape extension, `?metric=` sort,
+  slice 20 → 50, `_centralityInternals` export.
+- `client/src/modules/graph/CentralityView.jsx` — METRICS array, metric
+  toggle UI, sort + bar + value column wired to active metric, header
+  label tracks active metric, localStorage persistence.
+- `client/src/modules/Log.jsx` — `segmentBursts()` helper, burst toggle
+  + state, expanded-burst tracking, render loop processes segments
+  (single vs burst), expanded burst inlines entries with left-border.
+- `tests/centralityAlgorithms.test.ts` — NEW (14 specs).
+- `package.json`, `cli/package.json`, `mcpb/manifest.json` — version
+  bump 4.7.8 → 4.7.9.
+- `CHANGELOG.md`, `ROADMAP.md` — this entry.
+
+### What's next
+
+Both Tier-3 and Tier-4 deferred backlogs are at **zero**. Remaining
+roadmap items:
+
+1. **`server/db/store.ts` split** (~1700L) — last sizable monolith.
+   Less natural seams than the v4.7.x file splits; consider
+   extract-method-cluster as the first-pass approach.
+2. **Fresh audit pass** — same playbook that produced the v4.7.7 +
+   v4.7.8 sweeps; likely turns up a small batch of new tier-4-ish
+   items.
+3. **Vite bundle code-split** — 517.79kB warning persists. Lazy-load
+   Graph + Overseer modules would meaningfully shrink initial load.
+4. **Auto-link similarity threshold (#280) UI slider** — still doesn't
+   drive the server. Hookup is straightforward but queued.
+
+### Patterns codified
+
+- **Power iteration on bipartite graphs needs a self-loop shift.**
+  Documented in `computeEigenvectorCentrality` header.
+- **Algorithm + API in one file with a `_internals` export.** Keeps
+  routes self-contained while still letting tests reach in. Pattern is
+  now usable for any future graph-algorithm additions.
+- **Render-time segmentation for the activity stream.** Burst-grouping
+  doesn't change the data shape — singles and bursts are rendering
+  decisions, not store concepts. Mirrors how `formatDate`/sanitizeMessage
+  treat display-time as the right place for "imperfect data normalized
+  for the user."
+
 ## v4.7.8 — Tier-4 closeout (minimap · export · ambient telemetry)
 
 Closes the **last three** Tier-4 polish items deferred from v4.7.7. Graph

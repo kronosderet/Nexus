@@ -96,7 +96,27 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.7.8 (Tier-4 closeout — minimap, export, ambient telemetry · shipped 2026-05-09)
+## Current — v4.7.9 (Tier-3 closeout — alternative centrality + burst-grouping · shipped 2026-05-10)
+
+Closes the **last two** Tier-3 deferred items from v4.5.10. Centrality view
+gains betweenness (Brandes' algorithm) and eigenvector (power iteration with
+self-loop shift) ranking metrics alongside the existing degree default —
+each surfaces a different shape of "important" decision: hub vs bridge vs
+deep core. Server `/api/impact/centrality` accepts `?metric=` and returns
+all three values per row plus the requested sort. Log activity stream
+gains burst-grouping: ≥3 consecutive same-type events within 60s collapse
+into a single expandable row so bursty categories (Plotted, Commit) don't
+bury substantive events. Toggleable via a button next to the time-range
+chips, persisted in localStorage.
+
+**Tier-3 deferred backlog: 0.** **Tier-4 polish backlog: 0.** What's left
+across the roadmap is structural: the optional `server/db/store.ts` split
+(~1700L, last sizable monolith), and whatever a fresh audit pass turns up.
+
+**416 tests (+14 new for centrality algorithms) · 29 tools · no migrations
+· no breaking changes.**
+
+## Previous — v4.7.8 (Tier-4 closeout — minimap, export, ambient telemetry · shipped 2026-05-09)
 
 Closes the **last three** deferred Tier-4 polish items in a single sweep —
 Graph Visual minimap (`#336`), screenshot export with legend baked in

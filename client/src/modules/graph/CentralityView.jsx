@@ -32,6 +32,26 @@ function SortableHeader({ label, sortKey, currentKey, currentDir, onSort, classN
   );
 }
 
+// v4.7.9 #301 — metric persistence key. localStorage so a user's chosen
+// ranking metric survives reloads (graph audits often happen across multiple
+// sessions; toggling back to "betweenness" every time is friction).
+const METRIC_STORAGE_KEY = 'nexus.centrality.metric';
+const METRICS = [
+  { key: 'total',        label: 'Degree',       short: 'Edges',    tooltip: 'Number of direct edges per decision. Hub-finder.' },
+  { key: 'betweenness',  label: 'Betweenness',  short: 'Btw',      tooltip: 'How many shortest paths run through a node. Bridge-finder — high values mean removal cuts the graph.' },
+  { key: 'eigenvector',  label: 'Eigenvector',  short: 'Eigen',    tooltip: 'Recursive prestige — high if connected to other high-eigenvector nodes. Surfaces "deep core" decisions.' },
+];
+function readSavedMetric() {
+  try {
+    if (typeof window === 'undefined') return 'total';
+    const v = window.localStorage.getItem(METRIC_STORAGE_KEY);
+    return METRICS.some((m) => m.key === v) ? v : 'total';
+  } catch { return 'total'; }
+}
+function writeSavedMetric(m) {
+  try { if (typeof window !== 'undefined') window.localStorage.setItem(METRIC_STORAGE_KEY, m); } catch {}
+}
+
 export default function CentralityView({ data, onPickBlast, onPickVisual }) {
   // v4.4.3 #298 — pagination beyond the top-15 cap. Most users care about top hubs, but
   // scrolling through the long tail matters for orphan-hunting and validation work.
@@ -49,8 +69,16 @@ export default function CentralityView({ data, onPickBlast, onPickVisual }) {
   }, [data]);
   // v4.6.5 #303 — sortable columns. Default centrality desc (count of edges).
   // Click a header to switch sort key + flip direction.
-  const [sortKey, setSortKey] = useState('total');
+  // v4.7.9 #301 — sortKey now also accepts 'betweenness' / 'eigenvector' set via
+  // the metric toggle below. The ranking-metric toggle and the column-header
+  // sort write to the same key, so the bar and the active sort always agree.
+  const [sortKey, setSortKey] = useState(readSavedMetric);
   const [sortDir, setSortDir] = useState('desc');
+  const setMetric = (m) => {
+    setSortKey(m);
+    setSortDir('desc');
+    writeSavedMetric(m);
+  };
   const onSort = (key) => {
     if (sortKey === key) {
       setSortDir(d => d === 'desc' ? 'asc' : 'desc');
@@ -97,23 +125,69 @@ export default function CentralityView({ data, onPickBlast, onPickVisual }) {
       if (sortKey === 'id') return (a.id - b.id) * dir;
       if (sortKey === 'wow') return ((a.weeklyDelta ?? 0) - (b.weeklyDelta ?? 0)) * dir;
       if (sortKey === 'project') return ((a.project || '').localeCompare(b.project || '')) * dir;
+      // v4.7.9 #301 — alternative metrics
+      if (sortKey === 'betweenness') return ((a.betweenness ?? 0) - (b.betweenness ?? 0)) * dir;
+      if (sortKey === 'eigenvector') return ((a.eigenvector ?? 0) - (b.eigenvector ?? 0)) * dir;
       // default: total
       return ((a.total ?? 0) - (b.total ?? 0)) * dir;
     });
     return list;
   }, [data, projectFilter, sortKey, sortDir]);
 
+  // v4.7.9 #301 — derive max value of the active metric for normalized bars.
+  // Each metric has a different scale: degree counts integers, betweenness can
+  // run into the thousands, eigenvector is fractional 0..1. The bar uses
+  // (value/max) * 100 so any metric reads cleanly.
+  const activeMetric = METRICS.find((m) => m.key === sortKey) || METRICS[0];
+  const isAlternative = sortKey === 'betweenness' || sortKey === 'eigenvector';
+  const maxMetricValue = useMemo(() => {
+    if (!data?.centrality) return 1;
+    let m = 0;
+    for (const c of data.centrality) {
+      const v = c[activeMetric.key] ?? 0;
+      if (v > m) m = v;
+    }
+    return m || 1;
+  }, [data, activeMetric.key]);
+  const formatMetricValue = (v) => {
+    if (v == null) return '—';
+    if (sortKey === 'eigenvector') return v.toFixed(3);
+    if (sortKey === 'betweenness') return v < 10 ? v.toFixed(1) : String(Math.round(v));
+    return String(v);
+  };
+
   return (
     <div className="bg-nexus-surface border border-nexus-border rounded-xl p-5">
       <div className="flex items-baseline justify-between mb-3">
         <p className="text-xs font-mono text-nexus-text-faint">Avg {data?.averageConnections} connections per decision</p>
-        {/* v4.3.10 #295 — quick explainer so newcomers know what they're reading */}
+        {/* v4.3.10 #295 — quick explainer so newcomers know what they're reading.
+            v4.7.9 #301 — tooltip explains the active metric (toggle adjusts copy). */}
         <span
           className="text-[10px] font-mono text-nexus-text-faint cursor-help border-b border-dashed border-nexus-text-faint"
-          title="Centrality = number of edges (connections) per decision. High-centrality decisions are architectural hubs — changing them affects a lot. This ranks by degree centrality."
+          title={`Centrality ranks decisions by structural importance. Active metric: ${activeMetric.label} — ${activeMetric.tooltip}`}
         >
           what&rsquo;s this?
         </span>
+      </div>
+      {/* v4.7.9 #301 — ranking-metric toggle. Three classic centrality measures
+          surface different "important" nodes: degree (hubs), betweenness (bridges),
+          eigenvector (deep core). Selection persisted in localStorage. */}
+      <div className="flex items-center gap-1.5 flex-wrap mb-3">
+        <span className="text-[9px] font-mono text-nexus-text-faint mr-1 uppercase tracking-wider">Rank by:</span>
+        {METRICS.map((m) => (
+          <button
+            key={m.key}
+            onClick={() => { setMetric(m.key); setPage(15); }}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-mono border transition-colors ${
+              sortKey === m.key
+                ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/30'
+                : 'text-nexus-text-faint border-nexus-border hover:text-nexus-text'
+            }`}
+            title={m.tooltip}
+          >
+            {m.label}
+          </button>
+        ))}
       </div>
       {/* v4.7.7 #304 — auto-generated insight callout on top-N project distribution.
           Rotates as graph structure shifts (recomputes from current data). */}
@@ -149,12 +223,13 @@ export default function CentralityView({ data, onPickBlast, onPickVisual }) {
           ))}
         </div>
       )}
-      {/* v4.3.10 #293 + v4.5.10 #300/#302 + v4.6.5 #303 — sortable column headers */}
+      {/* v4.3.10 #293 + v4.5.10 #300/#302 + v4.6.5 #303 — sortable column headers
+          v4.7.9 #301 — value-column header reflects the active metric short label */}
       <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-nexus-border">
         <span className="w-1 shrink-0" />{/* color bar spacer */}
         <SortableHeader label="ID" sortKey="id" currentKey={sortKey} currentDir={sortDir} onSort={onSort} className="w-8" title="Sort by decision ID" />
-        <SortableHeader label="Centrality" sortKey="total" currentKey={sortKey} currentDir={sortDir} onSort={onSort} className="flex-1" title="Sort by edge count (default)" />
-        <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-6 text-right">Edges</span>
+        <SortableHeader label={activeMetric.label} sortKey={activeMetric.key} currentKey={sortKey} currentDir={sortDir} onSort={onSort} className="flex-1" title={activeMetric.tooltip} />
+        <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-10 text-right" title={activeMetric.tooltip}>{activeMetric.short}</span>
         <SortableHeader label="WoW" sortKey="wow" currentKey={sortKey} currentDir={sortDir} onSort={onSort} className="w-10 text-right" title="Sort by week-over-week edge delta" />
         <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-12" title="Edge types: typed (amber) · keyword-auto (cyan) · semantic-auto (purple) · manual (gray)">Types</span>
         <span className="text-[9px] font-mono text-nexus-text-faint uppercase tracking-wider w-48">Decision</span>
@@ -179,13 +254,21 @@ export default function CentralityView({ data, onPickBlast, onPickVisual }) {
               title={`Open Blast Radius for this decision${c.project ? ` · project: ${c.project}` : ''}`}
             >
               <span className="text-xs font-mono text-nexus-text-faint w-8">#{c.id}</span>
+              {/* v4.7.9 #301 — bar reflects the active ranking metric, not just degree */}
               <div className="flex-1 h-2 bg-nexus-bg rounded-full">
-                <div className="h-full bg-nexus-amber/60 rounded-full" style={{ width: `${Math.min(100, c.total * 5)}%` }} />
+                <div
+                  className={`h-full rounded-full ${isAlternative ? 'bg-nexus-blue/60' : 'bg-nexus-amber/60'}`}
+                  style={{ width: `${Math.min(100, ((c[activeMetric.key] ?? 0) / maxMetricValue) * 100)}%` }}
+                />
               </div>
               <span
-                className="text-xs font-mono text-nexus-text-dim w-6 text-right"
-                title={`${c.total} edge${c.total !== 1 ? 's' : ''} in the knowledge graph`}
-              >{c.total}</span>
+                className="text-xs font-mono text-nexus-text-dim w-10 text-right tabular-nums"
+                title={
+                  isAlternative
+                    ? `${activeMetric.label}: ${formatMetricValue(c[activeMetric.key])} · ${c.total} direct edge${c.total !== 1 ? 's' : ''}`
+                    : `${c.total} edge${c.total !== 1 ? 's' : ''} in the knowledge graph`
+                }
+              >{isAlternative ? formatMetricValue(c[activeMetric.key]) : c.total}</span>
               {/* v4.5.10 #302 — WoW delta chip. Shows +/− vs 7d ago. Muted when 0. */}
               {c.weeklyDelta != null && (
                 <span

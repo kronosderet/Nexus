@@ -318,6 +318,67 @@ export default function Log({ onNavigate }) {
     return grouped;
   }, [filteredActivity]);
 
+  // v4.7.9 #363 — burst-grouping toggle + expansion state. Bursty categories
+  // (Plotted at task-import time, Commit at deploy time) can stack 50+ rows in
+  // the same minute and bury substantive events. Grouping collapses ≥3
+  // consecutive same-type entries within a 60s window into a single row that
+  // expands on click. Toggleable so the firehose is still one click away.
+  // Persisted in localStorage so the user's preference survives reloads.
+  const BURST_MIN = 3;
+  const BURST_GAP_MS = 60_000;
+  const BURST_KEY = 'nexus.log.bursts';
+  const [burstsEnabled, setBurstsEnabled] = useState(() => {
+    try { return typeof localStorage !== 'undefined' ? localStorage.getItem(BURST_KEY) !== '0' : true; }
+    catch { return true; }
+  });
+  const toggleBursts = () => {
+    setBurstsEnabled((v) => {
+      const next = !v;
+      try { if (typeof localStorage !== 'undefined') localStorage.setItem(BURST_KEY, next ? '1' : '0'); } catch {}
+      return next;
+    });
+  };
+  const [expandedBursts, setExpandedBursts] = useState(() => new Set());
+  const toggleBurstExpanded = (key) => {
+    setExpandedBursts((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  // v4.7.9 #363 — segment a chronologically-sorted list of activity entries
+  // into "single" rows + "burst" groups. Bursts: BURST_MIN+ consecutive
+  // entries of the same type, each within BURST_GAP_MS of its neighbor. The
+  // segmenter doesn't reach across date-group boundaries because it operates
+  // on per-day arrays inside the groupedActivity map.
+  function segmentBursts(items) {
+    if (!burstsEnabled || items.length < BURST_MIN) {
+      return items.map((entry) => ({ kind: 'single', entry }));
+    }
+    const out = [];
+    let i = 0;
+    while (i < items.length) {
+      let j = i;
+      while (j + 1 < items.length) {
+        const a = items[j];
+        const b = items[j + 1];
+        if (a.type !== b.type) break;
+        const gap = Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        if (gap > BURST_GAP_MS) break;
+        j++;
+      }
+      const span = j - i + 1;
+      if (span >= BURST_MIN) {
+        out.push({ kind: 'burst', entries: items.slice(i, j + 1), type: items[i].type });
+      } else {
+        for (let k = i; k <= j; k++) out.push({ kind: 'single', entry: items[k] });
+      }
+      i = j + 1;
+    }
+    return out;
+  }
+
   const loading = tab === 'activity' ? loadingA : loadingS;
 
   return (
@@ -402,6 +463,18 @@ export default function Log({ onNavigate }) {
             ))}
             {/* v4.5.10 #361 — export buttons. Only on activity tab (sessions export
                 is a future follow-up). Exports filteredActivityAll (respects filters). */}
+            {/* v4.7.9 #363 — burst-grouping toggle. On by default; collapses ≥3
+                consecutive same-type entries within 60s into a single expandable
+                row so bursty categories don't bury substantive events. */}
+            {tab === 'activity' && (
+              <button
+                onClick={toggleBursts}
+                className={`text-[10px] font-mono px-2 py-1 rounded border transition-colors ${burstsEnabled ? 'bg-nexus-amber/10 text-nexus-amber border-nexus-amber/30' : 'text-nexus-text-faint border-nexus-border hover:text-nexus-text'}`}
+                title={burstsEnabled ? 'Burst-grouping ON — ≥3 same-type events within 60s collapse into one expandable row. Click to disable.' : 'Burst-grouping OFF — every event renders as its own row. Click to re-enable.'}
+              >
+                {burstsEnabled ? '◆ Group bursts' : 'Group bursts'}
+              </button>
+            )}
             {tab === 'activity' && filteredActivityAll.length > 0 && (
               <span className="ml-auto flex items-center gap-1">
                 <span className="text-[9px] font-mono text-nexus-text-faint">Export:</span>
@@ -525,47 +598,85 @@ export default function Log({ onNavigate }) {
             {/* v4.4.1 #356 — Load-more footer. Renders below the day groups once there
                 are more filtered entries than currently visible. Simple pagination
                 growing client-side slice. */}
-            {Object.entries(groupedActivity).map(([date, items]) => (
+            {Object.entries(groupedActivity).map(([date, items]) => {
+              // v4.7.9 #363 — segment items into singles + bursts before rendering
+              const segments = segmentBursts(items);
+              return (
               <div key={date}>
                 <div className="text-xs font-mono text-nexus-text-faint uppercase tracking-wider mb-2 sticky top-0 bg-nexus-bg py-1">{date}</div>
                 <div className="space-y-1">
-                  {items.map((entry, i) => {
-                    const config = TYPE_CONFIG[entry.type] || TYPE_CONFIG.system;
-                    const Icon = config.icon;
-                    // v4.4.1 #354 — click-through: types with a `module` map navigate on click.
-                    // Types with `module: null` (system, error, file_change, etc.) stay read-only.
-                    const clickable = !!(config.module && onNavigate);
-                    const Tag = clickable ? 'button' : 'div';
-                    const onClick = clickable ? () => onNavigate(config.module) : undefined;
-                    // v4.4.3 #359 — expand-on-click for truncated messages. If message is
-                    // long enough to visually truncate (>~120 chars), show an expandable state.
-                    // Non-navigation entries become the expand toggle; navigation entries
-                    // still navigate on primary click but have a native tooltip with full text.
-                    const MSG_TRUNC = 120;
-                    const cleanMessage = sanitizeMessage(entry.message || '');
-                    const isLong = cleanMessage.length > MSG_TRUNC;
-                    // v4.5.0 — per-row stagger on reveal (cap at 100ms total so
-                    // long lists don't feel sluggish). New WS arrivals get an
-                    // amber flash on top of the reveal.
-                    const delay = Math.min(i * 18, 100);
-                    const wsClass = isNewActivity(entry.id) ? ' animate-ws-flash' : '';
-                    return (
-                      <Tag
-                        key={entry.id}
-                        {...(clickable ? { onClick, type: 'button' } : {})}
-                        className={`flex items-start gap-3 py-2 px-3 rounded-lg transition-colors w-full text-left animate-row-reveal${wsClass} ${clickable ? 'hover:bg-nexus-surface cursor-pointer' : 'hover:bg-nexus-surface/50'}`}
-                        style={{ animationDelay: `${delay}ms` }}
-                        title={clickable ? `Click to open ${config.module}` : (isLong ? cleanMessage : undefined)}
-                      >
-                        <span className="text-xs font-mono text-nexus-text-faint w-12 pt-0.5 shrink-0">{formatTime(entry.created_at)}</span>
-                        <Icon size={14} className={`${config.color} mt-0.5 shrink-0`} />
-                        <span className="text-sm text-nexus-text-dim">{cleanMessage}</span>
-                      </Tag>
-                    );
-                  })}
+                  {(() => {
+                    // Local renderer so single + expanded-burst entries share the same row markup
+                    const renderEntry = (entry, i, indent = false) => {
+                      const config = TYPE_CONFIG[entry.type] || TYPE_CONFIG.system;
+                      const Icon = config.icon;
+                      const clickable = !!(config.module && onNavigate);
+                      const Tag = clickable ? 'button' : 'div';
+                      const onClick = clickable ? () => onNavigate(config.module) : undefined;
+                      const MSG_TRUNC = 120;
+                      const cleanMessage = sanitizeMessage(entry.message || '');
+                      const isLong = cleanMessage.length > MSG_TRUNC;
+                      const delay = Math.min(i * 18, 100);
+                      const wsClass = isNewActivity(entry.id) ? ' animate-ws-flash' : '';
+                      return (
+                        <Tag
+                          key={entry.id}
+                          {...(clickable ? { onClick, type: 'button' } : {})}
+                          className={`flex items-start gap-3 py-2 ${indent ? 'pl-8 pr-3' : 'px-3'} rounded-lg transition-colors w-full text-left animate-row-reveal${wsClass} ${clickable ? 'hover:bg-nexus-surface cursor-pointer' : 'hover:bg-nexus-surface/50'}`}
+                          style={{ animationDelay: `${delay}ms` }}
+                          title={clickable ? `Click to open ${config.module}` : (isLong ? cleanMessage : undefined)}
+                        >
+                          <span className="text-xs font-mono text-nexus-text-faint w-12 pt-0.5 shrink-0">{formatTime(entry.created_at)}</span>
+                          <Icon size={14} className={`${config.color} mt-0.5 shrink-0`} />
+                          <span className="text-sm text-nexus-text-dim">{cleanMessage}</span>
+                        </Tag>
+                      );
+                    };
+                    // v4.7.9 #363 — segments are either single entries or burst groups.
+                    // Bursts render as a compact summary row with click-to-expand;
+                    // expanded state shows the underlying entries inline.
+                    return segments.map((seg, segIdx) => {
+                      if (seg.kind === 'single') {
+                        return renderEntry(seg.entry, segIdx);
+                      }
+                      const burstKey = `${date}::${seg.entries[0].id}-${seg.entries[seg.entries.length - 1].id}`;
+                      const isExpanded = expandedBursts.has(burstKey);
+                      const config = TYPE_CONFIG[seg.type] || TYPE_CONFIG.system;
+                      const Icon = config.icon;
+                      const first = seg.entries[0];
+                      const last = seg.entries[seg.entries.length - 1];
+                      const timeSpan = formatTime(last.created_at) === formatTime(first.created_at)
+                        ? formatTime(first.created_at)
+                        : `${formatTime(first.created_at)}–${formatTime(last.created_at)}`;
+                      return (
+                        <div key={burstKey} className="space-y-1">
+                          <button
+                            type="button"
+                            onClick={() => toggleBurstExpanded(burstKey)}
+                            aria-expanded={isExpanded}
+                            className="flex items-start gap-3 py-2 px-3 rounded-lg transition-colors w-full text-left bg-nexus-surface/30 hover:bg-nexus-surface border border-dashed border-nexus-border/60 cursor-pointer"
+                            title={`${seg.entries.length} ${config.label} events within 60s — click to ${isExpanded ? 'collapse' : 'expand'}`}
+                          >
+                            <span className="text-xs font-mono text-nexus-text-faint w-12 pt-0.5 shrink-0">{timeSpan}</span>
+                            <Icon size={14} className={`${config.color} mt-0.5 shrink-0`} />
+                            <span className="text-sm text-nexus-text-dim flex-1">
+                              {isExpanded ? '▾' : '▸'} <span className="font-mono">{seg.entries.length}× {config.label}</span> events bursting in {timeSpan}
+                            </span>
+                            <span className="text-[9px] font-mono text-nexus-text-faint pt-1 shrink-0">{isExpanded ? 'collapse' : 'expand'}</span>
+                          </button>
+                          {isExpanded && (
+                            <div className="space-y-1 border-l border-nexus-border/40 ml-4 pl-2">
+                              {seg.entries.map((e, idx) => renderEntry(e, idx, true))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
-            ))}
+              );
+            })}
             {/* v4.4.1 #356 — Load-more button appears when there are more entries than shown */}
             {filteredActivity.length < filteredActivityAll.length && (
               <div className="flex justify-center pt-4">

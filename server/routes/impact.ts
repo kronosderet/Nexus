@@ -44,6 +44,13 @@ interface CentralityEntry {
   weeklyDelta?: number;
   // v4.5.10 #300 — edge-type breakdown
   byType?: { typed: number; keyword: number; semantic: number; manual: number };
+  // v4.7.9 #301 — alternative ranking metrics. `total` answers "who has the most
+  // direct connections" (degree). These two answer different questions:
+  //   betweenness — who sits on the most shortest paths (a removal cuts the graph)
+  //   eigenvector — who is connected to other influential nodes (recursive prestige)
+  // Both computed undirected; values rounded for display.
+  betweenness?: number;
+  eigenvector?: number;
 }
 
 // Minimal shapes for the LM Studio /models and /messages responses used by /forecast.
@@ -244,6 +251,13 @@ export function createImpactRoutes(store: NexusStore) {
       return 'manual';
     };
 
+    // v4.7.9 #301 — alternative ranking metrics computed once over the full graph.
+    // Brandes' algorithm for betweenness; power iteration for eigenvector. Both
+    // operate on the undirected adjacency. ~400-node graphs land in well under
+    // 100ms even in the worst case (Brandes is O(V·E)).
+    const betweennessMap = computeBetweennessCentrality(decisions, edges);
+    const eigenvectorMap = computeEigenvectorCentrality(decisions, edges);
+
     const centrality: CentralityEntry[] = decisions.map((d: Decision) => {
       const incidentNow = edges.filter((e: GraphEdge) => e.from === d.id || e.to === d.id);
       const incidentPrior = edgesAsOfWeekAgo.filter((e: GraphEdge) => e.from === d.id || e.to === d.id);
@@ -265,17 +279,30 @@ export function createImpactRoutes(store: NexusStore) {
         weeklyDelta: total - incidentPrior.length,
         // v4.5.10 #300 — per-row edge-type breakdown
         byType,
+        // v4.7.9 #301 — alternative metrics. Betweenness rounded to 1 decimal,
+        // eigenvector to 4 (small fractional values after L2 normalization).
+        betweenness: Math.round((betweennessMap[d.id] ?? 0) * 10) / 10,
+        eigenvector: Math.round((eigenvectorMap[d.id] ?? 0) * 10000) / 10000,
       };
     });
 
-    centrality.sort((a, b) => b.total - a.total);
+    // v4.7.9 #301 — ?metric=total|betweenness|eigenvector picks the sort key.
+    // Slice cap raised 20 → 50 so when the user toggles metric, the top-N for
+    // that metric actually surfaces (a high-betweenness node may not be in the
+    // degree top-20). Client-side pagination already handles 50 rows.
+    const requested = String(req.query.metric || 'total').toLowerCase();
+    const validMetrics = new Set(['total', 'betweenness', 'eigenvector']);
+    const sortMetric = validMetrics.has(requested) ? (requested as 'total' | 'betweenness' | 'eigenvector') : 'total';
+    centrality.sort((a, b) => (b[sortMetric] ?? 0) - (a[sortMetric] ?? 0));
     const avg = centrality.reduce((s, c) => s + c.total, 0) / (centrality.length || 1);
 
     res.json({
-      centrality: centrality.slice(0, 20),
+      centrality: centrality.slice(0, 50),
       averageConnections: Math.round(avg * 10) / 10,
       mostCentral: centrality[0] || null,
       leastCentral: centrality[centrality.length - 1] || null,
+      // v4.7.9 #301 — surfaces what the server sorted by so the UI can show it
+      sortMetric,
     });
   });
 
@@ -529,6 +556,147 @@ export function createImpactRoutes(store: NexusStore) {
 
   return router;
 }
+
+// v4.7.9 #301 — build undirected adjacency once. Both centrality algorithms
+// operate on the same shape; co-locating the construction makes the cost of a
+// second metric "compute on the same adjacency, not rebuild it" if a third
+// metric ever wants in.
+function buildUndirectedAdjacency(decisions: Decision[], edges: GraphEdge[]): Map<number, number[]> {
+  const adj = new Map<number, number[]>();
+  for (const d of decisions) adj.set(d.id, []);
+  for (const e of edges) {
+    if (adj.has(e.from)) adj.get(e.from)!.push(e.to);
+    if (adj.has(e.to)) adj.get(e.to)!.push(e.from);
+  }
+  return adj;
+}
+
+// v4.7.9 #301 — Brandes' algorithm for betweenness centrality on unweighted
+// undirected graphs (Brandes 2001). For each source s: BFS to compute σ_sv
+// (number of shortest paths) and the predecessor list, then accumulate
+// dependency δ in reverse-BFS order. Each node's betweenness sums δ contributions
+// across all sources. Divide by 2 at the end since each undirected pair is
+// traversed twice. O(V·E) overall — scales fine for ~400-node graphs.
+function computeBetweennessCentrality(decisions: Decision[], edges: GraphEdge[]): Record<number, number> {
+  const adj = buildUndirectedAdjacency(decisions, edges);
+  const between: Record<number, number> = {};
+  for (const d of decisions) between[d.id] = 0;
+
+  for (const s of decisions) {
+    const stack: number[] = [];
+    const pred = new Map<number, number[]>();
+    const sigma = new Map<number, number>();
+    const dist = new Map<number, number>();
+    for (const d of decisions) {
+      pred.set(d.id, []);
+      sigma.set(d.id, 0);
+      dist.set(d.id, -1);
+    }
+    sigma.set(s.id, 1);
+    dist.set(s.id, 0);
+    const queue: number[] = [s.id];
+    while (queue.length > 0) {
+      const v = queue.shift()!;
+      stack.push(v);
+      const dv = dist.get(v)!;
+      const sigmaV = sigma.get(v)!;
+      for (const w of adj.get(v) || []) {
+        if (dist.get(w) === -1) {
+          queue.push(w);
+          dist.set(w, dv + 1);
+        }
+        if (dist.get(w) === dv + 1) {
+          sigma.set(w, (sigma.get(w) || 0) + sigmaV);
+          pred.get(w)!.push(v);
+        }
+      }
+    }
+    const delta = new Map<number, number>();
+    for (const d of decisions) delta.set(d.id, 0);
+    while (stack.length > 0) {
+      const w = stack.pop()!;
+      const sigmaW = sigma.get(w) || 0;
+      const deltaW = delta.get(w)!;
+      for (const v of pred.get(w) || []) {
+        const sigmaV = sigma.get(v) || 0;
+        const inc = sigmaW > 0 ? (sigmaV / sigmaW) * (1 + deltaW) : 0;
+        delta.set(v, (delta.get(v) || 0) + inc);
+      }
+      if (w !== s.id) between[w] = (between[w] || 0) + (delta.get(w) || 0);
+    }
+  }
+  // Undirected — each pair counted twice, divide by 2.
+  for (const id in between) between[id] = between[id] / 2;
+  return between;
+}
+
+// v4.7.9 #301 — eigenvector centrality via power iteration with a self-loop
+// shift. Pure A·x oscillates on bipartite graphs (the eigenvector of A has a
+// matching −eigenvalue twin, so consecutive iterates flip between the two
+// shadows of the true principal eigenvector — visibly: a star graph converges
+// to "everyone equal" rather than "center > leaves"). Adding x_old to each
+// iteration is equivalent to power-iterating (A+I) — same principal eigen-
+// vector, but eigenvalues shift from ±λ to 1±λ, killing the bipartite sign
+// flip. Standard fix; matches NetworkX behavior on small graphs.
+//
+// Disconnected nodes still get 0 — their column in (A+I)·x has only the
+// self-contribution, which falls out under L2 normalization once any
+// connected component dominates. Edge-case: completely empty graph (no
+// edges at all) collapses to the zero vector explicitly.
+function computeEigenvectorCentrality(decisions: Decision[], edges: GraphEdge[]): Record<number, number> {
+  const adj = buildUndirectedAdjacency(decisions, edges);
+  const ids = decisions.map((d) => d.id);
+  if (ids.length === 0) return {};
+
+  // Edge case: no edges at all → meaningless to rank by "connected to influence."
+  // Return the zero vector explicitly rather than the initial all-ones.
+  if (edges.length === 0) {
+    const out: Record<number, number> = {};
+    for (const id of ids) out[id] = 0;
+    return out;
+  }
+
+  const x = new Map<number, number>();
+  for (const id of ids) x.set(id, 1);
+  const MAX_ITER = 100;
+  const TOL = 1e-6;
+  for (let iter = 0; iter < MAX_ITER; iter++) {
+    const xNew = new Map<number, number>();
+    for (const id of ids) {
+      // Self-loop shift: x_new[i] = x_old[i] + Σ x_old[neighbor].
+      // Equivalent to power-iterating (A + I); breaks bipartite oscillation.
+      let sum = x.get(id) || 0;
+      for (const w of adj.get(id) || []) sum += x.get(w) || 0;
+      xNew.set(id, sum);
+    }
+    let normSq = 0;
+    for (const id of ids) {
+      const v = xNew.get(id) || 0;
+      normSq += v * v;
+    }
+    const norm = Math.sqrt(normSq);
+    if (norm === 0) break;
+    let diff = 0;
+    for (const id of ids) {
+      const next = (xNew.get(id) || 0) / norm;
+      diff += Math.abs(next - (x.get(id) || 0));
+      x.set(id, next);
+    }
+    if (diff < TOL) break;
+  }
+  const out: Record<number, number> = {};
+  for (const id of ids) out[id] = x.get(id) || 0;
+  return out;
+}
+
+// v4.7.9 #301 — re-export so tests can exercise the algorithms directly without
+// spinning up the Express harness. Keeps the route file as both the algorithm
+// home and the API surface.
+export const _centralityInternals = {
+  buildUndirectedAdjacency,
+  computeBetweennessCentrality,
+  computeEigenvectorCentrality,
+};
 
 // Follow directed edges (led_to, depends_on) downstream
 function traverseDirected(store: NexusStore, startId: number, edgeTypes: string[], maxDepth = 4): AffectedDecision[] {
