@@ -34,7 +34,10 @@ interface EmbedCacheEntry { vec: number[]; ts: number }
 type EmbedCache = Record<string, EmbedCacheEntry>;
 interface EmbeddingResponse { data?: Array<{ embedding?: number[] }> }
 
-export function createSmartSearchRoutes(store: NexusStore, embedCache: EmbedCache) {
+// v4.8.1 #drift — default embedCache to a fresh empty record so callers that
+// don't manage one (e.g. dashboard.ts) can omit the second arg. Per-process
+// cache is fine; the dashboard creates one router instance.
+export function createSmartSearchRoutes(store: NexusStore, embedCache: EmbedCache = {}) {
   const router = Router();
 
   router.get('/', async (req: Request, res: Response) => {
@@ -105,6 +108,8 @@ function buildCorpus(store: NexusStore): CorpusItem[] {
       id: t.id,
       text: `${t.title} ${t.description}`,
       display: `[${t.status}] ${t.title}`,
+      // v4.8.1 #drift — task.project is optional; coalesce so CorpusItem.project (string) holds.
+      project: t.project ?? '',
       date: t.created_at,
     });
   }
@@ -117,6 +122,7 @@ function buildCorpus(store: NexusStore): CorpusItem[] {
       id: a.id,
       text: a.message,
       display: a.message,
+      project: '',
       date: a.created_at,
     });
   }
@@ -129,6 +135,7 @@ function buildCorpus(store: NexusStore): CorpusItem[] {
       id: p.id,
       text: `${p.name} ${p.content.slice(0, 500)}`,
       display: p.name,
+      project: '',
       date: p.updated_at,
     });
   }

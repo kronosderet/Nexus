@@ -244,7 +244,7 @@ export async function localApiFetch(path: string, init: LocalApiInit = {}): Prom
     const typeFilter = params.get('type');
     const index = scanCCMemories(limit * 2);
     return typeFilter
-      ? { ...index, memories: index.memories.filter((m: MemoryEntryLike) => m.type === typeFilter).slice(0, limit) }
+      ? { ...index, memories: index.memories.filter((m) => m.type === typeFilter).slice(0, limit) }
       : { ...index, memories: index.memories.slice(0, limit) };
   }
 
@@ -302,11 +302,14 @@ export async function localApiFetch(path: string, init: LocalApiInit = {}): Prom
     const tasks = store.getAllTasks();
     const usage = store.getLatestUsage();
     const risks: RiskItem[] = [];
+    // v4.8.1 #drift — RiskItem requires `category` + `message` + `level`. Prior
+    // pushes omitted category which tsc rejected. Adding the canonical 'fuel'
+    // category since that's what these warnings track.
     if (usage?.weekly_percent != null && usage.weekly_percent <= 10) {
-      risks.push({ level: 'warning', message: `Weekly Claude usage at ${usage.weekly_percent}% — ration carefully` });
+      risks.push({ level: 'warning', category: 'fuel', message: `Weekly Claude usage at ${usage.weekly_percent}% — ration carefully` });
     }
     if (usage?.session_percent != null && usage.session_percent <= 15) {
-      risks.push({ level: 'warning', message: `Session fuel low (${usage.session_percent}%) — consider wrapping up` });
+      risks.push({ level: 'warning', category: 'fuel', message: `Session fuel low (${usage.session_percent}%) — consider wrapping up` });
     }
     return { risks };
   }

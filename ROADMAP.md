@@ -96,7 +96,21 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.8.0 (Structural cleanup · shipped 2026-05-10)
+## Current — v4.8.1 (Audit-driven type drift cleanup · shipped 2026-05-10)
+
+Post-release patch following the v4.8.0 audit pass. Five drift findings
+addressed: 39 of 49 TypeScript errors fixed (down to 10, all pre-existing
+AIConnection-family drift the handover keeps marked as untouched), the
+plugin manifest version that had been silently stuck at 4.1.0 since release
+caught up, and `versionDrift.test.ts` now scans the plugin manifest so the
+same kind of drift can't accumulate again. Audit also confirmed: 0 TODO /
+FIXME / HACK markers in source, doc test/tool counts (423 / 29) in sync,
+plugin surface complete (9 skills, 3 lifecycle hooks, MCPB stdio server).
+
+**No code-behavior changes — all functional tests still 423/423 green.** Type
+drift cleanup, version drift fix, and one new drift-guard test (424 total).
+
+## Previous — v4.8.0 (Structural cleanup · shipped 2026-05-10)
 
 The v4.7.x arc shipped nine point releases — one big refactor (#217 four-part
 file split), two polish sweeps (Tier-4), and two Tier-3 closeouts. v4.8.0

@@ -33,6 +33,12 @@ describe('version drift guard (v4.3.7 F1c)', () => {
   const manifest = readJson<{ version: string; tools: Array<{ name: string }> }>(
     join(REPO, 'mcpb', 'manifest.json')
   );
+  // v4.8.1 — plugin/.claude-plugin/plugin.json is loaded by Claude Code when
+  // the plugin is installed. Pre-v4.8.1 it sat at 4.1.0 unnoticed because no
+  // test scanned it. Including it here turns drift into a CI failure.
+  const pluginManifest = readJson<{ version: string }>(
+    join(REPO, 'plugin', '.claude-plugin', 'plugin.json')
+  );
 
   it('root package.json version is non-empty semver-ish', () => {
     expect(rootPkg.version).toMatch(/^\d+\.\d+\.\d+/);
@@ -44,6 +50,10 @@ describe('version drift guard (v4.3.7 F1c)', () => {
 
   it('mcpb/manifest.json version matches root', () => {
     expect(manifest.version).toBe(rootPkg.version);
+  });
+
+  it('plugin/.claude-plugin/plugin.json version matches root (v4.8.1 #drift)', () => {
+    expect(pluginManifest.version).toBe(rootPkg.version);
   });
 
   it('server/lib/version.ts exports version matching root package.json', async () => {

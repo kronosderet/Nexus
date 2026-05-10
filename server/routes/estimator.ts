@@ -119,11 +119,13 @@ function buildEstimate(store: NexusStore) {
 
   // Weekly planning: how many full sessions left this week?
   // Learn from historical data, but cap at sane range (2-15% per session)
+  // v4.8.1 #drift — averageBurnRate is optional in the buildHistoricalStats
+  // return shape; coalesce to 0 so the comparison is always defined.
   const historicalStats = buildHistoricalStats(store);
-  const learnedBurn = historicalStats.averageBurnRate;
+  const learnedBurn = historicalStats.averageBurnRate ?? 0;
   const defaultSessionBurn = 5; // 5% of weekly per session (conservative default for Max 5x)
   const sessionBurn = (learnedBurn > 2 && learnedBurn < 15) ? learnedBurn : defaultSessionBurn;
-  const sessionsLeftThisWeek = estimatedWeekly > 0 ? Math.floor(estimatedWeekly / sessionBurn) : 0;
+  const sessionsLeftThisWeek = estimatedWeekly > 0 && sessionBurn > 0 ? Math.floor(estimatedWeekly / sessionBurn) : 0;
 
   // Event-based costs (derived from actual activity vs fuel data)
   const eventCosts = calculateEventCosts(store);
@@ -421,7 +423,9 @@ function predictTaskCost(store: NexusStore, taskType: string, estimate: ReturnTy
     estimatedFuelCost: estimatedCost,
     canAfford,
     currentFuel: estimate.estimated?.session,
-    afterTask: canAfford ? Math.round((estimate.estimated.session - estimatedCost) * 10) / 10 : null,
+    // v4.8.1 #drift — narrow estimate.estimated before the subtraction; canAfford
+    // already implies it's defined, but tsc doesn't carry the implication.
+    afterTask: canAfford && estimate.estimated ? Math.round((estimate.estimated.session - estimatedCost) * 10) / 10 : null,
   };
 }
 

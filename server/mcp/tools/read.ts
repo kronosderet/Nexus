@@ -16,7 +16,7 @@ import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { TOOL_COUNT_EXPECTED } from '../../lib/version.ts';
 import { STANDALONE, NEXUS_BASE, SERVER_VERSION, SERVER_STARTED_AT } from '../lib/config.ts';
 import { nexusFetch } from '../lib/nexusFetch.ts';
-import { formatBrief, formatPlan, formatGuard, type BriefData } from '../lib/format.ts';
+import { formatBrief, formatPlan, formatGuard, type BriefData, type PlanData, type GuardData } from '../lib/format.ts';
 
 export const readTools: Tool[] = [
   {
@@ -234,7 +234,8 @@ export const readHandlers: Record<string, (args: any) => Promise<string>> = {
     };
 
     // Minimal shapes for these dispatcher-return values — only the fields we read.
-    type TaskLite = { status: string; title: string };
+    // v4.8.1 #drift — TaskLite needs `id` so it satisfies BriefData.activeTasks.
+    type TaskLite = { id: number; status: string; title: string };
     type SessionLite = { project: string; created_at: string; summary: string };
     type DecisionLite = { decision: string; project: string };
 
@@ -277,28 +278,35 @@ export const readHandlers: Record<string, (args: any) => Promise<string>> = {
           : `${Math.round(ageH / 24)}d`;
     }
 
-    const briefBody = formatBrief(
-      {
-        fuel: fuel?.estimated
-          ? {
-              session: fuel.estimated.session,
-              weekly: fuel.estimated.weekly,
-              runwayMinutes: fuel.session?.minutesRemaining,
-            }
-          : null,
-        activeTasks,
-        priorSessions,
-        keyDecisions,
-        recentPlans,
-        totalPlans: pi.totalFiles ?? 0,
-        ccMemories,
-        totalMemories: mi.totalFiles ?? 0,
-        risks: (risks as { risks?: Array<{ message?: string }> }).risks || [],
-        pendingContradictions,
-        lastContradictionScanAgo,
-      } as BriefData,
-      project
-    );
+    // v4.8.1 #drift — narrow the fuel response shape locally so property access
+    // doesn't trip tsc. nexusFetch returns `unknown`; this is the contract /api/estimator
+    // gives us when populated (null otherwise).
+    type FuelLite = {
+      estimated?: { session?: number; weekly?: number };
+      session?: { minutesRemaining?: number };
+    } | null;
+    const fuelTyped = fuel as FuelLite;
+
+    const briefData: BriefData = {
+      fuel: fuelTyped?.estimated
+        ? {
+            session: fuelTyped.estimated.session,
+            weekly: fuelTyped.estimated.weekly,
+            runwayMinutes: fuelTyped.session?.minutesRemaining,
+          }
+        : null,
+      activeTasks,
+      priorSessions,
+      keyDecisions,
+      recentPlans,
+      totalPlans: pi.totalFiles ?? 0,
+      ccMemories,
+      totalMemories: mi.totalFiles ?? 0,
+      risks: (risks as { risks?: Array<{ message?: string }> }).risks || [],
+      pendingContradictions,
+      lastContradictionScanAgo,
+    };
+    const briefBody = formatBrief(briefData, project);
 
     // v4.6.0 #398 — Continuous Handover prepend. When a card exists for the
     // project, lead with it so the next instance reads the live handover
@@ -315,7 +323,7 @@ export const readHandlers: Record<string, (args: any) => Promise<string>> = {
   async nexus_get_plan(args) {
     const qs = args?.project ? `?project=${encodeURIComponent(args.project)}` : '';
     const data = await nexusFetch(`/api/plan${qs}`);
-    return formatPlan(data as Record<string, unknown>);
+    return formatPlan(data as PlanData);
   },
 
   async nexus_check_guard(args) {
@@ -323,7 +331,7 @@ export const readHandlers: Record<string, (args: any) => Promise<string>> = {
     const data = await nexusFetch(
       `/api/guard?title=${encodeURIComponent(args.title)}`
     );
-    return formatGuard(data as Record<string, unknown>, args.title);
+    return formatGuard(data as GuardData, args.title);
   },
 
   async nexus_search(args) {

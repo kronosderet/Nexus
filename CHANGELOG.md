@@ -9,6 +9,105 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.8.1 — Audit-driven type drift cleanup
+
+Post-release patch following the v4.8.0 audit pass. The audit walked five
+dimensions: Claude Code surface coverage, code-quality markers, documentation
+drift, TypeScript drift, and stale modules. Five real findings; all addressed.
+
+**No code-behavior changes** — every fix is type-level or version-level.
+**424 tests · 29 MCP tools · no migrations.**
+
+### Audit findings
+
+| Dimension | Finding |
+|---|---|
+| **Surface coverage** | Plugin has 9 skills + 3 lifecycle hooks + MCPB stdio. ✓ Complete. |
+| **Code-quality markers** | 0 TODO / FIXME / HACK / XXX in source. ✓ Clean. |
+| **Documentation drift** | Test count (423) and tool count (29) in sync across README / CONCEPT / CHANGELOG / `version.ts`. ✓ Clean. |
+| **TypeScript drift** | **49 errors** — 39 fixable, 10 pre-existing AIConnection family. **Fixed.** |
+| **Plugin manifest drift** | `plugin/.claude-plugin/plugin.json` stuck at `4.1.0` since release. **Fixed.** |
+
+### TypeScript drift — 49 → 10 errors (39 fixed)
+
+Most errors clustered in code introduced by the v4.7.6 mcp-split (`format.ts`)
+and a handful of pre-existing-but-uncovered shapes. Categorized:
+
+| File | Before | Cause | Fix |
+|---|---|---|---|
+| `mcp/lib/format.ts` | 17 | `formatPlan` / `formatGuard` typed as `Record<string, unknown>` — every property access tripped tsc | New explicit `PlanData` + `GuardData` interfaces; `BriefData` tightened from `Record & {...}` to plain interface |
+| `mcp/tools/read.ts` | 5 | Cascade from `format.ts`: `as BriefData` cast failed; `fuel?.estimated` accessed on opaque dispatcher result; `TaskLite` missing `id` | Local `FuelLite` narrowing + explicit `briefData: BriefData = {...}` + `id` added to `TaskLite` |
+| `routes/estimator.ts` | 4 | `learnedBurn` / `sessionBurn` / `estimate.estimated` possibly undefined | `?? 0` coalesce + explicit narrowing before subtraction |
+| `routes/smartSearch.ts` | 3 | `CorpusItem` requires `project` but task/activity/scratchpad inserts omitted it | Added `project: t.project ?? ''` to all three call sites |
+| `mcp/localApi.ts` | 3 | `MemoryEntryLike` index-signature mismatch + `RiskItem` missing `category` field | Removed unnecessary type annotation; added `category: 'fuel'` to risk pushes |
+| `routes/predict.ts` | 2 | Return-type `stats: Record<string, number>` didn't match nested actual shape | New `DetectGapsStats` interface |
+| `dashboard.ts` | 2 | `createSmartSearchRoutes` signature changed to require `embedCache`; risk-scan response typed as `{level}` not `RiskItem[]` | Default `embedCache = {}` for backward-compat callers; tightened response type to `RiskItem[]` |
+| `routes/focus.ts` | 1 | `commits` not in declared type but emitted in object | Type widened to match construction shape |
+| `routes/webhooks.ts` | 1 | `hook.format` is `string \| undefined` passed where `string` required | `?? 'json'` coalesce |
+| `watchers/contradictionPoller.ts` | 1 | `'contradiction'` literal not in `ScheduledScan.type` union | Extended union to `'risk' \| 'digest' \| 'contradiction'` |
+| `routes/overseer.ts` | 9 | Pre-existing `AIConnection` vs `AIConfig` drift (handover keeps marked as untouched) | **Skipped** — separate dedicated commit when AI-handling refactor lands |
+| `routes/autoSummary.ts` | 1 | Same AIConnection family | **Skipped** |
+
+### Plugin manifest drift
+
+`plugin/.claude-plugin/plugin.json` had been silently stuck at `4.1.0` since
+the v4.1 plugin first shipped. None of the existing drift tests scanned it,
+so the gap accumulated through every v4.2 → v4.8.0 release. Now:
+
+- Manifest bumped 4.1.0 → 4.8.1 (matches the rest of the surfaces).
+- `tests/versionDrift.test.ts` extended to scan it. Same kind of drift will
+  fail CI on the next release, so it can't accumulate again.
+
+### Type-system patterns codified
+
+- **Formatters take typed inputs, not `Record<string, unknown>`.** When a
+  pure-presentation function receives composed-from-many-endpoints data,
+  give it a real interface even if some fields are optional. `Record &
+  {...}` reads as "permissive" but actually fails on every typed access.
+- **Cascade fixes upstream.** `read.ts` errors weren't independent — they
+  surfaced because `format.ts` types were loose. Fixing the lib first made
+  the consumer fixes obvious.
+- **Drift tests evolve with surfaces.** Plugin manifest is a versioned
+  surface; it belongs in `versionDrift.test.ts`. Add new versioned surfaces
+  there as they appear (mcpb, cli, plugin all done; future ones to follow).
+
+### Files touched
+
+- `server/mcp/lib/format.ts` — `BriefData` tightened, new `PlanData` /
+  `GuardData` interfaces, nullable `filename` fallback in formatBrief
+- `server/mcp/tools/read.ts` — typed `briefData`, `FuelLite` narrowing,
+  `TaskLite.id`, `formatPlan` / `formatGuard` calls use new types
+- `server/routes/estimator.ts` — nullish guards on learned/session burn
+- `server/routes/smartSearch.ts` — `project` field on all `CorpusItem`
+  insertions; `embedCache` parameter defaults to `{}`
+- `server/mcp/localApi.ts` — `RiskItem.category` field; removed implicit
+  `MemoryEntryLike` annotation
+- `server/routes/predict.ts` — `DetectGapsStats` interface
+- `server/dashboard.ts` — `RiskItem` import + typed risk-scan response
+- `server/routes/focus.ts` — `git` shape widened
+- `server/routes/webhooks.ts` — `hook.format ?? 'json'` coalesce
+- `server/types.ts` — `ScheduledScan.type` union extended
+- `plugin/.claude-plugin/plugin.json` — version 4.1.0 → 4.8.1
+- `tests/versionDrift.test.ts` — new spec scanning plugin manifest
+- `package.json`, `cli/package.json`, `mcpb/manifest.json` — version
+  bump 4.8.0 → 4.8.1
+- `CHANGELOG.md`, `ROADMAP.md` — this entry
+
+### Pre-existing drift left untouched
+
+10 errors remain — all in the `AIConnection` vs `AIConfig` family
+(`server/routes/overseer.ts` 9 + `server/routes/autoSummary.ts` 1). The
+handover has marked these as untouched since v4.5.x. Fix belongs in a
+dedicated AI-handling refactor, not this audit-driven patch.
+
+### What's next
+
+The v4.7.x → v4.8.0 → v4.8.1 arc is closed. Both Tier-3 and Tier-4
+deferred backlogs are at zero, structural cleanup is done, type drift is
+down to one well-understood family. Forward direction is integration
+work (Cowork plugin packaging, Dispatch webhook listener, Memory Stores
+bridge — see v4.8.0 brief) rather than internal cleanup.
+
 ## v4.8.0 — Structural cleanup
 
 The v4.7.x arc shipped nine point releases over two days. v4.8.0 collects

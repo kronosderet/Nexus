@@ -14,6 +14,7 @@ import { join, dirname } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
+import type { RiskItem } from './types.ts';
 
 // Ensure ~/.nexus/ exists and point the store there
 const NEXUS_HOME = process.env.NEXUS_HOME || join(homedir(), '.nexus');
@@ -187,16 +188,20 @@ async function start() {
     try {
       const res = await fetch(`http://localhost:${PORT}/api/overseer/risks`);
       if (!res.ok) return;
-      const data: { risks?: Array<{ level: string }> } = await res.json();
-      const critical = (data.risks || []).filter((r) => r.level === 'critical').length;
-      const warnings = (data.risks || []).filter((r) => r.level === 'warning').length;
+      // v4.8.1 #drift — type the response shape with the full RiskItem instead of
+      // just `{ level }`. _lastRiskScan expects RiskItem[]; the prior local type
+      // dropped category + message and tsc rejected the assignment.
+      const data: { risks?: RiskItem[] } = await res.json();
+      const risks = data.risks || [];
+      const critical = risks.filter((r) => r.level === 'critical').length;
+      const warnings = risks.filter((r) => r.level === 'warning').length;
       store.addScheduledScan({
         type: 'risk',
         timestamp: new Date().toISOString(),
-        result: { risks: data.risks?.length || 0, critical, warnings, items: (data.risks || []).slice(0, 10) },
+        result: { risks: risks.length, critical, warnings, items: risks.slice(0, 10) },
       });
-      store._lastRiskScan = { risks: data.risks || [], scannedAt: new Date().toISOString(), critical, warnings };
-      console.log(`  ◈ Scheduled risk scan: ${data.risks?.length || 0} risks (${critical} critical, ${warnings} warnings)`);
+      store._lastRiskScan = { risks, scannedAt: new Date().toISOString(), critical, warnings };
+      console.log(`  ◈ Scheduled risk scan: ${risks.length} risks (${critical} critical, ${warnings} warnings)`);
     } catch {}
   }
 

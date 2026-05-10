@@ -247,7 +247,10 @@ export interface SuggestedContradiction {
 }
 
 export interface ScheduledScan {
-  type: 'risk' | 'digest';
+  // v4.8.1 #drift — added 'contradiction' to match contradictionPoller.addScheduledScan
+  // calls. The poller has been writing this type since v4.7.3 #310 but the union
+  // hadn't been updated.
+  type: 'risk' | 'digest' | 'contradiction';
   timestamp: string;
   // Shape varies by scan type — risks are a summary of counts + items;
   // digests are a narrative summary + stats. Opaque at the type level.

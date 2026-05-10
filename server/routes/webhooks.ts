@@ -115,7 +115,7 @@ export function createWebhookRoutes(store: NexusStore, broadcast: BroadcastFn) {
     const hook = config.outbound.find((h: WebhookEntry) => h.id === String(req.params.id));
     if (!hook) return res.status(404).json({ error: 'Nothing on the charts.' });
 
-    const payload = formatPayload('test', 'Nexus webhook test -- all instruments nominal.', hook.format);
+    const payload = formatPayload('test', 'Nexus webhook test -- all instruments nominal.', hook.format ?? 'json');
     try {
       await fetch(hook.url, {
         method: 'POST',

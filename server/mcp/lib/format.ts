@@ -16,25 +16,42 @@
 import { STANDALONE, SERVER_VERSION } from './config.ts';
 
 // Brief data comes from a composition of 6+ different endpoint responses —
-// treating it as `unknown` would force defensive checks on every access. We
-// keep the shape loose (Record<string, unknown>) and let individual accessors
-// narrow as needed.
-export type BriefData = Record<string, unknown> & {
-  fuel?: { session?: number | null; weekly?: number | null; runwayMinutes?: number | null };
+// each formatter has its own narrow shape so callers can pass typed data
+// without defensive checks. v4.8.1 #drift: tightened from
+// Record<string, unknown> & {...} to plain interfaces so property accesses
+// in formatPlan/formatGuard don't break tsc.
+export interface BriefData {
+  fuel?: { session?: number | null; weekly?: number | null; runwayMinutes?: number | null } | null;
   activeTasks?: Array<{ id: number; status: string; title: string }>;
   priorSessions?: Array<{ created_at: string; summary: string }>;
   keyDecisions?: Array<{ decision: string }>;
   recentPlans?: Array<{ project?: string | null; title: string; ageDays: number }>;
   totalPlans?: number;
+  // ccMemories: each entry has at least one of description/name/filename. The
+  // formatter falls back through them in that order, then to a generic label.
   ccMemories?: Array<{ type: string; description?: string; name?: string; filename?: string }>;
   totalMemories?: number;
   risks?: Array<{ message?: string }>;
   // v4.7.3 #310 — auto-suggest contradictions surfaced in the brief.
-  // pendingContradictions = count of `_suggestedContradictions` with status='suggested'.
-  // lastContradictionScan = age of the most recent auto-scan (informational).
   pendingContradictions?: number;
   lastContradictionScanAgo?: string;
-};
+}
+
+// v4.8.1 #drift — explicit shapes for the other two formatters. Previously
+// they took `Record<string, unknown>` which fired tsc on every property
+// access. read.ts / nexus_get_plan / nexus_check_guard now construct typed
+// objects before calling.
+export interface PlanData {
+  fuelState?: { session?: number; weekly?: number; runwayMinutes?: number };
+  aiPlan?: string;
+}
+
+export interface GuardData {
+  warning?: string;
+  similarTasks?: Array<{ id: number; status: string; title: string; similarity: number }>;
+  relatedDecisions?: Array<{ id: number; project: string; decision: string }>;
+  pastSessions?: Array<{ id: number; project: string; summary: string }>;
+}
 
 export function formatBrief(data: BriefData, project: string): string {
   const lines: string[] = [];
@@ -107,7 +124,9 @@ export function formatBrief(data: BriefData, project: string): string {
     lines.push(`CC memory${totalSuffix}:`);
     for (const m of data.ccMemories.slice(0, 5)) {
       const typeTag = `[${m.type}]`;
-      const headline = (m.description || m.name || m.filename).slice(0, 90);
+      // v4.8.1 #drift — fall back to a generic label when all three fields
+      // are missing. Previously the .slice() call could trip on `undefined`.
+      const headline = (m.description || m.name || m.filename || 'memory').slice(0, 90);
       lines.push(`  › ${typeTag} ${headline}`);
     }
   }
@@ -134,13 +153,13 @@ export function formatBrief(data: BriefData, project: string): string {
   return lines.join('\n');
 }
 
-export function formatPlan(data: Record<string, unknown>): string {
+export function formatPlan(data: PlanData): string {
   const lines: string[] = [];
   lines.push('◈ NEXUS SESSION PLAN');
   lines.push('');
   if (data.fuelState) {
     lines.push(
-      `Fuel: ${data.fuelState.session}% session | ${data.fuelState.weekly}% weekly | ${data.fuelState.runwayMinutes}m runway`
+      `Fuel: ${data.fuelState.session ?? '?'}% session | ${data.fuelState.weekly ?? '?'}% weekly | ${data.fuelState.runwayMinutes ?? '?'}m runway`
     );
     lines.push('');
   }
@@ -152,7 +171,7 @@ export function formatPlan(data: Record<string, unknown>): string {
   return lines.join('\n');
 }
 
-export function formatGuard(data: Record<string, unknown>, title: string): string {
+export function formatGuard(data: GuardData, title: string): string {
   const similarTasks = data?.similarTasks || [];
   const relatedDecisions = data?.relatedDecisions || [];
   const pastSessions = data?.pastSessions || [];

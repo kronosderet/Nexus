@@ -78,7 +78,15 @@ interface GapSuggestion {
   decisionId?: number;
 }
 
-async function detectGaps(store: NexusStore): Promise<{ suggestions: GapSuggestion[]; stats: Record<string, number> }> {
+// v4.8.1 #drift — stats shape was annotated as Record<string, number> but the
+// actual returned shape has nested objects (byCategory + byPriority). Tighten
+// the return type so tsc agrees with reality.
+interface DetectGapsStats {
+  total: number;
+  byCategory: Record<string, number>;
+  byPriority: { high: number; normal: number; low: number };
+}
+async function detectGaps(store: NexusStore): Promise<{ suggestions: GapSuggestion[]; stats: DetectGapsStats }> {
   const suggestions: GapSuggestion[] = [];
   const ledger = store.getAllDecisions();
   const edges = store.getAllEdges();
