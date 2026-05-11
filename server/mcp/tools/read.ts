@@ -173,6 +173,75 @@ export const readTools: Tool[] = [
       },
     },
   },
+  // v4.8.2 — list/management tools. The asymmetric task-management surface (only
+  // create/complete/delete + no list) was the standing audit finding from this
+  // release cycle. Five new read tools close the gap for tasks, decisions,
+  // thoughts, and sessions. nexus_brief is still the right "everything at once"
+  // tool; these are for filtered slices when you know what you want.
+  {
+    name: 'nexus_list_tasks',
+    description:
+      'List tasks with optional filters by project, status, priority, and a max count. ' +
+      'Use when you need a scoped slice of the board — "all in-progress tasks in Nexus," ' +
+      '"every backlog item across projects," "high-priority items only." Returns an array ' +
+      'of tasks. Prefer this over nexus_brief when you want the full task list (brief caps to ~10).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project: { type: 'string', description: 'Filter to one project (case-insensitive). Omit to include all projects.' },
+        status: { type: 'string', enum: ['backlog', 'in_progress', 'review', 'done'], description: 'Filter to one status. Omit to include all statuses.' },
+        priority: { type: 'number', description: 'Filter to one priority (0=low, 1=normal, 2=high).' },
+        limit: { type: 'number', description: 'Max tasks to return. Omit for no cap.' },
+      },
+    },
+  },
+  {
+    name: 'nexus_list_decisions',
+    description:
+      'List decisions from The Ledger with optional filters by project, tag, and a max count. ' +
+      'Returns an array of decisions with id, decision text, project, tags, lifecycle, created_at. ' +
+      'Use when you need "all decisions for project X" or "every decision tagged \'audit\'." ' +
+      'For semantic similarity matching, use nexus_search instead.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project: { type: 'string', description: 'Filter to one project. Omit to include all.' },
+        tag: { type: 'string', description: 'Filter to decisions carrying this tag.' },
+        limit: { type: 'number', description: 'Max decisions to return. Default 50.' },
+      },
+    },
+  },
+  {
+    name: 'nexus_list_thoughts',
+    description:
+      'Read the Thought Stack without popping. Returns active thoughts (the LIFO interrupt-recovery ' +
+      'stack) so you can see what context is queued before deciding to pop. Useful when you want to ' +
+      'check if a relevant thought is on the stack but don\'t want the side effect of pop_thought ' +
+      'marking it resolved. Pass status="all" to also see resolved/abandoned thoughts.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project: { type: 'string', description: 'Filter to one project. Omit to include all.' },
+        status: { type: 'string', enum: ['active', 'resolved', 'abandoned', 'all'], description: 'Default "active". "all" includes resolved + abandoned.' },
+        limit: { type: 'number', description: 'Max thoughts to return. Default 20.' },
+      },
+    },
+  },
+  {
+    name: 'nexus_list_sessions',
+    description:
+      'List recent session entries (the memory-bridge records logged by nexus_log_session). ' +
+      'Returns summaries + decisions + tags + files_touched for each. Useful for "what did I do ' +
+      'this week" or "last few sessions on project X." For full-text search across session bodies, ' +
+      'use nexus_search.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project: { type: 'string', description: 'Filter to one project. Omit to include all.' },
+        limit: { type: 'number', description: 'Max sessions to return. Default 10, capped at 200.' },
+      },
+    },
+  },
 ];
 
 export const readHandlers: Record<string, (args: any) => Promise<string>> = {
@@ -509,5 +578,97 @@ export const readHandlers: Record<string, (args: any) => Promise<string>> = {
       }
       throw err;
     }
+  },
+
+  // v4.8.2 — list/management tools
+
+  async nexus_list_tasks(args) {
+    const qs = new URLSearchParams();
+    if (args?.project) qs.set('project', String(args.project));
+    if (args?.status) qs.set('status', String(args.status));
+    if (args?.priority != null) qs.set('priority', String(args.priority));
+    if (args?.limit != null) qs.set('limit', String(args.limit));
+    const tasks = await nexusFetch(`/api/tasks${qs.toString() ? '?' + qs.toString() : ''}`) as Array<{
+      id: number; title: string; status: string; priority?: number; project?: string;
+    }>;
+    if (tasks.length === 0) return '◈ No tasks match those filters.';
+    const filterTag = [
+      args?.project && `project=${args.project}`,
+      args?.status && `status=${args.status}`,
+      args?.priority != null && `priority=${args.priority}`,
+    ].filter(Boolean).join(' · ');
+    const header = filterTag ? `◈ Tasks (${tasks.length}) · ${filterTag}` : `◈ Tasks (${tasks.length})`;
+    const lines = [header, ''];
+    for (const t of tasks) {
+      const prio = t.priority === 2 ? '!!' : t.priority === 1 ? ' !' : '  ';
+      lines.push(`${prio} #${t.id} [${t.status.padEnd(11)}] [${t.project || 'general'}] ${t.title}`);
+    }
+    return lines.join('\n');
+  },
+
+  async nexus_list_decisions(args) {
+    const qs = new URLSearchParams();
+    if (args?.project) qs.set('project', String(args.project));
+    if (args?.tag) qs.set('tag', String(args.tag));
+    qs.set('limit', String(args?.limit ?? 50));
+    const decisions = await nexusFetch(`/api/ledger?${qs.toString()}`) as Array<{
+      id: number; decision: string; project: string; lifecycle?: string; tags?: string[]; created_at: string;
+    }>;
+    if (decisions.length === 0) return '◈ No decisions match those filters.';
+    const filterTag = [
+      args?.project && `project=${args.project}`,
+      args?.tag && `tag=${args.tag}`,
+    ].filter(Boolean).join(' · ');
+    const header = filterTag ? `◈ Decisions (${decisions.length}) · ${filterTag}` : `◈ Decisions (${decisions.length})`;
+    const lines = [header, ''];
+    for (const d of decisions) {
+      const lc = d.lifecycle ? `[${d.lifecycle}]` : '[?]';
+      lines.push(`  #${d.id} ${lc} [${d.project}] ${d.decision.slice(0, 100)}${d.decision.length > 100 ? '…' : ''}`);
+    }
+    return lines.join('\n');
+  },
+
+  async nexus_list_thoughts(args) {
+    // status=all → ?all=true, otherwise default to active-only (matches the
+    // /api/thoughts default behavior so this tool reads the live stack first).
+    const qs = new URLSearchParams();
+    if (args?.project) qs.set('project', String(args.project));
+    const wantAll = args?.status === 'all' || args?.status === 'resolved' || args?.status === 'abandoned';
+    if (wantAll) qs.set('all', 'true');
+    if (args?.status && args.status !== 'all') qs.set('status', String(args.status));
+    const thoughts = await nexusFetch(`/api/thoughts${qs.toString() ? '?' + qs.toString() : ''}`) as Array<{
+      id: number; text: string; context?: string; project?: string; status: string; pushed_at: string;
+    }>;
+    const limit = Number(args?.limit ?? 20);
+    const slice = thoughts.slice(0, Number.isFinite(limit) && limit > 0 ? limit : 20);
+    if (slice.length === 0) return '◈ Thought Stack empty (no active thoughts).';
+    const lines = [`◈ Thought Stack (${slice.length}${thoughts.length > slice.length ? ' of ' + thoughts.length : ''})`, ''];
+    for (const t of slice) {
+      const projTag = t.project ? `[${t.project}] ` : '';
+      const stTag = t.status !== 'active' ? `[${t.status}] ` : '';
+      lines.push(`  #${t.id} ${stTag}${projTag}${t.text.slice(0, 100)}${t.text.length > 100 ? '…' : ''}`);
+      if (t.context) lines.push(`    context: ${t.context.slice(0, 80)}`);
+    }
+    return lines.join('\n');
+  },
+
+  async nexus_list_sessions(args) {
+    const qs = new URLSearchParams();
+    if (args?.project) qs.set('project', String(args.project));
+    qs.set('limit', String(args?.limit ?? 10));
+    const sessions = await nexusFetch(`/api/sessions?${qs.toString()}`) as Array<{
+      id: number; project: string; summary: string; created_at: string; decisions?: string[]; blockers?: string[]; tags?: string[];
+    }>;
+    if (sessions.length === 0) return '◈ No sessions match those filters.';
+    const filterTag = args?.project ? `project=${args.project}` : '';
+    const header = filterTag ? `◈ Sessions (${sessions.length}) · ${filterTag}` : `◈ Sessions (${sessions.length})`;
+    const lines = [header, ''];
+    for (const s of sessions) {
+      const date = new Date(s.created_at).toLocaleDateString();
+      lines.push(`  #${s.id} ${date} [${s.project}] ${s.summary.slice(0, 100)}${s.summary.length > 100 ? '…' : ''}`);
+      if (s.tags?.length) lines.push(`    tags: ${s.tags.join(', ')}`);
+      if (s.blockers?.length) lines.push(`    blockers: ${s.blockers.length}`);
+    }
+    return lines.join('\n');
   },
 };

@@ -96,7 +96,20 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.8.1 (Audit-driven type drift cleanup · shipped 2026-05-10)
+## Current — v4.8.2 (MCP management coverage · shipped 2026-05-10)
+
+Post-v4.8.1 patch closing the standing MCP-tool asymmetry. The audit revealed
+the task-management surface had `create_task` + `complete_task` (status=done)
++ `delete_task` but **no general update** and **no list**. Same gap applied
+to decisions, thoughts, and sessions — the only way to read those at scale
+was `nexus_brief` (capped) or `nexus_search` (semantic).
+
+**Five new MCP tools (29 → 34)** close the gap. Pure additions — no
+deprecations, no behavior changes elsewhere.
+
+**429 tests · 34 MCP tools · no migrations · no breaking changes.**
+
+## Previous — v4.8.1 (Audit-driven type drift cleanup · shipped 2026-05-10)
 
 Post-release patch following the v4.8.0 audit pass. Five drift findings
 addressed: 39 of 49 TypeScript errors fixed (down to 10, all pre-existing

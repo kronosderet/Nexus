@@ -85,9 +85,11 @@ describe('MCP tool registry composition', () => {
     expect(total).toBe(TOOL_COUNT_EXPECTED);
   });
 
-  it('expected category sizes (read 10 · write 13 · ai 3 · composite 3 = 29)', () => {
-    expect(readTools.length).toBe(10);
-    expect(writeTools.length).toBe(13);
+  it('expected category sizes (read 14 · write 14 · ai 3 · composite 3 = 34, v4.8.2)', () => {
+    // v4.8.2 — added 4 list-tools to read (list_tasks, list_decisions,
+    // list_thoughts, list_sessions) and 1 update tool to write (update_task).
+    expect(readTools.length).toBe(14);
+    expect(writeTools.length).toBe(14);
     expect(aiTools.length).toBe(3);
     expect(compositeTools.length).toBe(3);
   });

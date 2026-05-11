@@ -2,7 +2,7 @@
 
 **AI Cowork Metabrain for Claude Code**
 
-A local-first metabrain that gives every Claude Code instance persistent memory, a Knowledge Graph, and a strategic AI advisor. 29 native MCP tools. Ambient-telemetry hook layer injects rich context on every session start. Zero cloud dependencies.
+A local-first metabrain that gives every Claude Code instance persistent memory, a Knowledge Graph, and a strategic AI advisor. 34 native MCP tools. Ambient-telemetry hook layer injects rich context on every session start. Zero cloud dependencies.
 
 ## Install as Claude Code Plugin
 
@@ -51,13 +51,13 @@ Nexus solves the biggest problem with AI-assisted development: **Claude forgets 
 - **Cross-process sync** — file-watcher in NexusStore means dashboard + MCPB stay in sync on external writes; no more lost edits across processes.
 - **Multi-source Memory Bridge** *(v4.7.0)* — `nexus_import_cc_memories` reads from every configured source (default: `~/.claude/projects/*/memory/*.md`; add Cowork-sandbox or cross-machine paths via `_memoryBridge.sources[]` in `~/.nexus/nexus.json`). Per-source try/catch, optional content-hash dedup so the same memory across machines is one Decision. Use `source_filter` to scope a scan to one source for debugging.
 
-## 29 Native MCP Tools
+## 34 Native MCP Tools
 
 After installing, Claude Code can call these directly — no shell-outs, no CLI:
 
-**Read:** `nexus_brief`, `nexus_get_plan`, `nexus_check_guard`, `nexus_search`, `nexus_get_critique`, `nexus_predict_gaps`, `nexus_get_blast_radius`, `nexus_ask_overseer`, `nexus_version`, `nexus_read_handover`
+**Read:** `nexus_brief`, `nexus_get_plan`, `nexus_check_guard`, `nexus_search`, `nexus_get_critique`, `nexus_predict_gaps`, `nexus_get_blast_radius`, `nexus_ask_overseer`, `nexus_version`, `nexus_read_handover`, `nexus_list_tasks`, `nexus_list_decisions`, `nexus_list_thoughts`, `nexus_list_sessions`
 
-**Write:** `nexus_create_task`, `nexus_complete_task`, `nexus_delete_task`, `nexus_log_activity`, `nexus_log_session`, `nexus_log_usage`, `nexus_record_decision`, `nexus_update_decision`, `nexus_link_decisions`, `nexus_push_thought`, `nexus_pop_thought`, `nexus_import_cc_memories`, `nexus_update_handover`
+**Write:** `nexus_create_task`, `nexus_update_task`, `nexus_complete_task`, `nexus_delete_task`, `nexus_log_activity`, `nexus_log_session`, `nexus_log_usage`, `nexus_record_decision`, `nexus_update_decision`, `nexus_link_decisions`, `nexus_push_thought`, `nexus_pop_thought`, `nexus_import_cc_memories`, `nexus_update_handover`
 
 **Async AI:** `nexus_ask_overseer_start`, `nexus_get_overseer_result`, `nexus_propose_edges`
 
@@ -122,7 +122,7 @@ Without LM Studio, all 25 non-AI tools work normally (4 AI-dependent tools: `nex
 
 | Layer | Stack |
 |---|---|
-| MCP | 29 tools, stdio, standalone (no server needed) |
+| MCP | 34 tools, stdio, standalone (no server needed) |
 | Dashboard | React 19 + Vite + Tailwind CSS 4 (optional, 8 modules) |
 | Server | Express 5 + TypeScript (dashboard only) |
 | Store | JSON at `~/.nexus/nexus.json` (atomic writes, 3-gen backup, idempotent migrations) |

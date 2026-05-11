@@ -9,6 +9,113 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.8.2 — MCP management coverage
+
+Post-v4.8.1 patch closing the standing MCP-tool asymmetry. The Captain's
+audit observation: the task-management surface had `create_task` +
+`complete_task` (only sets status=done) + `delete_task` but **no general
+update** (can't move backlog → in_progress → review) and **no list** (couldn't
+read all project tasks without `nexus_brief`'s cap or `nexus_search`'s
+semantic mode). Same gap applied to decisions, thoughts, and sessions.
+
+**Five new MCP tools (29 → 34).** Pure additions; no deprecations; no
+behavior changes elsewhere.
+
+**429 tests (+5 for the new endpoints/filters) · 34 MCP tools · no
+migrations · no breaking changes.**
+
+### The five new tools
+
+| Tool | Bucket | Closes |
+|---|---|---|
+| `nexus_list_tasks` | read | "show me all in-progress tasks in Nexus" / "every backlog item across projects" / "high-priority items only" — the core gap |
+| `nexus_update_task` | write | move a task through statuses (backlog → in_progress → review → done), change priority, reassign project, fix title/description |
+| `nexus_list_decisions` | read | "all decisions in project X" / "decisions tagged 'audit'" |
+| `nexus_list_thoughts` | read | inspect the Thought Stack without the pop side effect |
+| `nexus_list_sessions` | read | "what did I do this week" / "last few sessions on project X" |
+
+### Tool buckets after v4.8.2
+
+| Bucket | Count | Tools |
+|---|---|---|
+| Read | 14 | brief, get_plan, check_guard, search, get_critique, predict_gaps, get_blast_radius, ask_overseer, version, read_handover, **list_tasks**, **list_decisions**, **list_thoughts**, **list_sessions** |
+| Write | 14 | create_task, **update_task**, complete_task, delete_task, log_activity, log_session, log_usage, record_decision, update_decision, link_decisions, push_thought, pop_thought, import_cc_memories, update_handover |
+| Async AI | 3 | ask_overseer_start, get_overseer_result, propose_edges |
+| Composite | 3 | bridge_session, fleet_overview, calendar_runway |
+| **Total** | **34** | |
+
+### Server-side support
+
+`GET /api/tasks` now accepts query-param filters (`project`, `status`,
+`priority`, `limit`). Unfiltered calls still return everything — the
+dashboard contract is preserved. The other endpoints (`/ledger`,
+`/thoughts`, `/sessions`) already had filter support, so the four read
+tools just pass arguments through.
+
+### Audit context (what the Captain caught)
+
+The MCP-tool audit walked every tool by bucket and checked coverage:
+
+- **Tasks** ❌ — only create / complete (→done) / delete. **No list, no
+  move-status.** Most-called tool family (`task_created` 235× in the
+  activity log) but the management story was incomplete.
+- **Decisions** — `record` / `update_decision` / `link_decisions` covered
+  CUD, but listing was only via `brief` (top 5) or `search` (semantic).
+- **Thoughts** — push / pop with the LIFO contract was correct, but
+  there was no way to peek at the stack without the pop side effect.
+- **Sessions** — `log_session` covered create, no way to list.
+- **Probably rarely called** (kept, no changes): `calendar_runway` (needs
+  external calendar MCP), `ask_overseer` sync variant (10s timeout —
+  async path is preferred).
+- **No deprecations.** Every existing tool has a clear purpose.
+
+### Implementation notes
+
+- `nexus_update_task` rejects no-op calls (at least one mutating field
+  required). Prevents silent success when the caller forgets to specify
+  what to update.
+- `nexus_list_thoughts` defaults to `status=active` (the live stack);
+  `status=all` returns resolved + abandoned too. Matches the
+  `/api/thoughts` endpoint contract.
+- `nexus_list_tasks` returns a Cartographer-style formatted text output
+  (`!! #id [status] [project] title`) — same shape as the brief and the
+  CLI `nexus tasks` command, so callers get a recognizable rendering.
+- All four list tools include a "no matches" friendly path so callers
+  don't get an empty string.
+
+### Files touched
+
+- `server/mcp/tools/read.ts` — 4 new tool defs + 4 new handlers
+  (list_tasks / list_decisions / list_thoughts / list_sessions)
+- `server/mcp/tools/write.ts` — 1 new tool def + 1 new handler
+  (update_task), inserted between complete_task and delete_task
+- `server/routes/tasks.ts` — query-param filters on GET /
+- `server/lib/version.ts` — `TOOL_COUNT_EXPECTED` 29 → 34
+- `mcpb/manifest.json` — 5 new tool entries
+- `tests/mcpToolsRegistry.test.ts` — category sizes 10/13/3/3 → 14/14/3/3
+- `tests/routes.test.ts` — 5 new specs for filter params + status
+  transitions
+- README.md / CONCEPT.md / mcpb/README.md / plugin/README.md /
+  marketplace.json / plugin/.claude-plugin/plugin.json /
+  cli/nexus.js / client/src/components/WelcomeScreen.jsx — count refs
+  29 → 34
+- `package.json`, `cli/package.json`, `mcpb/manifest.json`,
+  `plugin/.claude-plugin/plugin.json` — version 4.8.1 → 4.8.2
+- `CHANGELOG.md`, `ROADMAP.md` — this entry
+
+### Patterns codified
+
+- **Asymmetric CRUD is a smell.** When you have create + the special-case
+  done-transition + delete but no general update, you're betting that no
+  one will need intermediate transitions. The bet failed.
+- **List tools deserve filter args at the API level.** Filtering inside
+  the MCP tool over a full-board fetch works for small stores but
+  doesn't scale. `/api/tasks` query params now push the filter down to
+  the store layer.
+- **Reading without side effects matters.** `pop_thought` is great when
+  you want to commit to consuming the top; `list_thoughts` is for when
+  you want to look first.
+
 ## v4.8.1 — Audit-driven type drift cleanup
 
 Post-release patch following the v4.8.0 audit pass. The audit walked five

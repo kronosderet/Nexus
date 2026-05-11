@@ -183,6 +183,31 @@ export const writeTools: Tool[] = [
     },
   },
   {
+    // v4.8.2 — generalized task update. Pre-v4.8.2 the MCP only had
+    // create / complete (status=done) / delete. Status transitions like
+    // backlog → in_progress → review had no MCP surface, even though the
+    // dashboard PATCH endpoint supports them. This closes that gap.
+    name: 'nexus_update_task',
+    description:
+      'Update an existing task by id. Use this to move a task through statuses ' +
+      '(backlog → in_progress → review → done), adjust priority, reassign project, ' +
+      'or fix the title/description. For the specific "mark done" case, nexus_complete_task ' +
+      'is still the ergonomic shortcut. For deletion, nexus_delete_task. ' +
+      'Returns the updated task. Fields not provided are left unchanged.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'number', description: 'Task id to update.' },
+        status: { type: 'string', enum: ['backlog', 'in_progress', 'review', 'done'], description: 'New status. Skip to keep current.' },
+        priority: { type: 'number', description: 'New priority (0=low, 1=normal, 2=high).' },
+        project: { type: 'string', description: 'Reassign to a different project.' },
+        title: { type: 'string', description: 'Rewrite the title.' },
+        description: { type: 'string', description: 'Rewrite the description.' },
+      },
+      required: ['id'],
+    },
+  },
+  {
     name: 'nexus_log_activity',
     description:
       'Log an activity entry into the live activity stream. Use for notable events that aren\'t full-fledged tasks ' +
@@ -471,6 +496,26 @@ export const writeHandlers: Record<string, (args: any) => Promise<string>> = {
       lines.push(`  ◈ Auto-resolved ${result.resolvedThoughts} linked thought${result.resolvedThoughts! > 1 ? 's' : ''}`);
     }
     return lines.join('\n');
+  },
+
+  async nexus_update_task(args) {
+    if (args?.id == null) throw new Error('id is required');
+    // v4.8.2 — at least one mutating field must be supplied; otherwise the call
+    // is a no-op and the tool would silently succeed. Catch the misuse explicitly.
+    const patchableFields = ['status', 'priority', 'project', 'title', 'description'] as const;
+    const body: Record<string, unknown> = {};
+    for (const f of patchableFields) {
+      if (args[f] !== undefined) body[f] = args[f];
+    }
+    if (Object.keys(body).length === 0) {
+      throw new Error('Provide at least one field to update (status / priority / project / title / description).');
+    }
+    const result = await nexusFetch(`/api/tasks/${Number(args.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }) as { id: number; title: string; status: string; project?: string; priority?: number };
+    const changed = Object.keys(body).join(', ');
+    return `◈ Course adjusted #${result.id}\n  [${result.status}] ${result.title}\n  changed: ${changed}`;
   },
 
   async nexus_delete_task(args) {

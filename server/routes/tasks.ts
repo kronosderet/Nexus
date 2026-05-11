@@ -8,8 +8,29 @@ type BroadcastFn = (data: unknown) => void;
 export function createTaskRoutes(store: NexusStore, broadcast: BroadcastFn) {
   const router = Router();
 
-  router.get('/', (_req: Request, res: Response) => {
-    res.json(store.getAllTasks());
+  router.get('/', (req: Request, res: Response) => {
+    // v4.8.2 — query-param filters so MCP `nexus_list_tasks` (and any other
+    // consumer) can pull a scoped slice instead of the full board. All
+    // filters are optional; the unfiltered call still returns every task,
+    // preserving the dashboard contract.
+    const { project, status, priority, limit } = req.query;
+    let tasks = store.getAllTasks();
+    if (typeof project === 'string' && project) {
+      const p = project.toLowerCase();
+      tasks = tasks.filter(t => (t.project || '').toLowerCase() === p);
+    }
+    if (typeof status === 'string' && status) {
+      tasks = tasks.filter(t => t.status === status);
+    }
+    if (typeof priority === 'string' && priority) {
+      const n = Number(priority);
+      if (Number.isFinite(n)) tasks = tasks.filter(t => (t.priority ?? 0) === n);
+    }
+    if (typeof limit === 'string' && limit) {
+      const n = parseInt(limit, 10);
+      if (Number.isFinite(n) && n > 0) tasks = tasks.slice(0, n);
+    }
+    res.json(tasks);
   });
 
   router.post('/', (req: Request, res: Response) => {

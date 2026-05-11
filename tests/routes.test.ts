@@ -119,6 +119,51 @@ describe('Tasks API', () => {
     const res = await request(app).post('/api/tasks').send({ title: 'X', priority: 1.5 });
     expect(res.status).toBe(400);
   });
+
+  // v4.8.2 — GET /api/tasks query-param filters (drives nexus_list_tasks)
+  it('GET /api/tasks?project=X returns only tasks for that project', async () => {
+    await request(app).post('/api/tasks').send({ title: 'Filter-A', project: 'ProjA' });
+    await request(app).post('/api/tasks').send({ title: 'Filter-B', project: 'ProjB' });
+    const res = await request(app).get('/api/tasks?project=ProjA');
+    expect(res.status).toBe(200);
+    expect(res.body.every((t: { project?: string }) => t.project === 'ProjA')).toBe(true);
+    expect(res.body.some((t: { title: string }) => t.title === 'Filter-A')).toBe(true);
+    expect(res.body.some((t: { title: string }) => t.title === 'Filter-B')).toBe(false);
+  });
+
+  it('GET /api/tasks?status=in_progress returns only in-progress tasks', async () => {
+    const c = await request(app).post('/api/tasks').send({ title: 'WIP task' });
+    await request(app).patch(`/api/tasks/${c.body.id}`).send({ status: 'in_progress' });
+    const res = await request(app).get('/api/tasks?status=in_progress');
+    expect(res.status).toBe(200);
+    expect(res.body.every((t: { status: string }) => t.status === 'in_progress')).toBe(true);
+  });
+
+  it('GET /api/tasks?limit=2 caps the response', async () => {
+    const res = await request(app).get('/api/tasks?limit=2');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBeLessThanOrEqual(2);
+  });
+
+  it('PATCH /api/tasks/:id moves task through statuses (drives nexus_update_task)', async () => {
+    const c = await request(app).post('/api/tasks').send({ title: 'Status-transition' });
+    // backlog → in_progress
+    let res = await request(app).patch(`/api/tasks/${c.body.id}`).send({ status: 'in_progress' });
+    expect(res.body.status).toBe('in_progress');
+    // in_progress → review
+    res = await request(app).patch(`/api/tasks/${c.body.id}`).send({ status: 'review' });
+    expect(res.body.status).toBe('review');
+    // review → done
+    res = await request(app).patch(`/api/tasks/${c.body.id}`).send({ status: 'done' });
+    expect(res.body.status).toBe('done');
+  });
+
+  it('PATCH /api/tasks/:id can change priority + project simultaneously', async () => {
+    const c = await request(app).post('/api/tasks').send({ title: 'Multi-update' });
+    const res = await request(app).patch(`/api/tasks/${c.body.id}`).send({ priority: 2, project: 'NewProj' });
+    expect(res.body.priority).toBe(2);
+    expect(res.body.project).toBe('NewProj');
+  });
 });
 
 // ── Activity ──────────────────────────────────────────────
