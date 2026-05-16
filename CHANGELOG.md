@@ -9,6 +9,125 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.9.0 — Hook & memory hardening
+
+Audit-driven release. Three parallel agents (server, client, CLI/packaging) and
+a full read of `store.ts`, `dashboard.ts`, `storeMigrations.ts`, `types.ts`,
+and the MCP entrypoint surfaced 36 findings; this release lands **26 of them**
+(10 P0 bugs, 8 of 14 P1 quality items, 8 of 12 P2 polish bundles). The
+remaining 10 are well-scoped and queued for v4.9.1.
+
+**455 tests (+26 net) · 34 MCP tools · no migrations · no breaking changes.**
+Three new test files (`tests/hooks.test.ts`, `tests/storeFlush.test.ts`,
+`tests/taskCompletionAttribution.test.ts`) plus a +7-spec extension of
+`versionDrift.test.ts`. ~600 LOC of dead code deleted (`server/routes/{ai,
+notify,plans,terminal}.ts`).
+
+### P0 bug fixes (10 / 10)
+
+| # | What | Where |
+|---|---|---|
+| **B1** | Thought schema bug: hooks wrote `created_at`, schema is `pushed_at` — handoff thoughts NaN-sorted to the bottom of the LIFO and never resurfaced | `cli/hooks/session-stop.js` + plugin copy |
+| **B2** | Plugin hook drift — `plugin/server/hooks/` resynced byte-identical to `cli/hooks/`; prompt-submit no longer reverts to pre-v4.3 noise, session-start regains v4.7.6 Chapter Narrator | `plugin/server/hooks/{*.js}` |
+| **B3** | Kanban drop ReferenceError on every drag — `setTasks` → `tasksSlice.patch` | `client/src/modules/Command.jsx:280` |
+| **B4** | Rules-of-Hooks violation in `AnalysisBlock` crashed first Overseer chat reply — `useState` hoisted above early returns | `client/src/modules/Overseer.jsx:267-299` |
+| **B5** | StrategicView gap→task threw `fetchAll is not defined` — `onRefresh` prop now destructured | `client/src/modules/Command.jsx` |
+| **B6** | Duplicate embedding cache: route + lib both wrote `EMBED_CACHE_PATH` with divergent keys. Routes module dropped its fork; `lib/embeddings.ts` now in-memory-evicts on every `set` | `server/routes/embeddings.ts`, `server/lib/embeddings.ts` |
+| **B7** | `_flush()` mtime race — `_lastFlushAt` stamped BEFORE the rename so a failed flush no longer makes the watcher misclassify our own write as external | `server/db/store.ts:198-249` |
+| **B8** | `.claude-plugin/marketplace.json` was advertising v4.2.0 to `/plugin marketplace add` users; both `metadata.version` and `plugins[].version` now drift-guarded | `tests/versionDrift.test.ts` + marketplace bump |
+| **B9** | `recordTaskCompletion` silently dropped attribution when a task closed before today's session was logged. New `_pendingTaskCompletions` buffer drains in `createSession()` on matching project + day | `server/db/store.ts:579-630` |
+| **B10** | `/suggested-contradictions/:id/accept` and `/dismiss` now broadcast WS so the Conflicts tab updates without manual refresh | `server/routes/ledger.ts:306-336` |
+
+### P1 quality (8 / 14 shipped)
+
+- **Q1** Wired webhook routes back into `dashboard.ts` (unmounted since the
+  v4.7.6 MCPB split) and deleted four truly dead route files (`ai.ts`,
+  `notify.ts`, `plans.ts`, `terminal.ts`) — ~600 LOC removed.
+- **Q2** Consolidated three `detectAI()` implementations through
+  `lib/aiEndpoints.ts`. Added Anthropic to the canonical endpoint list +
+  `detectAI(endpoints)` overload. `autoSummary.ts` and `plan.ts` drop their
+  local forks; the Ollama-only-user gap in autoSummary is closed.
+- **Q7** `NexusProvider` context values (`coreVal` / `fuelVal` / `fleetVal`)
+  and per-slice handles now memoised. Kills the wide re-render cascade where
+  every WS event re-rendered every module.
+- **Q10** Drift guards for the three unguarded CLI tool-count strings
+  (`cli/nexus.js:468`, `:495`, `:1250`) and a new per-tool assertion: every
+  manifest tool must appear in `plugin/README.md` AND `mcpb/README.md`. Plugin
+  README Write section gains the missing `nexus_update_task`.
+- **Q11** `DigestWidget` WS refresh debounced 1 s — bursts of 4 events no
+  longer fire 4 sequential `/api/digest` fetches.
+- **Q12** Throttled error logging in `gpuPoller` + `overseerPoller`
+  (warning at most every 5 min so sustained outages surface instead of
+  silently dropping the 60 s GPU sample / 5 min risk scan).
+- **Q13** Path-traversal guards extracted: `safeProject()` lives in
+  `server/lib/path.ts` and is applied in `focus.ts` + `remediate.ts`
+  (previously only `github.ts` had it).
+- **Q14** Stable list keys across Overseer chat (the chat input cursor jump
+  fix), `Log` decisions/blockers, and `Fuel` per-task rows.
+
+**Deferred to v4.9.1** (well-scoped): Q3 `_flush` coalescing, Q4
+`_significantWords` per-decision caching, Q5 standalone-mode poller story,
+Q6 CLI verbs for the 10 MCP-only operations, Q8 route tests for
+handover/usage/estimator/plan/autoSummary, Q9 extending the MCPB smoke test
+from 13/34 to 28/34 tool coverage.
+
+### P2 polish (8 / 12 shipped)
+
+- **E_const** Shared `EDGE_RELS`, `EDGE_REL_SET`, `GENERIC_TAGS`, `isGenericTag`
+  in new `server/lib/constants.ts` — three duplicate literals collapsed.
+- **E_type** `_autolinkConfig` typed on `NexusData` — drops two `as any` casts
+  in `store.ts`.
+- **E_store** Three single-line store fixes: heatmap activity cap honest
+  (2000 → 500 to match `store.ts:413`), `getSelfCritique` ceiling 24 h → 30 d
+  so multi-day tasks surface, `_significantWords` regex Unicode-aware
+  (`\p{L}\p{N}`) so non-ASCII decisions auto-link.
+- **E_terminal** Terminal `onclose` stale-closure fixed via `outputLenRef` (no
+  more "Terminal not available" spam on reconnect).
+- **E_winregex** `risk.fix.cmd` regex accepts both Windows and POSIX path
+  separators so risk-fix actions don't lose the `project` arg on Win11.
+- **E_skillname** Added required `name:` frontmatter (per 2026 SKILL.md
+  spec) to 9 skills + 1 agent.
+- **E_searchparallel** `smartSearch.ts` uses `Promise.all` instead of
+  sequential `await` — ~30× speed-up on cold cache for ~300 corpus items.
+- **E_locale** Replaced 6 hardcoded `cs-CZ` literals (Overseer × 4, Command,
+  ClockWidget) with `formatLocaleTime` / `formatLocaleDate` /
+  `formatLocaleDateTime`. New `formatLocaleDateTime` helper in `lib/locale.js`.
+
+**Deferred to v4.9.1**: `E_time` `lib/time.js` consolidating 6 `relativeAge`
+duplicates, `E_components` `<ProgressBar>` + `<EmptyState>` extraction,
+`E_accessors` `deleteSession()` etc. (5 direct `store.data.*` mutations),
+`E_confirm` `<ConfirmDialog>` replacing `window.prompt`/`window.confirm`.
+
+### New test files
+
+- `tests/hooks.test.ts` — 11 specs covering canonical Thought shape (4 ×
+  CLI + 4 × plugin = 8) and CLI↔plugin hook byte-parity (3).
+- `tests/storeFlush.test.ts` — 4 specs covering `_lastFlushAt` timing and
+  the mtime grace window.
+- `tests/taskCompletionAttribution.test.ts` — 4 specs covering direct
+  attribution, deferred buffer drain, cross-project isolation, and
+  deduplication.
+
+### Patterns codified
+
+- **Silent metabrain regressions deserve type-guarded fixtures**
+  (`tests/hooks.test.ts` — schema mismatch couldn't have shipped if a 5-line
+  fixture spec existed).
+- **Buffer when ordering is uncertain**: `_pendingTaskCompletions` drains on
+  the natural pairing event (`createSession`) instead of losing data when
+  the ordering invariant is wrong.
+- **Cross-process race fences need both pre- and post- markers**
+  (`_lastFlushAt` stamped twice around the rename).
+- **Single-cache rule**: when two modules write the same file with different
+  keys, the cache is dead in the worst possible way — silently halved.
+- **Drift guards must scan version literals AND per-tool listings**: tool
+  count alone doesn't catch a missing entry in a 34-tool list.
+
+### Files touched
+
+48 modified, 4 deleted, 4 added. See `git diff --stat 5655d3a..HEAD` for the
+full surface.
+
 ## v4.8.2 — MCP management coverage
 
 Post-v4.8.1 patch closing the standing MCP-tool asymmetry. The Captain's

@@ -1,4 +1,5 @@
 ---
+name: overseer
 description: Strategic AI advisor with access to the full Nexus metabrain — decisions, sessions, tasks, fuel patterns
 ---
 

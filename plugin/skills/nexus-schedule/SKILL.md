@@ -1,4 +1,5 @@
 ---
+name: nexus-schedule
 description: Set up recurring Nexus audits and scans via mcp__scheduled-tasks__*
 disable-model-invocation: true
 ---

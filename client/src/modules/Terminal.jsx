@@ -10,6 +10,10 @@ export default function TerminalModule() {
   const outputRef = useRef(null);
   const lineId = useRef(0);
   const inputRef = useRef(null);
+  // v4.9.0 #754 — ref-mirror of output.length so onclose can read the live
+  // value instead of the stale closure capture from the initial-mount useEffect.
+  const outputLenRef = useRef(0);
+  useEffect(() => { outputLenRef.current = output.length; }, [output.length]);
 
   useEffect(() => {
     // Terminal WebSocket only available on dev server, not dashboard
@@ -26,7 +30,11 @@ export default function TerminalModule() {
     ws.onopen = () => setConnected(true);
     ws.onclose = () => {
       setConnected(false);
-      if (output.length === 0) {
+      // v4.9.0 #754 — read CURRENT output length via ref so a mid-session
+      // reconnect doesn't spam the "not available" row. Pre-fix `output.length`
+      // was captured from the initial-mount closure (empty `[]` deps) and was
+      // always 0, so every reconnect appended another "not available" line.
+      if (outputLenRef.current === 0) {
         setOutput([{ id: ++lineId.current, type: 'system', text: '◈ Terminal not available in dashboard mode. Use Claude Code terminal instead.' }]);
       }
     };

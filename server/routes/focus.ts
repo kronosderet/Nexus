@@ -3,13 +3,16 @@ import { execSync } from 'child_process';
 import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
 import { PROJECTS_DIR } from '../lib/config.ts';
+// v4.9.0 #747 — guard against path traversal via the :project URL param.
+import { safeProject } from '../lib/path.ts';
 
 export function createFocusRoutes(store: NexusStore): Router {
   const router = Router();
 
   // Get full focus view for a project
   router.get('/:project', (req: Request, res: Response) => {
-    const project = String(req.params.project);
+    const project = safeProject(req.params.project);
+    if (!project) return res.status(400).json({ error: 'Invalid project name.' });
     const p = project.toLowerCase();
     const projectPath = join(PROJECTS_DIR, project);
 

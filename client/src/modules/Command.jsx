@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
 import FuelFreshnessStamp from '../components/FuelFreshnessStamp.jsx';
+// v4.9.0 #759 — honour the cs/en locale toggle for time formatting.
+import { formatLocaleTime } from '../lib/locale.js';
 import TodayView from './command/TodayView.jsx';
 
 // ── Shared helpers ──────────────────────────────────────
@@ -277,7 +279,12 @@ export default function Command({ ws }) {
   async function handleUpdate(id, updates) { await api.updateTask(id, updates); }
   async function handleDelete(id) { await api.deleteTask(id); }
   async function handleDrop(taskId, newStatus) {
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+    // v4.9.0 #727 — Command no longer owns local `tasks` state (post-v4.4.1
+    // NexusProvider rewrite); use the slice's patch callback for the optimistic
+    // update. Pre-fix this called `setTasks` which was renamed away → every
+    // Kanban drop threw ReferenceError; the WS round-trip eventually papered
+    // over it but the optimistic UX was dead.
+    tasksSlice.patch(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
     await api.updateTask(taskId, { status: newStatus });
   }
   // Composite workflows: Start/Ship/Park (push thought + log activity + status change in one shot)
@@ -628,7 +635,7 @@ function LaterPanel({ backlog, onUpdate, onStart }) {
   );
 }
 
-function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predict, critique, fuel, workload, recentActivity, risks = [], onDismissRisk, riskKey, loadingPlan, onRefreshPlan, onUpdate, onStart, onShip, onPark }) {
+function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predict, critique, fuel, workload, recentActivity, risks = [], onDismissRisk, riskKey, loadingPlan, onRefreshPlan, onRefresh, onUpdate, onStart, onShip, onPark }) {
   const gaps = predict?.suggestions || [];
   const planTasks = parsePlanTasks(plan?.aiPlan);
   const focus = planFocus(plan?.aiPlan);
@@ -865,7 +872,7 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
                     <span className={`text-[9px] font-mono uppercase ${CATEGORY_COLOR[g.category] || 'text-nexus-text-faint'}`}>{CATEGORY_LABEL[g.category] || g.category}</span>
                     <p className="text-xs text-nexus-text-dim truncate">{g.title}</p>
                   </div>
-                  <button onClick={() => { api.createTask({ title: g.title, description: g.reason, priority: g.priority || 1 }).then(() => fetchAll()).catch(() => {}); }}
+                  <button onClick={() => { api.createTask({ title: g.title, description: g.reason, priority: g.priority || 1 }).then(() => onRefresh?.()).catch(() => {}); }}
                     className="text-nexus-text-faint hover:text-nexus-amber shrink-0" title="Create task from gap"><Plus size={10} /></button>
                 </div>
               );
@@ -883,7 +890,7 @@ function StrategicView({ tasks, inProgress, backlog, done, thoughts, plan, predi
           <div className="space-y-1">
             {recentDone.slice(0, 8).map(t => {
               // Show completion time + age (how long task existed in backlog)
-              const completedAt = t.updated_at ? new Date(t.updated_at).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) : null;
+              const completedAt = t.updated_at ? formatLocaleTime(t.updated_at) : null;
               const ageMs = (t.created_at && t.updated_at) ? new Date(t.updated_at).getTime() - new Date(t.created_at).getTime() : 0;
               const ageDays = Math.floor(ageMs / 86400000);
               const ageLabel = ageDays > 0 ? `${ageDays}d in backlog` : null;

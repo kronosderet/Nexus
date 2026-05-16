@@ -3,6 +3,8 @@ import type { NexusStore } from '../db/store.ts';
 import type { Decision, GraphEdge } from '../types.ts';
 import { validateBody } from '../lib/validate.ts';
 import { NewDecisionSchema, AutolinkConfigSchema } from '../lib/validators.ts';
+// v4.9.0 #749 — EDGE_REL_SET and isGenericTag live in lib/constants.ts now.
+import { EDGE_REL_SET, isGenericTag } from '../lib/constants.ts';
 
 type BroadcastFn = (data: unknown) => void;
 
@@ -170,16 +172,9 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
     }
 
     // Cross-project: link decisions with same tags.
-    // v4.4.1 #314 — blacklist generic tags that every project uses as metadata. Without this
-    // guard, `milestone` (52 edges) + `github` (16 edges) dominated the Nexus ↔ Firewall-Godot
-    // cross-project graph with 68/77 false positives. These tags label "version shipping" and
-    // "github repo created" which every project does; shared values don't imply coupling.
-    const GENERIC_TAGS = new Set([
-      'milestone', 'shipped', 'released', 'release', 'audit', 'polish',
-      'github', 'git', 'hygiene-migration', 'version', 'versioning',
-    ]);
-    const isGenericTag = (t: string) => GENERIC_TAGS.has(t.toLowerCase()) || /^v\d/i.test(t);
-
+    // v4.4.1 #314 — blacklist generic tags that every project uses as metadata.
+    // v4.9.0 #749 — GENERIC_TAGS + isGenericTag live in lib/constants.ts; same
+    // set is also used by storeMigrations.ts for the v4.4.1-H3 cleanup migration.
     const byTag: Record<string, Decision[]> = {};
     for (const d of decisions) {
       for (const t of (d.tags || [])) {
@@ -230,11 +225,8 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
   router.patch('/link/:id', (req: Request, res: Response) => {
     const id = Number(req.params.id);
     const { rel, note } = req.body ?? {};
-    const ALLOWED: ReadonlySet<GraphEdge['rel']> = new Set([
-      'led_to', 'replaced', 'depends_on', 'contradicts', 'related', 'informs', 'experimental',
-    ] as const);
-    if (rel && !ALLOWED.has(rel)) {
-      return res.status(400).json({ error: `rel must be one of: ${[...ALLOWED].join(', ')}` });
+    if (rel && !EDGE_REL_SET.has(rel)) {
+      return res.status(400).json({ error: `rel must be one of: ${[...EDGE_REL_SET].join(', ')}` });
     }
     const edges = store.getAllEdges();
     const edge = edges.find((e: GraphEdge) => e.id === id);
@@ -315,6 +307,11 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
     const note = `Accepted from Overseer scan (scan_id=${suggestion.scan_id}, confidence=${suggestion.confidence.toFixed(2)}): ${suggestion.reason}`;
     const edge = store.addEdge(suggestion.from_id, suggestion.to_id, 'contradicts', note.slice(0, 400));
     store.updateSuggestedContradiction(id, 'accepted');
+    // v4.9.0 #734 — broadcast WS so the Conflicts tab + Graph view drop the stale
+    // suggestion row immediately (pre-fix the row sat there until manual refresh).
+    // Matches the pattern from /link/:id PATCH at L245.
+    broadcast({ type: 'edge_update', payload: edge });
+    broadcast({ type: 'suggestion_update', payload: { id, status: 'accepted' } });
     res.json({ edge, suggestion: { ...suggestion, status: 'accepted' } });
   });
 
@@ -323,6 +320,9 @@ export function createLedgerRoutes(store: NexusStore, broadcast: BroadcastFn) {
     const id = Number(req.params.id);
     const updated = store.updateSuggestedContradiction(id, 'dismissed');
     if (!updated) return res.status(404).json({ error: 'Suggestion not found.' });
+    // v4.9.0 #734 — broadcast for the same reason as accept (Conflicts tab needs
+    // to drop the dismissed row without a manual refresh).
+    broadcast({ type: 'suggestion_update', payload: { id, status: 'dismissed' } });
     res.json({ suggestion: updated });
   });
 

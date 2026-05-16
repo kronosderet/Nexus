@@ -1,4 +1,5 @@
 ---
+name: nexus-thought-stack
 description: Use the Nexus Thought Stack + CC spawn_task together for bidirectional interrupt recovery
 disable-model-invocation: true
 ---

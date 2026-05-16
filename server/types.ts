@@ -191,6 +191,22 @@ export interface NexusData {
   // machine AND from a Cowork sandbox path the same user reaches over a different
   // surface. See server/lib/memoryBridge.ts for the default population logic.
   _memoryBridge?: MemoryBridgeConfig;
+  // v4.9.0 #733 — task completions that happened BEFORE any session was logged
+  // today. Pre-fix recordTaskCompletion silently dropped these (the function
+  // filtered sessions by today's date prefix and returned if no match). Now
+  // they're queued here and drained by logSession() on the next matching day +
+  // project, preserving session → task provenance even when ordering is off.
+  _pendingTaskCompletions?: PendingTaskCompletion[];
+  // v4.9.0 #750 — auto-link similarity threshold persisted by the UI slider.
+  // Pre-fix store.ts:307 cast `(this.data as any)._autolinkConfig`; now typed.
+  _autolinkConfig?: { semanticThreshold: number };
+}
+
+// v4.9.0 #733
+export interface PendingTaskCompletion {
+  task_id: number;
+  project: string | null;     // task's project at the time of completion, if known
+  completed_at: string;       // ISO timestamp
 }
 
 // v4.6.0 #398 — handover card payload.

@@ -1,4 +1,5 @@
 ---
+name: nexus-health
 description: Verify Nexus installation health — store, AI, hooks, tools
 disable-model-invocation: true
 ---

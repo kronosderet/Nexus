@@ -19,6 +19,14 @@ export function cosineSim(a: number[], b: number[]): number {
 }
 
 // ── Embedding cache ────────────────────────────────────
+// v4.9.0 #730 — single in-memory cache, single writer to EMBED_CACHE_PATH.
+// Before v4.9.0 server/routes/embeddings.ts had a DUPLICATE cache pointing at
+// the same file with a different key shape (200-char raw vs sha256(1000-char))
+// and no debounce/exit-flush. Two writers stomped each other; cache hits never
+// crossed. The route module now imports from here exclusively.
+const CACHE_MAX = 500;
+const CACHE_EVICT_TO = 400;
+
 let cache: Record<string, { vec: number[]; ts: number }> = {};
 if (existsSync(EMBED_CACHE_PATH)) {
   try { cache = JSON.parse(readFileSync(EMBED_CACHE_PATH, 'utf-8')); }
@@ -28,17 +36,24 @@ if (existsSync(EMBED_CACHE_PATH)) {
   }
 }
 
+// v4.9.0 #730 — in-memory eviction moved into the `set` path. Pre-fix eviction
+// only ran inside saveCache (debounced 2s); a write-heavy run could grow the
+// in-memory cache without bound between flushes.
+function setCacheEntry(key: string, vec: number[]): void {
+  cache[key] = { vec, ts: Date.now() };
+  const keys = Object.keys(cache);
+  if (keys.length > CACHE_MAX) {
+    const sorted = keys.sort((a, b) => (cache[a].ts || 0) - (cache[b].ts || 0));
+    for (const k of sorted.slice(0, keys.length - CACHE_EVICT_TO)) delete cache[k];
+  }
+}
+
 let savePending: NodeJS.Timeout | null = null;
 function saveCache() {
   // Debounce: write at most once per 2 seconds (reduced from 5s to limit crash-window data loss)
   if (savePending) return;
   savePending = setTimeout(() => {
     savePending = null;
-    const keys = Object.keys(cache);
-    if (keys.length > 500) {
-      const sorted = keys.sort((a, b) => (cache[a].ts || 0) - (cache[b].ts || 0));
-      for (const k of sorted.slice(0, keys.length - 400)) delete cache[k];
-    }
     try { writeFileSync(EMBED_CACHE_PATH, JSON.stringify(cache)); }
     catch (err) {
       console.warn('[embeddings] failed to persist cache:', (err as Error).message);
@@ -58,6 +73,17 @@ process.on('exit', () => {
   }
 });
 
+// v4.9.0 #730 — exported helpers for routes/embeddings.ts (which dropped its
+// duplicate cache in favour of this module).
+export function getCacheSize(): number { return Object.keys(cache).length; }
+export function getCachePath(): string { return EMBED_CACHE_PATH; }
+/** Force an immediate flush of the in-memory cache to disk (cancels any pending debounce). */
+export function flushCache(): void {
+  if (savePending) { clearTimeout(savePending); savePending = null; }
+  try { writeFileSync(EMBED_CACHE_PATH, JSON.stringify(cache)); }
+  catch (err) { console.warn('[embeddings] flush failed:', (err as Error).message); }
+}
+
 export async function getEmbedding(text: string): Promise<number[] | null> {
   // Hash full text to avoid collisions from truncation
   const key = createHash('sha256').update(text.slice(0, 1000)).digest('hex').slice(0, 32);
@@ -74,7 +100,7 @@ export async function getEmbedding(text: string): Promise<number[] | null> {
     const data: { data?: Array<{ embedding?: number[] }> } = await res.json();
     const vec = data?.data?.[0]?.embedding;
     if (vec) {
-      cache[key] = { vec, ts: Date.now() };
+      setCacheEntry(key, vec);
       saveCache();
     }
     return vec || null;

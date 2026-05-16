@@ -1,4 +1,5 @@
 ---
+name: nexus-plan
 description: Generate an AI-powered session plan based on fuel, tasks, and knowledge graph
 disable-model-invocation: true
 ---

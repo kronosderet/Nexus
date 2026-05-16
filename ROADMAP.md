@@ -96,7 +96,41 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.8.2 (MCP management coverage · shipped 2026-05-10)
+## Current — v4.9.0 (Hook & memory hardening · shipped 2026-05-16)
+
+Audit-driven release. Three parallel agents (server / client / CLI+packaging)
+surfaced 36 findings across the codebase post-v4.8.2 — none of them overlapping
+with the known `AIConnection` drift, the RAM-pressure Vitest flake, the
+cross-project task leak, or the `MCPB lags repo` gotcha. This release lands
+**26 of them** (10 P0, 8 of 14 P1, 8 of 12 P2). The remaining 10 are
+well-scoped and queued for v4.9.1.
+
+**455 tests · 34 MCP tools · no migrations · no breaking changes.**
+
+Highlights:
+- **B1 silent metabrain regression caught** — handoff thoughts wrote
+  `created_at` instead of `pushed_at`, NaN-sorted to the bottom of the LIFO
+  stack, and never resurfaced. Plugin hooks resynced byte-identical to CLI.
+- **Data-layer hardening**: `_flush()` mtime race closed, duplicate embedding
+  cache collapsed (~50 LOC dedup), `recordTaskCompletion` pending-buffer
+  prevents silent attribution drops when a task closes before today's session
+  is logged.
+- **Public-surface drift fix**: `.claude-plugin/marketplace.json` was
+  advertising v4.2.0 for ~5 releases; now drift-guarded.
+- **~600 LOC of dead code removed** (`server/routes/{ai,notify,plans,terminal}.ts`);
+  webhook routes revived back into `dashboard.ts`.
+- **Path-traversal vector closed**: `safeProject()` extracted from `github.ts`
+  to `lib/path.ts`; `focus.ts` and `remediate.ts` now guard the user-supplied
+  project param before joining into `PROJECTS_DIR`.
+
+Deferred to v4.9.1: `_flush` coalescing (Q3 + Q4), standalone-mode poller
+story (Q5), 10 CLI verbs for the MCP-only operations (Q6), route tests for
+handover/usage/estimator/plan/autoSummary (Q8), MCPB smoke-test coverage
+13/34 → 28/34 (Q9), `lib/time.js` + `<ProgressBar>` / `<EmptyState>` /
+`<ConfirmDialog>` extractions, `deleteSession()` plus the remaining direct
+`store.data.*` mutations.
+
+## Previous — v4.8.2 (MCP management coverage · shipped 2026-05-10)
 
 Post-v4.8.1 patch closing the standing MCP-tool asymmetry. The audit revealed
 the task-management surface had `create_task` + `complete_task` (status=done)

@@ -94,8 +94,10 @@ function SessionCard({ session }) {
           </button>
           {expanded && (
             <div className="mt-2 space-y-2 pl-3 border-l-2 border-nexus-border">
-              {session.decisions?.length > 0 && <div><span className="text-xs font-mono text-nexus-green">Decisions:</span><ul className="mt-0.5">{session.decisions.map((d, i) => <li key={i} className="text-xs text-nexus-text-dim">• {d}</li>)}</ul></div>}
-              {session.blockers?.length > 0 && <div><span className="text-xs font-mono text-nexus-amber flex items-center gap-1"><AlertTriangle size={10} />Blockers:</span><ul className="mt-0.5">{session.blockers.map((b, i) => <li key={i} className="text-xs text-nexus-text-dim">• {b}</li>)}</ul></div>}
+              {/* v4.9.0 #748 — stable keys scoped per session.id so React doesn't
+                  reuse the wrong DOM if decisions/blockers ever get re-ordered. */}
+              {session.decisions?.length > 0 && <div><span className="text-xs font-mono text-nexus-green">Decisions:</span><ul className="mt-0.5">{session.decisions.map((d, i) => <li key={`${session.id}-d-${i}-${String(d).slice(0, 20)}`} className="text-xs text-nexus-text-dim">• {d}</li>)}</ul></div>}
+              {session.blockers?.length > 0 && <div><span className="text-xs font-mono text-nexus-amber flex items-center gap-1"><AlertTriangle size={10} />Blockers:</span><ul className="mt-0.5">{session.blockers.map((b, i) => <li key={`${session.id}-b-${i}-${String(b).slice(0, 20)}`} className="text-xs text-nexus-text-dim">• {b}</li>)}</ul></div>}
             </div>
           )}
         </>

@@ -179,16 +179,21 @@ async function semanticSearch(corpus: CorpusItem[], query: string, cache: EmbedC
   const queryVec = await getEmbedding(query, cache);
   if (!queryVec) return [];
 
+  // v4.9.0 #757 — parallelise embeddings. Pre-fix the per-item awaits were
+  // serialised, so a cold cache with N=300 corpus items meant 300 round-trips
+  // in sequence. The embeddings endpoint handles parallel requests natively;
+  // Promise.all completes in roughly max(per-item) rather than sum.
+  const vectors = await Promise.all(
+    corpus.map((item) => getEmbedding(item.text.slice(0, 500), cache).catch(() => null)),
+  );
   const scored: ScoredItem[] = [];
-  for (const item of corpus) {
-    const itemVec = await getEmbedding(item.text.slice(0, 500), cache);
+  for (let idx = 0; idx < corpus.length; idx++) {
+    const itemVec = vectors[idx];
     if (!itemVec) continue;
-
     // Dot product (vectors are approximately normalized by nomic-embed)
     let dot = 0;
     for (let i = 0; i < queryVec.length; i++) dot += queryVec[i] * itemVec[i];
-
-    scored.push({ ...item, score: dot });
+    scored.push({ ...corpus[idx], score: dot });
   }
 
   return scored.sort((a, b) => b.score - a.score);

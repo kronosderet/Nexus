@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import type {
   NexusData, Task, ActivityEntry, Session, Scratchpad,
   UsageEntry, GpuSnapshot, Decision, GraphEdge, GraphData, SessionTiming,
-  Bookmark, AdviceEntry, Thought, RiskItem,
+  Bookmark, AdviceEntry, Thought, RiskItem, PendingTaskCompletion,
 } from '../types.js';
 import { findSimilar } from '../lib/embeddings.ts';
 import { scanCCMemories, type MemoryEntry } from '../lib/memoryIndex.ts';
@@ -233,6 +233,15 @@ export class NexusStore {
         }
         throw err;
       }
+      // v4.9.0 #731 — stamp _lastFlushAt BEFORE the rename, then re-stamp on
+      // success. Pre-fix the stamp ran only after rename completion. If the
+      // rename (or the copy fallback below) advanced the file's mtime but then
+      // threw before the stamp ran, the watcher's mtime-vs-_lastFlushAt guard
+      // misclassified our own partial write as an external one → reload()
+      // clobbered in-memory state with whatever ended up on disk. Setting
+      // BEFORE the rename closes the race; setting AFTER captures the true
+      // completion time once everything succeeded.
+      this._lastFlushAt = Date.now();
       // Promote tmp → primary (atomic on same filesystem)
       try {
         renameSync(getTmpPath(), getDbPath());
@@ -295,14 +304,16 @@ export class NexusStore {
   // Range clamped 0.4..0.95 to match the UI slider, with 0.55 fallback if the
   // stored value is missing or out of range.
   getAutolinkConfig(): { semanticThreshold: number } {
-    const raw = (this.data as any)._autolinkConfig;
+    // v4.9.0 #750 — _autolinkConfig is now typed on NexusData; no `as any` cast.
+    const raw = this.data._autolinkConfig;
     const t = raw?.semanticThreshold;
     const valid = typeof t === 'number' && Number.isFinite(t) && t >= 0.4 && t <= 0.95;
     return { semanticThreshold: valid ? t : 0.55 };
   }
   setAutolinkConfig(config: { semanticThreshold: number }): { semanticThreshold: number } {
     const t = Math.max(0.4, Math.min(0.95, Number(config.semanticThreshold) || 0.55));
-    (this.data as any)._autolinkConfig = { semanticThreshold: t };
+    // v4.9.0 #750 — typed via NexusData; no `as any` cast.
+    this.data._autolinkConfig = { semanticThreshold: t };
     this._flush();
     return { semanticThreshold: t };
   }
@@ -557,6 +568,16 @@ export class NexusStore {
       created_at: this._now(),
     };
     this.data.sessions.push(session);
+    // v4.9.0 #733 — drain any pending task completions (tasks closed before
+    // today's session was logged). They get merged into completed_task_ids
+    // here so the session → task provenance thread stays intact.
+    const drained = this._drainPendingCompletions(session);
+    if (drained.length > 0) {
+      session.completed_task_ids = [
+        ...(session.completed_task_ids || []),
+        ...drained.filter(id => !(session.completed_task_ids || []).includes(id)),
+      ];
+    }
     this._flush();
     return session;
   }
@@ -567,18 +588,59 @@ export class NexusStore {
     return { sessions, activeTasks: tasks };
   }
 
-  /** Record that a task was completed during the most recent session today. */
+  /** Record that a task was completed during the most recent session today.
+   *  v4.9.0 #733: if no session today (task closed BEFORE today's session was
+   *  logged), buffer the attribution in _pendingTaskCompletions instead of
+   *  dropping it. logSession() drains the buffer for project + day matches.
+   *  Pre-fix the early return silently broke the session → task provenance
+   *  thread whenever the user marked a task done before opening their session. */
   recordTaskCompletion(taskId: number): void {
     const today = new Date().toISOString().slice(0, 10);
     const session = [...this.data.sessions]
       .filter(s => s.created_at.startsWith(today))
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-    if (!session) return;
-    if (!session.completed_task_ids) session.completed_task_ids = [];
-    if (!session.completed_task_ids.includes(taskId)) {
-      session.completed_task_ids.push(taskId);
-      this._flush();
+    if (session) {
+      if (!session.completed_task_ids) session.completed_task_ids = [];
+      if (!session.completed_task_ids.includes(taskId)) {
+        session.completed_task_ids.push(taskId);
+        this._flush();
+      }
+      return;
     }
+    // No session today — buffer for the next logSession() to pick up.
+    if (!this.data._pendingTaskCompletions) this.data._pendingTaskCompletions = [];
+    const already = this.data._pendingTaskCompletions.some(p => p.task_id === taskId);
+    if (already) return;
+    const task = this.data.tasks.find(t => t.id === taskId);
+    this.data._pendingTaskCompletions.push({
+      task_id: taskId,
+      project: task?.project ?? null,
+      completed_at: this._now(),
+    });
+    this._flush();
+  }
+
+  /** Drain pending task completions that match a freshly-logged session's
+   *  project + day. Returns the task ids that were attributed.
+   *  v4.9.0 #733 — called by logSession() automatically. */
+  private _drainPendingCompletions(session: Session): number[] {
+    const pending = this.data._pendingTaskCompletions;
+    if (!pending || pending.length === 0) return [];
+    const sessionDay = session.created_at.slice(0, 10);
+    const drained: number[] = [];
+    const remaining: PendingTaskCompletion[] = [];
+    for (const p of pending) {
+      const sameDay = p.completed_at.slice(0, 10) === sessionDay;
+      const projectMatch = !p.project || !session.project || p.project === session.project;
+      if (sameDay && projectMatch) {
+        drained.push(p.task_id);
+      } else {
+        remaining.push(p);
+      }
+    }
+    if (drained.length === 0) return [];
+    this.data._pendingTaskCompletions = remaining;
+    return drained;
   }
 
   /** Link an advice entry to a decision it led to. */
@@ -880,7 +942,11 @@ export class NexusStore {
     const stopwords = new Set(['this', 'that', 'with', 'from', 'have', 'been', 'will', 'should', 'could', 'would', 'about', 'into', 'more', 'also', 'than', 'them', 'then', 'each', 'when', 'which', 'their', 'does', 'were', 'what', 'some', 'other', 'over', 'only', 'very', 'just', 'because', 'through', 'after', 'before', 'between', 'under']);
     return new Set(
       text.toLowerCase()
-        .replace(/[^a-z0-9\s]/g, ' ')
+        // v4.9.0 #753 — Unicode-aware tokeniser. Pre-fix `[^a-z0-9\s]` stripped
+        // every accented or CJK character, so auto-linking effectively never
+        // matched non-ASCII decision text. `\p{L}\p{N}` keeps letters + digits
+        // from all Unicode planes (Latin, accents, CJK, …).
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
         .split(/\s+/)
         .filter(w => w.length > 3 && !stopwords.has(w))
     );
@@ -1206,7 +1272,10 @@ export class NexusStore {
       const created = Date.parse(t.created_at);
       const updated = Date.parse(t.updated_at);
       return { id: t.id, title: t.title, status: t.status, minutes: Math.round((updated - created) / 60000) };
-    }).filter(t => t.minutes >= 0 && t.minutes < 24 * 60); // sanity bounds
+    // v4.9.0 #753 — bumped ceiling 24h → 30d. Long-running tasks (Phase 7E,
+    // bigger refactor batches) commonly span 1-3 days; the prior 24h cut hid
+    // them from "slowest tasks" altogether, defeating the purpose.
+    }).filter(t => t.minutes >= 0 && t.minutes < 30 * 24 * 60); // sanity bounds
 
     if (withDuration.length === 0) {
       return { slowTasks: [], fastTasks: [], stuckTasks: [], averageCompletionMinutes: null, insights: ['Insufficient data for self-critique. Complete more tasks.'] };

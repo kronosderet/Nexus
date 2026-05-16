@@ -465,7 +465,7 @@ nexus summarize ${project} --commit    # AI generates + saves session log
 nexus handoff ${project}               # Generate context capsule for next agent
 \`\`\`
 
-### Key Commands Reference (46 CLI + 18 MCP tools)
+### Key Commands Reference (46 CLI + 34 MCP tools)
 \`\`\`
 CONTEXT:    nexus brief | quick | handoff | context | onboard
 FUEL:       nexus usage | fuel | intel | workload | plan
@@ -492,15 +492,22 @@ TOOLS:      nexus ai | notify | digest | gpu | bookmarks
 + Thoughts (^T) — interrupt-recovery stack overlay
 + Shortcuts (^/) — keyboard shortcut matrix
 
-### Native MCP Tools (18 tools via nexus.mcpb)
+### Native MCP Tools (34 tools via nexus.mcpb)
 Install: double-click mcpb/nexus.mcpb → restart Claude Desktop
-Read:    nexus_brief, nexus_get_plan, nexus_check_guard, nexus_search,
-         nexus_get_critique, nexus_predict_gaps, nexus_get_blast_radius,
-         nexus_ask_overseer
-Write:   nexus_create_task, nexus_complete_task, nexus_log_activity,
-         nexus_log_session, nexus_log_usage, nexus_record_decision,
-         nexus_link_decisions, nexus_push_thought, nexus_pop_thought
-Ritual:  nexus_bridge_session (end-of-work: auto-summary + handoff)
+Read (14):       nexus_brief, nexus_get_plan, nexus_check_guard, nexus_search,
+                 nexus_get_critique, nexus_predict_gaps, nexus_get_blast_radius,
+                 nexus_ask_overseer, nexus_version, nexus_read_handover,
+                 nexus_list_tasks, nexus_list_decisions, nexus_list_thoughts,
+                 nexus_list_sessions
+Write (14):      nexus_create_task, nexus_update_task, nexus_complete_task,
+                 nexus_delete_task, nexus_log_activity, nexus_log_session,
+                 nexus_log_usage, nexus_record_decision, nexus_update_decision,
+                 nexus_link_decisions, nexus_push_thought, nexus_pop_thought,
+                 nexus_import_cc_memories, nexus_update_handover
+Async AI (3):    nexus_ask_overseer_start, nexus_get_overseer_result,
+                 nexus_propose_edges
+Composite (3):   nexus_bridge_session, nexus_fleet_overview,
+                 nexus_calendar_runway
 
 ### Important Rules
 - Session fuel resets on a FIXED 5-HOUR schedule (not rolling from first use)
@@ -1247,7 +1254,7 @@ ${JSON.stringify(config, null, 2).split('\n').map(l => '    ' + l).join('\n')}
 
   ${amber('Commands:')}
     nexus hooks                     Claude Code lifecycle hooks (install/uninstall)
-    nexus mcp                       Print MCP server config (25 tools, v${NEXUS_VERSION})
+    nexus mcp                       Print MCP server config (34 tools, v${NEXUS_VERSION})
     nexus mcp --run                 Run the MCP stdio server (for debugging)
     nexus plan                      Autonomous session plan (AI-generated)
     nexus summarize [project]       Overseer writes session log (preview)

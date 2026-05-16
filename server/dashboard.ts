@@ -66,6 +66,11 @@ async function start() {
   const { createEmbeddingRoutes } = await import('./routes/embeddings.ts');
   const { createMemoryRoutes } = await import('./routes/memory.ts');
   const { createHandoverRoutes } = await import('./routes/handover.ts');
+  // v4.9.0 #735 — webhook routes revived after the v4.7.6 MCPB split dropped
+  // them off the mount list. fireWebhooks() + the outbound config persistence
+  // were dormant for ~5 releases. Re-wired here so Discord/Slack/Teams
+  // integrations work again.
+  const { createWebhookRoutes } = await import('./routes/webhooks.ts');
   const { SERVER_VERSION } = await import('./lib/version.ts');
   // v4.7.3 #310 — auto-scan contradiction poller (24h cadence)
   const { startContradictionPoller } = await import('./watchers/contradictionPoller.ts');
@@ -139,6 +144,8 @@ async function start() {
   app.use('/api/cc-memory', createMemoryRoutes(store, broadcast));
   // v4.6.0 #398 — Continuous Handover. Per-project markdown card replacing dated HANDOVER files.
   app.use('/api/handover', createHandoverRoutes(store, broadcast));
+  // v4.9.0 #735 — webhook outbound integrations (Discord/Slack/Teams/raw JSON).
+  app.use('/api/webhooks', createWebhookRoutes(store, broadcast));
 
   // Fleet overview (cross-project priority)
   app.get('/api/fleet', (_req, res) => res.json(store.getFleetOverview()));

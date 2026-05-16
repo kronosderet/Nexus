@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { BarChart3, GitCommit, CheckCircle2, FileEdit, BookOpen, Flame, AlertTriangle, Calendar, RefreshCw } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
 
@@ -17,13 +17,25 @@ export default function DigestWidget({ ws, onNavigate }) {
   // v4.4.1 #235 — auto-refresh on WS events that affect digest stats.
   // Previously cached "0 commits" long after a commit landed. Now subscribes to
   // activity / task_update / session_created / task_deleted and refetches.
+  // v4.9.0 #745 — debounce: 4 events in a burst (typical for a single commit:
+  // task_update + activity + session_created + …) used to fire 4 sequential
+  // /api/digest fetches. Now coalesced into one fetch per 1 s window.
+  const debounceTimer = useRef(null);
   useEffect(() => {
     if (!ws?.subscribe) return;
-    return ws.subscribe((msg) => {
+    const unsubscribe = ws.subscribe((msg) => {
       if (msg.type === 'activity' || msg.type === 'task_update' || msg.type === 'task_deleted' || msg.type === 'session_created') {
-        refresh();
+        if (debounceTimer.current) clearTimeout(debounceTimer.current);
+        debounceTimer.current = setTimeout(() => {
+          debounceTimer.current = null;
+          refresh();
+        }, 1000);
       }
     });
+    return () => {
+      if (debounceTimer.current) { clearTimeout(debounceTimer.current); debounceTimer.current = null; }
+      unsubscribe?.();
+    };
   }, [ws, refresh]);
 
   if (!digest) return null;

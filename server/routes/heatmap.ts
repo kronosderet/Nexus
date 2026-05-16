@@ -11,7 +11,9 @@ export function createHeatmapRoutes(store: NexusStore): Router {
 
     const now = new Date();
     const cutoff = new Date(now.getTime() - weeks * 7 * 86400000);
-    let activity = store.getActivity(2000);
+    // v4.9.0 #753 — store caps activity at 500 entries (store.ts:413). The
+    // previous 2000 ask was misleading and could imply we had a larger window.
+    let activity = store.getActivity(500);
 
     // Filter by date
     activity = activity.filter(a => new Date(a.created_at) >= cutoff);

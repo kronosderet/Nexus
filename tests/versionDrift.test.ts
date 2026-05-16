@@ -56,6 +56,25 @@ describe('version drift guard (v4.3.7 F1c)', () => {
     expect(pluginManifest.version).toBe(rootPkg.version);
   });
 
+  // v4.9.0 #732 — .claude-plugin/marketplace.json carries TWO version fields
+  // (metadata.version AND plugins[].version) that the previous drift test only
+  // matched against tool-count regex. Both fields had been stuck at 4.2.0 for
+  // every release since v4.3 — the public `/plugin marketplace add` card was
+  // advertising stale info. Pin both to the root version.
+  it('.claude-plugin/marketplace.json metadata.version matches root (v4.9.0 #732)', () => {
+    const marketplace = readJson<{ metadata: { version: string } }>(
+      join(REPO, '.claude-plugin', 'marketplace.json')
+    );
+    expect(marketplace.metadata.version).toBe(rootPkg.version);
+  });
+
+  it('.claude-plugin/marketplace.json plugins[0].version matches root (v4.9.0 #732)', () => {
+    const marketplace = readJson<{ plugins: Array<{ version: string }> }>(
+      join(REPO, '.claude-plugin', 'marketplace.json')
+    );
+    expect(marketplace.plugins[0]?.version).toBe(rootPkg.version);
+  });
+
   it('server/lib/version.ts exports version matching root package.json', async () => {
     // Dynamic import so any JSON-load error from version.ts surfaces as a failing test.
     const mod = await import('../server/lib/version.ts');
@@ -96,6 +115,25 @@ describe('version drift guard (v4.3.7 F1c)', () => {
         .toContain(`name: '${tool.name}'`);
     }
   });
+
+  // v4.9.0 #744 — plugin/README.md Write section was missing nexus_update_task
+  // (v4.8.2 addition) for an entire release. Drift guard so the README's
+  // per-tool listing must mention every manifest tool by name.
+  it('every tool name in manifest.json appears in plugin/README.md (v4.9.0 #744)', () => {
+    const readme = readFileSync(join(REPO, 'plugin', 'README.md'), 'utf-8');
+    for (const tool of manifest.tools) {
+      expect(readme, `tool "${tool.name}" in manifest but not listed in plugin/README.md`)
+        .toContain(tool.name);
+    }
+  });
+
+  it('every tool name in manifest.json appears in mcpb/README.md (v4.9.0 #744)', () => {
+    const readme = readFileSync(join(REPO, 'mcpb', 'README.md'), 'utf-8');
+    for (const tool of manifest.tools) {
+      expect(readme, `tool "${tool.name}" in manifest but not listed in mcpb/README.md`)
+        .toContain(tool.name);
+    }
+  });
 });
 
 /**
@@ -126,6 +164,10 @@ const TOOL_COUNT_DRIFT_CHECKS: DriftCheck[] = [
   { file: 'mcpb/manifest.json',                regex: /as (\d+)\s+native MCP tools/,          label: 'mcpb/manifest.json long_description' },
   { file: 'cli/nexus.js',                      regex: /•\s*(\d+)\s+native MCP tools/,         label: 'cli/nexus.js brief splash bullet' },
   { file: 'cli/nexus.js',                      regex: /metabrain as (\d+)\s+native MCP tools/, label: 'cli/nexus.js MCP server splash' },
+  // v4.9.0 #744 — these three onboard/help strings drifted unguarded from v4.x.
+  { file: 'cli/nexus.js',                      regex: /\(46 CLI \+ (\d+) MCP tools\)/,        label: 'cli/nexus.js onboard Key Commands Reference' },
+  { file: 'cli/nexus.js',                      regex: /Native MCP Tools \((\d+) tools via nexus\.mcpb\)/, label: 'cli/nexus.js onboard MCP section' },
+  { file: 'cli/nexus.js',                      regex: /MCP server config \((\d+) tools, v/,   label: 'cli/nexus.js help splash' },
   { file: '.claude-plugin/marketplace.json',   regex: /(\d+)\s+native MCP tools/,             label: 'marketplace.json plugin description' },
   { file: 'plugin/.claude-plugin/plugin.json', regex: /(\d+)\s+native MCP tools/,             label: 'plugin.json description' },
   // v4.4.9 — WelcomeScreen was drifting unnoticed (said "22 MCP tools" at v4.4.8,

@@ -5,7 +5,7 @@
  * stale-while-revalidate, and centralized WebSocket invalidation.
  * Eliminates ~18 redundant API calls across 8 modules.
  */
-import { createContext, useState, useRef, useEffect, useCallback } from 'react';
+import { createContext, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../hooks/useApi.js';
 
 // ── Contexts ─────────────────────────────────────────
@@ -53,7 +53,15 @@ function useSlice(fetchFn, pollMs = null) {
     return () => clearInterval(id);
   }, [pollMs, doFetch]);
 
-  return { data, loading, ensure, refresh, markStale, patch };
+  // v4.9.0 #741 — memoize the slice handle so its identity is stable across
+  // renders unless `data` or `loading` actually changes. Pre-fix every render
+  // of NexusProvider produced a fresh handle object → every consumer module
+  // re-rendered on every WS event, even when its own slice was untouched.
+  // Returning a memoized object lets the context-value memos below short-circuit.
+  return useMemo(
+    () => ({ data, loading, ensure, refresh, markStale, patch }),
+    [data, loading, ensure, refresh, markStale, patch],
+  );
 }
 
 // ── WS invalidation map ──────────────────────────────
@@ -145,19 +153,24 @@ export default function NexusProvider({ ws, children }) {
     });
   }, [ws]);
 
-  // Context values
-  const coreVal = {
+  // Context values — v4.9.0 #741 memoized so consumers don't re-render on
+  // every parent render. Slice handles themselves are now stable (see useSlice
+  // above); these memos depend only on the slice refs, so e.g. a Pulse-only
+  // consumer doesn't re-render when a Task slice updates.
+  const coreVal = useMemo(() => ({
     tasks, activity, sessions, thoughts,
     _ensureAll: () => { tasks.ensure(); activity.ensure(); sessions.ensure(); thoughts.ensure(); },
-  };
-  const fuelVal = {
+  }), [tasks, activity, sessions, thoughts]);
+
+  const fuelVal = useMemo(() => ({
     estimator, workload, timing, history, fuelIntel,
     _ensureAll: () => { estimator.ensure(); workload.ensure(); timing.ensure(); history.ensure(); fuelIntel.ensure(); },
-  };
-  const fleetVal = {
+  }), [estimator, workload, timing, history, fuelIntel]);
+
+  const fleetVal = useMemo(() => ({
     pulse, fleet, graph,
     _ensureAll: () => { pulse.ensure(); fleet.ensure(); graph.ensure(); },
-  };
+  }), [pulse, fleet, graph]);
 
   return (
     <NexusCoreCtx.Provider value={coreVal}>

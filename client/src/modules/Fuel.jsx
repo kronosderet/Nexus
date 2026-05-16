@@ -163,8 +163,9 @@ function TaskCostPanel({ entries, maxCost, totalAnalyzed }) {
               </button>
               {isOpen && hasTasks && (
                 <div className="mt-1 mb-2 ml-4 pl-3 border-l border-nexus-border/60 space-y-1">
+                  {/* v4.9.0 #748 — stable key from session timestamp so re-sort doesn't shuffle state. */}
                   {v.tasks.map((t, i) => (
-                    <div key={i} className="flex items-start gap-2 text-[10px] font-mono">
+                    <div key={`${t.session ?? 'unk'}-${t.cost}-${i}`} className="flex items-start gap-2 text-[10px] font-mono">
                       <span className="w-10 text-right tabular-nums text-nexus-text-dim shrink-0">{t.cost}%</span>
                       {/* v4.7.7 #268 — locale-aware date so dashboard cs/en toggle is honored */}
                       <span className="w-24 text-nexus-text-faint shrink-0" title={`${formatLocaleDate(t.session)} ${formatLocaleTime(t.session)}`}>
@@ -587,8 +588,9 @@ export default function FuelModule() {
             <span className="w-14 text-right" title="Fuel readings logged during this session">Readings</span>
           </div>
           <div className="space-y-2">
+            {/* v4.9.0 #748 — s.date is unique per session row; use it as the stable key. */}
             {visible.map((s, i) => (
-              <div key={i} className="flex items-center gap-3 text-xs font-mono">
+              <div key={`${s.date ?? 'unk'}-${s.duration ?? i}`} className="flex items-center gap-3 text-xs font-mono">
                 <span className="text-nexus-text-faint w-20 shrink-0">{s.date}</span>
                 {/* v4.6.5 #269 — inverted color scale: high burn = red, low = green */}
                 <Bar percent={s.burned} className="flex-1" invert />

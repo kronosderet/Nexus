@@ -12,6 +12,8 @@
 import type { NexusData, Decision, Task } from '../types.js';
 import { getDefaultMemoryBridgeConfig } from '../lib/memoryBridge.ts';
 import { classifyProject } from '../lib/projectConfig.ts';
+// v4.9.0 #749 — shared GENERIC_TAGS Set with routes/ledger.ts.
+import { isGenericTag } from '../lib/constants.ts';
 
 export function runMigrations(data: NexusData): number {
     let changed = 0;
@@ -194,16 +196,13 @@ export function runMigrations(data: NexusData): number {
     // That manufactured ~68 noise edges between Nexus ↔ Firewall-Godot alone. v4.4.1
     // added a blacklist to the auto-linker; this migration cleans up the residue at rest.
     if (!applied['v4.4.1-H3']) {
-      const genericTagsSet = new Set([
-        'milestone', 'shipped', 'released', 'release', 'audit', 'polish',
-        'github', 'git', 'hygiene-migration', 'version', 'versioning',
-      ]);
-      const isGeneric = (tag: string) => genericTagsSet.has(tag.toLowerCase()) || /^v\d/i.test(tag);
+      // v4.9.0 #749 — isGenericTag lives in lib/constants.ts now (shared with
+      // ledger.ts auto-link). The migration body is unchanged.
       const before = (data.graph_edges || []).length;
       data.graph_edges = (data.graph_edges || []).filter(e => {
         const match = /^Shared tag:\s*(.+)$/.exec(e.note || '');
         if (!match) return true;
-        return !isGeneric(match[1].trim());
+        return !isGenericTag(match[1].trim());
       });
       const pruned = before - data.graph_edges.length;
       if (pruned > 0) {

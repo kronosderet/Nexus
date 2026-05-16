@@ -1,4 +1,5 @@
 ---
+name: nexus-status
 description: Quick metabrain status check — fuel, in-progress tasks, thought stack
 disable-model-invocation: true
 ---

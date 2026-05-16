@@ -3,6 +3,8 @@ import { api } from '../hooks/useApi.js';
 import { useNexusFleet } from '../context/useNexus.js';
 import { Brain, RefreshCw, AlertTriangle, Shield, Send, Loader2, Play, CheckCircle2, XCircle, Clock, Search, X, Copy, Check } from 'lucide-react';
 import Chip from '../components/Chip.jsx';
+// v4.9.0 #759 — locale-aware date/time formatting honours the cs/en toggle.
+import { formatLocaleDate, formatLocaleTime, formatLocaleDateTime } from '../lib/locale.js';
 
 // v4.4.5 #381 — Copy-as-Markdown button. Audit flagged that Overseer answers
 // require manual highlight-and-copy. Wraps navigator.clipboard.writeText with
@@ -80,7 +82,11 @@ function RiskCard({ risk }) {
   }
 
   function extractProject(cmd) {
-    const match = cmd.match(/Projects\/(\S+)/) || cmd.match(/focus (\S+)/);
+    // v4.9.0 #755 — accept both forward and backward slashes so Win11 paths
+    // (Projects\Foo) match alongside POSIX paths (Projects/Foo). Pre-fix only
+    // the `/` form matched, so risk-fix actions silently lost the project arg
+    // on Windows.
+    const match = cmd.match(/Projects[\\\/](\S+)/) || cmd.match(/focus (\S+)/);
     return match?.[1] || '';
   }
 
@@ -107,8 +113,10 @@ function RiskCard({ risk }) {
             const ariaLabel = `${a.label}${projectPart}${paramPart} — remediate: ${risk.message || risk.category || ''}`;
             const isRunning = running === a.label;
             return (
+              // v4.9.0 #748 — stable key from action label so reorder doesn't
+              // shuffle the running-state across buttons.
               <button
-                key={i}
+                key={a.label ?? a.action ?? `act-${i}`}
                 onClick={() => a.action && executeFix(a.action, a.project, a.param, a.label)}
                 disabled={running !== null}
                 aria-label={ariaLabel}
@@ -265,6 +273,17 @@ function InlineCommitRow() {
 }
 
 function AnalysisBlock({ text }) {
+  // v4.9.0 #728 — Rules-of-Hooks fix: `useState` MUST run on every render in
+  // the same order. Pre-fix it was declared after two early returns (`if (!text)`
+  // and `if (sections.length === 0)`) — when AnalysisBlock transitioned from
+  // empty → populated, React threw "Rendered fewer hooks than expected" because
+  // the hook count changed across renders. Every Overseer chat reply tripped this.
+  // All hooks now declared at the top, before any conditional returns.
+  // v4.5.10 #347 — Convert-to-task shortcut per bullet. Creates a Nexus-project
+  // task with the bullet text as title. Users can re-assign project later from
+  // Command view. Feedback shown inline next to the button.
+  const [converted, setConverted] = useState({}); // { bulletKey: 'done' | 'busy' | 'err' }
+
   if (!text) return null;
 
   // Parse sections from the analysis
@@ -293,10 +312,6 @@ function AnalysisBlock({ text }) {
     return <p className="text-sm text-nexus-text-dim leading-relaxed whitespace-pre-wrap">{text}</p>;
   }
 
-  // v4.5.10 #347 — Convert-to-task shortcut per bullet. Creates a Nexus-project
-  // task with the bullet text as title. Users can re-assign project later from
-  // Command view. Feedback shown inline next to the button.
-  const [converted, setConverted] = useState({}); // { bulletKey: 'done' | 'busy' | 'err' }
   const convertBullet = async (key, text) => {
     if (converted[key]) return;
     setConverted(prev => ({ ...prev, [key]: 'busy' }));
@@ -731,8 +746,13 @@ export default function Overseer() {
                   <p className="text-center text-[11px] font-mono text-nexus-text-faint py-4">No Q&A matches these filters.</p>
                 )}
                 {visibleChatHistory.map((msg, i) => (
+                  // v4.9.0 #748 — stable key so React doesn't reuse DOM under
+                  // the wrong index when a new reply lands. Pre-fix `key={i}`
+                  // caused the chat input cursor to jump mid-typing because
+                  // the input element got recycled into a different bubble's
+                  // DOM slot.
                   <div
-                    key={i}
+                    key={msg.time ?? `idx-${i}`}
                     style={{ animationDelay: `${Math.min(i * 15, 90)}ms` }}
                     className={`animate-row-reveal p-2.5 rounded-lg ${
                     msg.role === 'user'
@@ -784,17 +804,17 @@ export default function Overseer() {
                       {/* v4.4.2 #345 — smart timestamp: "HH:MM" for today, "Nd · HH:MM"
                           for recent days, full date for older. Audit flagged that just
                           "22:52" was ambiguous across days. */}
-                      <span className="text-[8px] font-mono text-nexus-text-faint ml-auto" title={new Date(msg.time).toLocaleString('cs-CZ')}>
+                      <span className="text-[8px] font-mono text-nexus-text-faint ml-auto" title={formatLocaleDateTime(msg.time)}>
                         {(() => {
                           const d = new Date(msg.time);
                           const now = new Date();
-                          const timeStr = d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+                          const timeStr = formatLocaleTime(d);
                           if (d.toDateString() === now.toDateString()) return timeStr;
                           const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
                           if (d.toDateString() === yesterday.toDateString()) return `yest · ${timeStr}`;
                           const daysAgo = Math.floor((now.getTime() - d.getTime()) / 86400000);
                           if (daysAgo < 7) return `${daysAgo}d · ${timeStr}`;
-                          return d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }) + ' ' + timeStr;
+                          return formatLocaleDate(d, { day: 'numeric', month: 'numeric' }) + ' ' + timeStr;
                         })()}
                       </span>
                     </div>
@@ -998,7 +1018,8 @@ export default function Overseer() {
             )}
             {risks && risks.length > 0 && (
               <div className="space-y-2">
-                {risks.map((r, i) => <RiskCard key={i} risk={r} />)}
+                {/* v4.9.0 #748 — stable key prevents card reorder/state mixup. */}
+                {risks.map((r, i) => <RiskCard key={`${r.category ?? 'r'}:${r.message ?? i}`} risk={r} />)}
 
                 {/* Scan for actionable risks via remediation API */}
                 <AutoFixPanel />
@@ -1022,7 +1043,7 @@ export default function Overseer() {
                         : 'bg-nexus-blue/10 text-nexus-blue border border-nexus-blue/20'
                       }`}>{s.type === 'risk' ? 'RISK SCAN' : 'DIGEST'}</span>
                       <span className="text-[9px] font-mono text-nexus-text-faint ml-auto">
-                        {new Date(s.timestamp).toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        {formatLocaleDateTime(s.timestamp, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
                     {s.type === 'risk' && s.result && (

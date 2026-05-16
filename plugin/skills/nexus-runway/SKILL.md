@@ -1,4 +1,5 @@
 ---
+name: nexus-runway
 description: Check current session fuel runway against upcoming calendar events and recommend wrap-up time
 disable-model-invocation: true
 ---

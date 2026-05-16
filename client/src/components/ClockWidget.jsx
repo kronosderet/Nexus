@@ -3,6 +3,8 @@ import { Clock, Calendar, Timer, Fuel } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
 import { useTweenedNumber } from '../hooks/useMotion.js';
 import { SESSION_EXPIRED_SHORT, SESSION_EXPIRED_TOOLTIP } from '../lib/fuelLabels.js';
+// v4.9.0 #759 — honour the cs/en locale toggle for time formatting.
+import { formatLocaleTime } from '../lib/locale.js';
 
 function formatCountdown(ms) {
   if (ms <= 0) return 'now';
@@ -74,7 +76,7 @@ export default function ClockWidget({ ws }) {
 
   // Client-side time (ticks every second)
   const localNow = new Date();
-  const timeStr = localNow.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const timeStr = formatLocaleTime(localNow, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const dateStr = clock.date; // Date doesn't need ticking
 
   // Live countdowns — compute from server reference + elapsed since fetch

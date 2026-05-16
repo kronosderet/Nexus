@@ -1,64 +1,17 @@
 import { Router, type Request, type Response } from 'express';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
 import type { NexusStore } from '../db/store.ts';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const EMBED_CACHE_PATH = join(__dirname, '..', '..', 'nexus-embeddings.json');
-const EMBED_MODEL = 'text-embedding-nomic-embed-text-v1.5';
-const EMBED_URL = 'http://localhost:1234/v1/embeddings';
-
-// ── Vector math ────────────────────────────────────────
-function cosineSim(a: number[], b: number[]) {
-  let dot = 0, magA = 0, magB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    magA += a[i] * a[i];
-    magB += b[i] * b[i];
-  }
-  return dot / (Math.sqrt(magA) * Math.sqrt(magB));
-}
-
-// ── Embedding cache (persist to disk) ──────────────────
-let cache: Record<string, { vec: number[]; ts: number }> = {};
-if (existsSync(EMBED_CACHE_PATH)) {
-  try { cache = JSON.parse(readFileSync(EMBED_CACHE_PATH, 'utf-8')); } catch {}
-}
-
-function saveCache() {
-  // Keep cache bounded (max 500 entries)
-  const keys = Object.keys(cache);
-  if (keys.length > 500) {
-    const sorted = keys.sort((a, b) => (cache[a].ts || 0) - (cache[b].ts || 0));
-    for (const k of sorted.slice(0, keys.length - 400)) delete cache[k];
-  }
-  writeFileSync(EMBED_CACHE_PATH, JSON.stringify(cache));
-}
-
-async function getEmbedding(text: string): Promise<number[] | null> {
-  const key = text.slice(0, 200); // cache key
-  if (cache[key]?.vec) return cache[key].vec;
-
-  try {
-    const res = await fetch(EMBED_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: EMBED_MODEL, input: text.slice(0, 1000) }),
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return null;
-    const data: { data?: Array<{ embedding?: number[] }> } = await res.json();
-    const vec = data.data?.[0]?.embedding;
-    if (vec) {
-      cache[key] = { vec, ts: Date.now() };
-      saveCache();
-    }
-    return vec ?? null;
-  } catch {
-    return null;
-  }
-}
+// v4.9.0 #730 — single embedding cache lives in lib/embeddings.ts. Pre-fix this
+// route had its OWN cache pointing at the same file with a different key shape
+// (200-char raw vs sha256(1000-char)) and no debounce/exit-flush. Two writers
+// stomped each other; cache hits never crossed. Now everything goes through the
+// canonical helpers below.
+import {
+  getEmbedding,
+  cosineSim,
+  flushCache,
+  getCacheSize,
+  getCachePath,
+} from '../lib/embeddings.ts';
 
 // ── Build searchable corpus from store ─────────────────
 interface EmbedCorpusItem {
@@ -125,20 +78,20 @@ export function createEmbeddingRoutes(store: NexusStore) {
   });
 
   // Reindex: pre-embed all current data
-  router.post('/reindex', async (req: Request, res: Response) => {
+  router.post('/reindex', async (_req: Request, res: Response) => {
     const corpus = buildCorpus(store);
     let embedded = 0;
     for (const item of corpus) {
       const vec = await getEmbedding(item.text);
       if (vec) embedded++;
     }
-    saveCache();
-    res.json({ total: corpus.length, embedded, cacheSize: Object.keys(cache).length });
+    flushCache();
+    res.json({ total: corpus.length, embedded, cacheSize: getCacheSize() });
   });
 
   // Cache stats
-  router.get('/stats', (req: Request, res: Response) => {
-    res.json({ cacheSize: Object.keys(cache).length, cachePath: EMBED_CACHE_PATH });
+  router.get('/stats', (_req: Request, res: Response) => {
+    res.json({ cacheSize: getCacheSize(), cachePath: getCachePath() });
   });
 
   return router;

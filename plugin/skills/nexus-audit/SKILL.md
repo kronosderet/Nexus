@@ -1,4 +1,5 @@
 ---
+name: nexus-audit
 description: Run a code audit using the local AI Overseer to analyze the codebase
 disable-model-invocation: true
 ---

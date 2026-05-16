@@ -3,6 +3,8 @@ import { execSync } from 'child_process';
 import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
 import { PROJECTS_DIR } from '../lib/config.ts';
+// v4.9.0 #747 — sanitise user-supplied project before join(PROJECTS_DIR, …).
+import { safeProject } from '../lib/path.ts';
 
 type BroadcastFn = (data: unknown) => void;
 
@@ -16,6 +18,10 @@ const SAFE_COMMANDS: Record<string, (project: string, param?: string) => { cmd: 
   'nexus-task-done': (_, id) => ({ cmd: `npx nexus done ${id}`, cwd: PROJECTS_DIR }),
   'nexus-log': (_, msg) => ({ cmd: `npx nexus log "${msg}"`, cwd: PROJECTS_DIR }),
 };
+
+// v4.9.0 #747 — commands that operate on a project directory (vs. the nexus-*
+// commands that ignore project and run from PROJECTS_DIR root).
+const PROJECT_SCOPED = new Set(['git-status', 'git-stash', 'git-diff-stat', 'git-log', 'git-fetch']);
 
 export function createRemediateRoutes(store: NexusStore, broadcast: BroadcastFn): Router {
   const router = Router();
@@ -33,7 +39,16 @@ export function createRemediateRoutes(store: NexusStore, broadcast: BroadcastFn)
       return res.status(400).json({ error: `Unknown action. Available: ${Object.keys(SAFE_COMMANDS).join(', ')}` });
     }
 
-    const { cmd, cwd } = SAFE_COMMANDS[action](project, param);
+    // v4.9.0 #747 — refuse traversal-shaped project names before they reach
+    // join(PROJECTS_DIR, project). Only enforced for the project-scoped
+    // commands; the nexus-* commands ignore project entirely.
+    let safeName: string | undefined;
+    if (PROJECT_SCOPED.has(action)) {
+      const checked = safeProject(project);
+      if (!checked) return res.status(400).json({ error: 'Invalid project name.' });
+      safeName = checked;
+    }
+    const { cmd, cwd } = SAFE_COMMANDS[action](safeName ?? project ?? '', param);
 
     try {
       const output = execSync(cmd, { cwd, encoding: 'utf-8', timeout: 15000 }).trim();

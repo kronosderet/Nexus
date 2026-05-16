@@ -1,18 +1,12 @@
 import { Router, type Request, type Response } from 'express';
 import { execSync, execFileSync } from 'child_process';
 import { readdirSync, statSync } from 'fs';
-import { join, basename } from 'path';
+import { join } from 'path';
 import type { NexusStore } from '../db/store.ts';
 import { PROJECTS_DIR } from '../lib/config.ts';
-
-// v4.3.6 C1 — guard against path traversal when a project name comes from the wire.
-// Must be a simple basename (no separators, no parent refs, non-empty).
-function safeProject(name: unknown): string | null {
-  if (typeof name !== 'string' || name.length === 0) return null;
-  if (name !== basename(name)) return null;
-  if (name === '..' || name === '.' || name.includes('\0')) return null;
-  return name;
-}
+// v4.9.0 #747 — safeProject lives in lib/path.ts now (shared with focus.ts +
+// remediate.ts which had no traversal guard before).
+import { safeProject } from '../lib/path.ts';
 
 type BroadcastFn = (data: unknown) => void;
 

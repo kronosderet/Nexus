@@ -71,13 +71,19 @@ function main() {
     if (!alreadyTracked) {
       const maxThoughtId = data.thoughts.length > 0 ? Math.max(...data.thoughts.map(t => t.id)) : 0;
       const taskList = inProgress.map(t => `#${t.id} ${t.title}`).join(', ');
+      // v4.9.0 #725 — write the canonical Thought shape (server/types.ts: pushed_at,
+      // popped_at, related_task_id). Pre-fix used `created_at` which is not a
+      // Thought field; session-start.js sorts by `pushed_at` so handoff thoughts
+      // sorted to `new Date(undefined) === NaN` → bottom of LIFO → never resumed.
       data.thoughts.push({
         id: maxThoughtId + 1,
         text: `Session ended with ${inProgress.length} task(s) still in progress: ${taskList}`,
         context: `auto-pushed by session-stop hook for ${project}`,
         project,
+        pushed_at: now,
+        popped_at: null,
         status: 'active',
-        created_at: now,
+        related_task_id: inProgress[0]?.id ?? null,
       });
     }
   }

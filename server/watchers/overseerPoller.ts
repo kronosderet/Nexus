@@ -46,6 +46,12 @@ export function startOverseerPoller(store: NexusStore, broadcast: BroadcastFn, i
   return interval;
 }
 
+// v4.9.0 #746 — throttled outer-catch logging. Pre-fix the entire risk scan
+// caught readdirSync failures silently; if PROJECTS_DIR went missing (drive
+// unplugged, path renamed) the risk feed went empty with no signal.
+let _lastOuterWarnAt = 0;
+const _OUTER_WARN_INTERVAL_MS = 5 * 60 * 1000;
+
 function detectRisks(store: NexusStore) {
   const risks: any[] = [];
   const tasks = store.getAllTasks();
@@ -69,9 +75,19 @@ function detectRisks(store: NexusStore) {
         if (daysSince > 14) {
           risks.push({ level: 'warning', category: 'stale', project: name, message: `${name} has gone cold (${daysSince}d since last commit)` });
         }
-      } catch {}
+      } catch {
+        // per-repo failure is intentional — one bad repo shouldn't kill the scan
+      }
     }
-  } catch {}
+  } catch (err) {
+    // v4.9.0 #746 — outer catch covers PROJECTS_DIR readdir failures. Throttled
+    // so a sustained outage warns at most once per 5 minutes.
+    const now = Date.now();
+    if (now - _lastOuterWarnAt >= _OUTER_WARN_INTERVAL_MS) {
+      _lastOuterWarnAt = now;
+      console.warn(`◈ Overseer risk scan: project sweep failed (PROJECTS_DIR=${PROJECTS_DIR}): ${(err as Error).message}`);
+    }
+  }
 
   // Task risks
   for (const t of tasks) {

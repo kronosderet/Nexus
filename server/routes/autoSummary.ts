@@ -3,10 +3,14 @@ import type { NexusStore } from '../db/store.ts';
 import { createGpuAwareSignal } from '../lib/gpuSignal.ts';
 import { acquireAiLock } from '../lib/aiSemaphore.ts';
 import { aiFetch } from '../lib/aiFetch.ts';
+// v4.9.0 #736 — use the canonical detectAI / endpoint list from lib/aiEndpoints.ts
+// instead of a duplicate local copy. Pre-fix this route had its own anthropic-only
+// AI_ENDPOINTS array and a forked detectAI; the route silently broke for users
+// running Ollama-only because the local list didn't include them.
+import { detectAI, ANTHROPIC_ENDPOINTS, type AIConnection } from '../lib/aiEndpoints.ts';
 
 // v4.3.5 P1 — local AI types.
 interface AIConfig { base: string; model: string }
-interface OpenAIModelsResponse { data?: Array<{ id: string }> }
 interface ParsedSummary {
   summary: string;
   decisions?: string[];
@@ -22,24 +26,10 @@ interface ParsedSummary {
  * blockers — then optionally saves it as a real session entry.
  */
 
-const AI_ENDPOINTS = [
-  { name: 'LM Studio (Anthropic)', base: 'http://localhost:1234/v1', type: 'anthropic' },
-];
-
-async function detectAI(): Promise<{ available: boolean; base?: string; model?: string }> {
-  for (const ep of AI_ENDPOINTS) {
-    try {
-      const res = await fetch(`${ep.base}/models`, { signal: AbortSignal.timeout(2000) });
-      if (!res.ok) continue;
-      const data: OpenAIModelsResponse = await res.json();
-      const models = (data.data || [])
-        .filter((m) => !m.id.includes('embed'))
-        .map((m) => m.id);
-      if (models.length === 0) continue;
-      return { available: true, base: ep.base, model: models[0] };
-    } catch {}
-  }
-  return { available: false };
+/** Detect an Anthropic-compatible local AI. Falls back to nothing if neither
+ *  LM Studio's /messages endpoint nor a generic openai endpoint is online. */
+async function detectAnthropicAI(): Promise<AIConnection> {
+  return detectAI(ANTHROPIC_ENDPOINTS);
 }
 
 async function askAI(ai: AIConfig, system: string, prompt: string, maxTokens = 1000): Promise<string> {
@@ -117,7 +107,7 @@ export function createAutoSummaryRoutes(store: NexusStore, broadcast: (data: unk
 }
 
 async function generateSummary(store: NexusStore, project: string) {
-  const ai = await detectAI();
+  const ai = await detectAnthropicAI();
   if (!ai.available) {
     return { error: 'No local AI detected. Start LM Studio.' };
   }

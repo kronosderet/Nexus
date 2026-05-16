@@ -2,10 +2,13 @@ import { Router, type Request, type Response } from 'express';
 import type { NexusStore } from '../db/store.ts';
 import type { Task, RiskItem } from '../types.ts';
 import { classifyProject, DEFAULT_PROJECT_NAME } from '../lib/projectConfig.ts';
+// v4.9.0 #736 — single AI detection helper instead of a per-route fork.
+// Pre-fix plan.ts shipped its own AI_ENDPOINTS + detectAI duplicating the lib
+// (missing Ollama). Now it composes the canonical lists with Anthropic preferred.
+import { detectAI, ANTHROPIC_ENDPOINTS, AI_ENDPOINTS } from '../lib/aiEndpoints.ts';
 
-// v4.3.5 P1 — shared AI response shapes (mirrored from ai.ts).
+// v4.3.5 P1 — shared AI response shapes (mirrored from the old ai.ts).
 interface AIConfig { base: string; model: string; type: string }
-interface OpenAIModelsResponse { data?: Array<{ id: string }> }
 interface AnthropicMessagesResponse { content?: Array<{ type?: string; text?: string }> }
 interface OpenAIChatResponse { choices?: Array<{ message?: { content?: string; reasoning_content?: string } }> }
 
@@ -19,25 +22,10 @@ interface OpenAIChatResponse { choices?: Array<{ message?: { content?: string; r
  * Uses Gemma 4 via local AI for the strategic reasoning layer.
  */
 
-const AI_ENDPOINTS = [
-  { name: 'LM Studio (Anthropic)', base: 'http://localhost:1234/v1', type: 'anthropic' },
-  { name: 'LM Studio', base: 'http://localhost:1234/v1', type: 'openai' },
-];
-
-async function detectAI(): Promise<{ available: boolean; base?: string; type?: string; model?: string }> {
-  for (const ep of AI_ENDPOINTS) {
-    try {
-      const res = await fetch(`${ep.base}/models`, { signal: AbortSignal.timeout(2000) });
-      if (!res.ok) continue;
-      const data: OpenAIModelsResponse = await res.json();
-      const models = (data.data || [])
-        .filter((m) => !m.id.includes('embed'))
-        .map((m) => m.id);
-      if (models.length === 0) continue;
-      return { available: true, base: ep.base, type: ep.type, model: models[0] };
-    } catch {}
-  }
-  return { available: false };
+/** Detect a local AI with Anthropic preferred (structured prompts work better
+ *  with the /messages shape); falls back to OpenAI and finally Ollama. */
+async function detectPlanAI() {
+  return detectAI([...ANTHROPIC_ENDPOINTS, ...AI_ENDPOINTS]);
 }
 
 async function askAI(ai: AIConfig, system: string, prompt: string, maxTokens = 1500): Promise<string> {
@@ -230,7 +218,7 @@ async function buildSessionPlan(store: NexusStore, projectFilter?: string) {
   }
 
   // ── 7. Ask AI for the plan ──────────────────────────
-  const ai = await detectAI();
+  const ai = await detectPlanAI();
   let aiPlan = '';
   let aiError: string | null = null;
 

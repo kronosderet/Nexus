@@ -1,4 +1,5 @@
 ---
+name: nexus-dashboard
 description: Launch the Nexus visual dashboard — Command, Fuel, Graph, Overseer, Log modules in the browser
 ---
 

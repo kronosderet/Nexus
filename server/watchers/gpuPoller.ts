@@ -4,6 +4,12 @@ import type { NexusStore } from '../db/store.ts';
 type BroadcastFn = (data: any) => void;
 
 export function startGpuPoller(store: NexusStore, broadcast?: BroadcastFn, intervalMs = 60000) {
+  // v4.9.0 #746 — throttled error logging. Pre-fix the catch was a bare `{}` so
+  // a killed nvidia-smi shell (driver reload, Windows update) silently dropped
+  // every 60s sample. Now we warn once per 5 minutes so operators can see when
+  // the GPU pipeline is dead instead of guessing why VRAM warnings are silent.
+  let lastWarnAt = 0;
+  const WARN_INTERVAL_MS = 5 * 60 * 1000;
   function snapshot() {
     try {
       const csv = execSync(
@@ -24,7 +30,13 @@ export function startGpuPoller(store: NexusStore, broadcast?: BroadcastFn, inter
 
       // Broadcast so clients can refresh without polling
       if (broadcast) broadcast({ type: 'gpu_snapshot', payload: snap });
-    } catch {}
+    } catch (err) {
+      const now = Date.now();
+      if (now - lastWarnAt >= WARN_INTERVAL_MS) {
+        lastWarnAt = now;
+        console.warn(`◈ GPU poller failed (will retry every ${intervalMs / 1000}s, warning at most every 5m): ${(err as Error).message}`);
+      }
+    }
   }
 
   // Initial snapshot

@@ -1,4 +1,5 @@
 ---
+name: nexus-brief
 description: Get the current Nexus metabrain state — fuel, tasks, sessions, decisions, risks
 disable-model-invocation: true
 ---

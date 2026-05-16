@@ -70,6 +70,14 @@ export function formatLocaleTime(d, opts) {
   return new Date(d).toLocaleTimeString(tag(read()), o);
 }
 
+// v4.9.0 #759 — full date+time formatter for the cases where callers used
+// `toLocaleString('cs-CZ', …)` directly. Pre-fix Overseer/Log/SessionCard had
+// six such literals bypassing the toggle.
+export function formatLocaleDateTime(d, opts) {
+  if (d == null) return '';
+  return new Date(d).toLocaleString(tag(read()), opts);
+}
+
 // Short labels that drift between modules. Keep this list small — the more
 // strings here, the harder cs/en parity becomes to maintain.
 export const LABELS = {
