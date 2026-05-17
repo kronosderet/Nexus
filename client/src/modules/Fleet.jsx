@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Ship, GitBranch, FileText, Brain, CheckCircle2, AlertTriangle, Clock, Layers, Activity, Network, GitCommit, X, Loader2 } from 'lucide-react';
 import { useNexusFleet } from '../context/useNexus.js';
 import { api } from '../hooks/useApi.js';
+// v4.9.1 #751 — shared relative-time helpers.
+import { relativeAge } from '../lib/time.js';
+import ConfirmDialog from '../components/ConfirmDialog.jsx';
 
 // v4.5.9 #248 — tiny 7-day activity sparkline. Deterministic shape from a
 // fixed-length [oldest..newest] count array. No axis, no labels, just the
@@ -43,12 +46,10 @@ function heatBadge(heat) {
   return { label: 'Dormant', color: 'text-nexus-text-faint bg-nexus-bg border-nexus-border' };
 }
 
+// v4.9.1 #751 — daysSince collapsed into relativeAge with day-flooring + special-day labels.
 function daysSince(dateStr) {
   if (!dateStr) return null;
-  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
-  if (days === 0) return 'today';
-  if (days === 1) return 'yesterday';
-  return `${days}d ago`;
+  return relativeAge(dateStr, { floorTo: 'day', specialDays: { 0: 'today', 1: 'yesterday' } });
 }
 
 function ProjectCard({ project, fleet, onNavigate }) {
@@ -93,13 +94,15 @@ function ProjectCard({ project, fleet, onNavigate }) {
       setGitBusy(false);
     }
   };
-  const doCommit = async (e) => {
+  // v4.9.1 #760 — was window.prompt for the commit message. Open a real modal
+  // with focus-trapped text input so the action has a11y + Win11-native styling.
+  const [commitDialogOpen, setCommitDialogOpen] = useState(false);
+  const openCommitDialog = (e) => {
     e.stopPropagation();
-    const message = window.prompt(
-      `Commit message for ${project.name}:`,
-      'Nexus auto-commit'
-    );
-    if (!message) return;
+    setCommitDialogOpen(true);
+  };
+  const performCommit = async (message) => {
+    setCommitDialogOpen(false);
     setGitBusy(true);
     setGitResult(null);
     try {
@@ -222,7 +225,7 @@ function ProjectCard({ project, fleet, onNavigate }) {
                 {gitExpanded ? 'Hide' : 'Diff'}
               </button>
               <button
-                onClick={doCommit}
+                onClick={openCommitDialog}
                 disabled={gitBusy}
                 className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-nexus-amber/30 text-nexus-amber hover:bg-nexus-amber/10 disabled:opacity-50"
                 title="Stage all + commit with a message you provide"
@@ -294,6 +297,16 @@ function ProjectCard({ project, fleet, onNavigate }) {
           <p className="text-[10px] font-mono text-nexus-text-dim truncate">#{fleetTask.id} {fleetTask.title.replace(/\[\w+\]\s*/, '')}</p>
         </div>
       )}
+      <ConfirmDialog
+        open={commitDialogOpen}
+        title={`Commit ${project.name}`}
+        message="Stages all changes and creates a commit. Push is separate."
+        inputLabel="Commit message"
+        inputDefault="Nexus auto-commit"
+        confirmLabel="Commit"
+        onConfirm={performCommit}
+        onCancel={() => setCommitDialogOpen(false)}
+      />
     </div>
   );
 }

@@ -225,13 +225,181 @@ async function main() {
   }
   console.log(`✓ nexus_version works (reports v${pkgVersion})`);
 
-  // Skip nexus_ask_overseer (slow AI inference — needs LM Studio running) and
-  // nexus_bridge_session (commits a real session entry — side-effect on user data).
-  // Both verified by presence in tools/list + manifest schema validation.
-  console.log(`  (skipped: nexus_ask_overseer, nexus_bridge_session — side-effects)`);
+  // ─────────────────────────────────────────────────────────────────────
+  // v4.9.1 #743 — extended coverage. Pre-fix 13/34 tools were exercised
+  // before shipping the bundle. A regression that dropped one of the v4.6
+  // handover tools or v4.8.2 list_* tools would have shipped silently.
+  // Now: all 8 read-only tools, both stateful thought ops (push/pop self-cleans),
+  // update_task (round-trip via the existing smoke task), record + update +
+  // link decision pair (cleaned up by cleanupSmokeTraces), log_session +
+  // update_handover (also cleaned up), and import_cc_memories in dry-run mode.
+  // ─────────────────────────────────────────────────────────────────────
+
+  // Pure read-only tools — zero residue.
+  for (const name of ['nexus_get_plan', 'nexus_read_handover', 'nexus_list_tasks', 'nexus_list_decisions', 'nexus_list_thoughts', 'nexus_list_sessions', 'nexus_fleet_overview']) {
+    const res = await send('tools/call', { name, arguments: name === 'nexus_read_handover' ? { project: 'Nexus' } : {} });
+    if (res.result.isError) {
+      console.error(`✗ ${name} error:`, res.result.content[0].text);
+      process.exit(1);
+    }
+    console.log(`✓ ${name} works`);
+  }
+
+  // get_blast_radius — try the first decision in the ledger; if none, accept the friendly "not found".
+  {
+    const list = await send('tools/call', { name: 'nexus_list_decisions', arguments: { limit: 1 } });
+    const idMatch = (list.result?.content?.[0]?.text || '').match(/#(\d+)/);
+    const probeId = idMatch ? parseInt(idMatch[1]) : 999999;
+    const blast = await send('tools/call', { name: 'nexus_get_blast_radius', arguments: { decision_id: probeId } });
+    if (blast.result.isError) {
+      console.error('✗ nexus_get_blast_radius error:', blast.result.content[0].text);
+      process.exit(1);
+    }
+    console.log(`✓ nexus_get_blast_radius works (probed decision #${probeId})`);
+  }
+
+  // update_task — interleaved with the existing create→complete flow, but
+  // because we already deleted the smoke task above, create a fresh one now,
+  // run update on it, then complete + delete in the same way. We extend the
+  // cleanup set with the new id.
+  let updateTaskId = null;
+  {
+    const created = await send('tools/call', {
+      name: 'nexus_create_task',
+      arguments: { title: 'SMOKE UPDATE TASK — safe to delete', description: 'update_task probe', status: 'backlog' },
+    });
+    const idMatch2 = (created.result?.content?.[0]?.text || '').match(/#(\d+)/);
+    updateTaskId = idMatch2 ? parseInt(idMatch2[1]) : null;
+    if (updateTaskId) {
+      const upd = await send('tools/call', {
+        name: 'nexus_update_task',
+        arguments: { id: updateTaskId, status: 'in_progress', priority: 1 },
+      });
+      if (upd.result.isError) {
+        console.error('✗ nexus_update_task error:', upd.result.content[0].text);
+        process.exit(1);
+      }
+      console.log(`✓ nexus_update_task works (#${updateTaskId} → in_progress)`);
+      await send('tools/call', { name: 'nexus_complete_task', arguments: { id: updateTaskId } });
+      await send('tools/call', { name: 'nexus_delete_task', arguments: { id: updateTaskId } });
+    }
+  }
+
+  // push_thought + pop_thought — self-cleaning pair. push, immediately pop,
+  // the thought ends up status='resolved' which cleanupSmokeTraces filters.
+  {
+    const push = await send('tools/call', {
+      name: 'nexus_push_thought',
+      arguments: { text: 'smoke test thought — safe to delete', context: 'smoke probe', project: 'smoke-test' },
+    });
+    if (push.result.isError) {
+      console.error('✗ nexus_push_thought error:', push.result.content[0].text);
+      process.exit(1);
+    }
+    console.log(`✓ nexus_push_thought works`);
+    const pop = await send('tools/call', { name: 'nexus_pop_thought', arguments: {} });
+    if (pop.result.isError) {
+      console.error('✗ nexus_pop_thought error:', pop.result.content[0].text);
+      process.exit(1);
+    }
+    console.log(`✓ nexus_pop_thought works`);
+  }
+
+  // record_decision + update_decision + link_decisions — three new tools in
+  // one chain. Both decisions are tagged 'smoke-test' so cleanupSmokeTraces
+  // can purge them and any edges between them.
+  let decisionAId = null;
+  let decisionBId = null;
+  {
+    const a = await send('tools/call', {
+      name: 'nexus_record_decision',
+      arguments: { decision: 'smoke test decision A — safe to delete', project: 'smoke-test', rationale: 'mcpb smoke probe' },
+    });
+    const idA = (a.result?.content?.[0]?.text || '').match(/#(\d+)/);
+    decisionAId = idA ? parseInt(idA[1]) : null;
+    if (a.result.isError || !decisionAId) {
+      console.error('✗ nexus_record_decision error:', a.result.content[0].text);
+      process.exit(1);
+    }
+    console.log(`✓ nexus_record_decision works (#${decisionAId})`);
+
+    const upd = await send('tools/call', {
+      name: 'nexus_update_decision',
+      arguments: { id: decisionAId, lifecycle: 'validated' },
+    });
+    if (upd.result.isError) {
+      console.error('✗ nexus_update_decision error:', upd.result.content[0].text);
+      process.exit(1);
+    }
+    console.log(`✓ nexus_update_decision works (#${decisionAId} → validated)`);
+
+    const b = await send('tools/call', {
+      name: 'nexus_record_decision',
+      arguments: { decision: 'smoke test decision B — safe to delete', project: 'smoke-test' },
+    });
+    const idB = (b.result?.content?.[0]?.text || '').match(/#(\d+)/);
+    decisionBId = idB ? parseInt(idB[1]) : null;
+
+    if (decisionBId) {
+      const link = await send('tools/call', {
+        name: 'nexus_link_decisions',
+        arguments: { from: decisionAId, to: decisionBId, rel: 'related', note: 'smoke test edge' },
+      });
+      if (link.result.isError) {
+        console.error('✗ nexus_link_decisions error:', link.result.content[0].text);
+        process.exit(1);
+      }
+      console.log(`✓ nexus_link_decisions works (#${decisionAId} → #${decisionBId})`);
+    }
+  }
+
+  // log_session — small session entry tagged 'smoke-test' so cleanup can scrub it.
+  {
+    const sess = await send('tools/call', {
+      name: 'nexus_log_session',
+      arguments: { project: 'smoke-test', summary: 'smoke test session — safe to delete', tags: ['smoke-test'] },
+    });
+    if (sess.result.isError) {
+      console.error('✗ nexus_log_session error:', sess.result.content[0].text);
+      process.exit(1);
+    }
+    console.log(`✓ nexus_log_session works`);
+  }
+
+  // update_handover — write a card under a test-only project, then cleanup wipes it.
+  {
+    const upd = await send('tools/call', {
+      name: 'nexus_update_handover',
+      arguments: { project: 'smoke-test-project', content: 'smoke test handover — safe to delete' },
+    });
+    if (upd.result.isError) {
+      console.error('✗ nexus_update_handover error:', upd.result.content[0].text);
+      process.exit(1);
+    }
+    console.log(`✓ nexus_update_handover works`);
+  }
+
+  // import_cc_memories — dry-run only so no decisions get imported.
+  {
+    const imp = await send('tools/call', { name: 'nexus_import_cc_memories', arguments: { dry_run: true } });
+    if (imp.result.isError) {
+      console.error('✗ nexus_import_cc_memories (dry-run) error:', imp.result.content[0].text);
+      process.exit(1);
+    }
+    console.log(`✓ nexus_import_cc_memories works (dry-run)`);
+  }
+
+  // Skip nexus_ask_overseer (slow AI inference — needs LM Studio running),
+  // nexus_ask_overseer_start / nexus_get_overseer_result (require dashboard
+  // async-task infra), and nexus_bridge_session (commits a real session
+  // entry that would be hard to scrub safely). All four verified by presence
+  // in tools/list + manifest schema validation.
+  console.log(`  (skipped: nexus_ask_overseer, nexus_ask_overseer_start, nexus_get_overseer_result, nexus_bridge_session — side-effects)`);
 
   console.log('\n=== BUNDLED SERVER WORKS AS STANDALONE NODE PROCESS ===');
   console.log(`  ${list.result.tools.length} tools total`);
+  // Pass the new ids into the cleanup so it can purge them.
+  globalThis.__smokeIds = { taskUpdate: updateTaskId, decisionA: decisionAId, decisionB: decisionBId };
   child.kill();
 
   // v4.5.2 — post-run cleanup. The smoke test fires several write-tool calls
@@ -256,23 +424,72 @@ async function cleanupSmokeTraces(createdId) {
   if (!existsSync(storePath)) return;
   const raw = readFileSync(storePath, 'utf-8');
   const data = JSON.parse(raw);
+  // v4.9.1 #743 — extended cleanup. Pre-fix scrubbed only activity + usage;
+  // the expanded smoke-test now also touches ledger, graph_edges, sessions,
+  // thoughts, and _handovers under deterministic markers (project name +
+  // "safe to delete" suffix), so we scrub those too.
   const before = {
     activity: (data.activity || []).length,
     usage: (data.usage || []).length,
+    ledger: (data.ledger || []).length,
+    graph_edges: (data.graph_edges || []).length,
+    sessions: (data.sessions || []).length,
+    thoughts: (data.thoughts || []).length,
+    handovers: Object.keys(data._handovers || {}).length,
   };
-  const smokeIdRe = createdId ? new RegExp(`"id":${createdId}\\b`) : null;
+  const ids = globalThis.__smokeIds || {};
+  const smokeIds = new Set([createdId, ids.taskUpdate, ids.decisionA, ids.decisionB].filter(Boolean));
+  const smokeIdRe = smokeIds.size > 0 ? new RegExp(`"id":(${[...smokeIds].join('|')})\\b`) : null;
+  const isSmokeDecision = (d) => smokeIds.has(d.id) || (d.project || '').toLowerCase() === 'smoke-test' || /safe to delete/i.test(d.decision || '');
+  const purgedDecisionIds = new Set((data.ledger || []).filter(isSmokeDecision).map((d) => d.id));
+
   data.activity = (data.activity || []).filter((a) => {
     const msg = (a.message || '').toLowerCase();
-    if (msg === 'smoke test activity') return false;                  // nexus_log_activity trace
-    if (/safe to delete/i.test(a.message || '')) return false;        // task_created/task_done/task_deleted referencing our SMOKE TEST title
-    if (smokeIdRe && smokeIdRe.test(a.meta || '')) return false;      // meta points at the smoke task id
+    if (msg === 'smoke test activity') return false;
+    if (/safe to delete/i.test(a.message || '')) return false;
+    if (smokeIdRe && smokeIdRe.test(a.meta || '')) return false;
+    // v4.9.1 #743 — match the "smoke test" prefix used by the new probes (e.g.
+    // "smoke test session — safe to delete"). Narrow enough not to touch
+    // unrelated user activity that merely mentions "smoke test" mid-sentence.
+    if (/^smoke test\b/i.test(a.message || '')) return false;
     return true;
   });
   data.usage = (data.usage || []).filter((u) => (u.note || '').toLowerCase() !== 'smoke test');
-  const after = { activity: data.activity.length, usage: data.usage.length };
-  if (before.activity !== after.activity || before.usage !== after.usage) {
+  data.ledger = (data.ledger || []).filter((d) => !isSmokeDecision(d));
+  data.graph_edges = (data.graph_edges || []).filter((e) => !purgedDecisionIds.has(e.from) && !purgedDecisionIds.has(e.to));
+  data.sessions = (data.sessions || []).filter((s) => {
+    if ((s.project || '').toLowerCase() === 'smoke-test') return false;
+    if (/safe to delete/i.test(s.summary || '')) return false;
+    if ((s.tags || []).includes('smoke-test')) return false;
+    return true;
+  });
+  data.thoughts = (data.thoughts || []).filter((t) => {
+    if ((t.project || '').toLowerCase() === 'smoke-test') return false;
+    // v4.9.1 #743 — narrower marker: match only the explicit smoke-test
+    // prefix, not any mention of the words.
+    if (/^smoke test\b/i.test(t.text || '')) return false;
+    return true;
+  });
+  if (data._handovers && data._handovers['smoke-test-project']) {
+    delete data._handovers['smoke-test-project'];
+  }
+  const after = {
+    activity: data.activity.length,
+    usage: data.usage.length,
+    ledger: data.ledger.length,
+    graph_edges: data.graph_edges.length,
+    sessions: data.sessions.length,
+    thoughts: data.thoughts.length,
+    handovers: Object.keys(data._handovers || {}).length,
+  };
+  const dirty = Object.keys(before).some((k) => before[k] !== after[k]);
+  if (dirty) {
     writeFileSync(storePath, JSON.stringify(data, null, 2));
-    console.log(`  ◈ Cleaned smoke traces: activity ${before.activity} → ${after.activity}, usage ${before.usage} → ${after.usage}`);
+    const summary = Object.entries(before)
+      .filter(([k]) => before[k] !== after[k])
+      .map(([k]) => `${k} ${before[k]} → ${after[k]}`)
+      .join(', ');
+    console.log(`  ◈ Cleaned smoke traces: ${summary}`);
   }
 }
 

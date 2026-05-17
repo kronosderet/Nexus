@@ -5,6 +5,7 @@ import { useNexusFleet } from '../context/useNexus.js';
 import DigestWidget from '../components/DigestWidget.jsx';
 import QuickActions from '../components/QuickActions.jsx';
 import ClockWidget from '../components/ClockWidget.jsx';
+import ProgressBar from '../components/ProgressBar.jsx';
 
 function formatBytes(bytes) {
   const gb = bytes / (1024 ** 3);
@@ -30,17 +31,11 @@ function StatCard({ icon: Icon, label, value, sub, color = 'text-nexus-amber' })
   );
 }
 
-/** Horizontal gauge bar */
+// v4.9.1 #752 — GaugeBar collapsed onto the shared <ProgressBar>. Keep the
+// thin wrapper for the existing `color` prop name + zero-pct passthrough so
+// the Pulse callsites don't need to be touched.
 function GaugeBar({ percent, color = 'bg-nexus-amber', className = '' }) {
-  const clamped = Math.max(0, Math.min(100, percent));
-  return (
-    <div className={`h-2 bg-nexus-bg rounded-full overflow-hidden ${className}`}>
-      <div
-        className={`h-full rounded-full transition-all duration-700 ${color}`}
-        style={{ width: `${clamped}%` }}
-      />
-    </div>
-  );
+  return <ProgressBar percent={percent} colorClass={color} className={className} minVisible={0} />;
 }
 
 function tempColor(c) {

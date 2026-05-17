@@ -37,6 +37,17 @@ export class NexusStore {
   private _nextThoughtId = 1;
   private _nextEdgeId = 1;
   private _edgeMutex = false;
+  // v4.9.1 #737 — batched-flush counter. When > 0, `_flush()` is a no-op so
+  // a chain of mutations (e.g. recordDecision → _autoLinkDecision → addEdge×N)
+  // produces a single write instead of one-per-mutation. Counter-based (not
+  // timer-based) so callers always see a clean disk state when the wrapping
+  // entry-point returns. Use via withBatchedFlush(fn).
+  private _batchedFlush = 0;
+  // v4.9.1 #738 — keyword word-set cache for the keyword auto-link pass.
+  // _significantWords is pure (text→Set<string>) so we can memo by decision.id;
+  // invalidate when decision.decision or decision.context changes
+  // (updateDecision below clears the entry).
+  private _wordSetCache = new Map<number, Set<string>>();
 
   constructor() {
     if (existsSync(getDbPath())) {
@@ -105,6 +116,20 @@ export class NexusStore {
   private _runMigrations(): void {
     const changed = runMigrations(this.data);
     if (changed > 0) this._flush();
+  }
+
+  /** v4.9.1 #737 — run `fn` with `_flush()` calls coalesced into a single write
+   *  at the end. Re-entrant safe (counter, not boolean). The outermost call
+   *  always flushes on exit, even when `fn` throws, so we never leave dirty
+   *  in-memory state unwritten. */
+  withBatchedFlush<T>(fn: () => T): T {
+    this._batchedFlush++;
+    try {
+      return fn();
+    } finally {
+      this._batchedFlush--;
+      if (this._batchedFlush === 0) this._flush();
+    }
   }
 
   /** Re-read data from disk (for external changes, e.g. MCP writes while dashboard is running). */
@@ -211,10 +236,21 @@ export class NexusStore {
     }
   }
 
+  // v4.9.1 #737 — public counter so tests can verify how many real disk writes
+  // happened (separate from how many times `_flush()` was called — the batched
+  // ones early-return). Increments inside the actual write block.
+  _realFlushCount = 0;
+
   _flush(): void {
     // Write mutex: skip if already flushing (prevents concurrent truncation)
     if (this._flushing) return;
+    // v4.9.1 #737 — coalesce nested mutations into one disk write. The wrapping
+    // entry-point will fire the real flush once when `_batchedFlush` decrements
+    // back to 0. Pre-fix `recordDecision → _autoLinkDecision → addEdge × N`
+    // chained 1 + min(5, N) full-store serialisations of a multi-MB JSON blob.
+    if (this._batchedFlush > 0) return;
     this._flushing = true;
+    this._realFlushCount++;
     try {
       const json = JSON.stringify(this.data, null, 2);
       // Atomic write: write to .tmp first, then promote via rename
@@ -279,6 +315,9 @@ export class NexusStore {
   updateDecision(id: number, updates: Partial<Pick<Decision, 'decision' | 'context' | 'alternatives' | 'tags' | 'project' | 'lifecycle' | 'confidence' | 'last_reviewed_at'>>): Decision | null {
     const d = this.getDecisionById(id);
     if (!d) return null;
+    // v4.9.1 #738 — invalidate the word-set cache when decision text/context
+    // changes so the keyword auto-link pass uses fresh tokens.
+    const textChanged = updates.decision != null || updates.context != null;
     if (updates.decision != null) d.decision = updates.decision;
     if (updates.context != null) d.context = updates.context;
     if (updates.alternatives != null) d.alternatives = updates.alternatives;
@@ -287,8 +326,20 @@ export class NexusStore {
     if (updates.lifecycle != null) { d.lifecycle = updates.lifecycle; d.deprecated = updates.lifecycle === 'deprecated'; }
     if (updates.confidence != null) d.confidence = updates.confidence;
     if (updates.last_reviewed_at != null) d.last_reviewed_at = updates.last_reviewed_at;
+    if (textChanged) this._wordSetCache.delete(id);
     this._flush();
     return d;
+  }
+
+  /** v4.9.1 #738 — memoised word-set lookup. Cache survives across recordDecision
+   *  calls so the keyword auto-link pass goes from O(N × text-tokenize) to
+   *  O(N + first-pass-tokenize). Invalidated by updateDecision when text changes. */
+  private _getWordSetFor(d: Decision): Set<string> {
+    const cached = this._wordSetCache.get(d.id);
+    if (cached) return cached;
+    const words = this._significantWords((d.decision || '') + ' ' + (d.context || ''));
+    this._wordSetCache.set(d.id, words);
+    return words;
   }
   getDecisionCount(): number { return (this.data.ledger || []).length; }
   getAllEdges(): GraphEdge[] { return this.data.graph_edges || []; }
@@ -588,6 +639,17 @@ export class NexusStore {
     return { sessions, activeTasks: tasks };
   }
 
+  /** Remove a session by id. Returns true if a row was removed, false if no
+   *  match. v4.9.1 #758 — added so routes/sessions.ts:67-73 stops reaching
+   *  into store.data.sessions directly. */
+  deleteSession(id: number): boolean {
+    const idx = this.data.sessions.findIndex(s => s.id === id);
+    if (idx === -1) return false;
+    this.data.sessions.splice(idx, 1);
+    this._flush();
+    return true;
+  }
+
   /** Record that a task was completed during the most recent session today.
    *  v4.9.0 #733: if no session today (task closed BEFORE today's session was
    *  logged), buffer the attribution in _pendingTaskCompletions instead of
@@ -707,9 +769,12 @@ export class NexusStore {
       lifecycle,
     };
     this.data.ledger.push(entry);
-    // Auto-link: find related decisions by keyword overlap (+ async semantic link).
-    if (autoLink) this._autoLinkDecision(entry);
-    this._flush();
+    // v4.9.1 #737 — coalesce the auto-link cascade. _autoLinkDecision calls
+    // addEdge × up-to-5, each of which would otherwise serialise the whole
+    // store. With withBatchedFlush we get one write at the end.
+    this.withBatchedFlush(() => {
+      if (autoLink) this._autoLinkDecision(entry);
+    });
     return entry;
   }
 
@@ -881,13 +946,16 @@ export class NexusStore {
         .finally(() => { this._pendingSemanticLinks--; });
     }
 
-    // Synchronous keyword fallback (always runs, immediate)
-    const newWords = this._significantWords(newDec.decision + ' ' + newDec.context);
+    // Synchronous keyword fallback (always runs, immediate).
+    // v4.9.1 #738 — use memoised word-set lookup so existing decisions are
+    // tokenised at most once across the process lifetime (cache invalidated
+    // when updateDecision changes the underlying text).
+    const newWords = this._getWordSetFor(newDec);
     if (newWords.size < 2) return linked;
 
     for (const existing of this.data.ledger) {
       if (existing.id === newDec.id || existing.deprecated) continue;
-      const existWords = this._significantWords(existing.decision + ' ' + (existing.context || ''));
+      const existWords = this._getWordSetFor(existing);
       let shared = 0;
       for (const w of newWords) if (existWords.has(w)) shared++;
       const similarity = shared / Math.max(newWords.size, 1);

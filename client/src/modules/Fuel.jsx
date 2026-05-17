@@ -11,6 +11,7 @@ import { useNexusFuel } from '../context/useNexus.js';
 import FuelFreshnessStamp from '../components/FuelFreshnessStamp.jsx';
 import { SESSION_EXPIRED_LONG, SESSION_EXPIRED_TOOLTIP } from '../lib/fuelLabels.js';
 import { formatLocaleDate, formatLocaleTime, useLabels } from '../lib/locale.js';
+import ProgressBar from '../components/ProgressBar.jsx';
 
 function color(pct) {
   if (pct == null) return 'text-nexus-text-faint';
@@ -34,14 +35,11 @@ function burnBarColor(pct) {
   return 'bg-nexus-green';
 }
 
+// v4.9.1 #752 — Bar is a thin adapter over the shared <ProgressBar> so the
+// existing call-sites (which pass `invert`) keep working without touching them.
 function Bar({ percent, className = '', height = 'h-2', invert = false }) {
-  const c = Math.max(0, Math.min(100, percent ?? 0));
   const colorFn = invert ? burnBarColor : barColor;
-  return (
-    <div className={`${height} bg-nexus-bg rounded-full overflow-hidden ${className}`}>
-      <div className={`h-full rounded-full transition-all duration-700 ${colorFn(c)}`} style={{ width: `${Math.max(2, c)}%` }} />
-    </div>
-  );
+  return <ProgressBar percent={percent} colorClass={colorFn} height={height} className={className} />;
 }
 
 function usageIntensity(used) {

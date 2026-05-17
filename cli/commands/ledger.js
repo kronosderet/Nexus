@@ -22,6 +22,34 @@ import { api } from '../lib/api.js';
 import { dim, amber, green, blue, red, progressBar } from '../lib/format.js';
 
 export const ledgerCommands = {
+  // v4.9.1 #740 — CLI mirror of nexus_update_decision. Edit a Ledger entry's
+  // text, project, tags, lifecycle, or confidence in-place.
+  async ['update-decision'](args) {
+    const id = parseInt(args[0]);
+    if (!id || isNaN(id)) {
+      console.error('  Usage: nexus update-decision <id> [-d text] [-c context] [-p project] [-t tags] [--lifecycle proposed|active|validated|deprecated|reference]');
+      return;
+    }
+    const body = {};
+    for (let i = 1; i < args.length; i++) {
+      const k = args[i];
+      const v = args[i + 1];
+      if ((k === '-d' || k === '--decision') && v) { body.decision = v; i++; }
+      else if ((k === '-c' || k === '--context') && v) { body.context = v; i++; }
+      else if ((k === '-p' || k === '--project') && v) { body.project = v; i++; }
+      else if ((k === '-t' || k === '--tags') && v) { body.tags = v.split(',').map((s) => s.trim()); i++; }
+      else if (k === '--lifecycle' && v) { body.lifecycle = v; i++; }
+      else if (k === '--confidence' && v) { body.confidence = Number(v); i++; }
+    }
+    if (Object.keys(body).length === 0) {
+      console.error('  Provide at least one field to update.');
+      return;
+    }
+    const dec = await api(`/ledger/${id}`, { method: 'PATCH', body });
+    console.log(`  ◈ Decision #${id} adjusted ${dim(`(${Object.keys(body).join(', ')})`)}`);
+    if (dec.lifecycle) console.log(`    lifecycle: ${amber(dec.lifecycle)}`);
+  },
+
   async record(args) {
     let project = process.cwd().split(/[/\\]/).pop();
     let context = '', alternatives = [], tags = [];

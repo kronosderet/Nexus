@@ -14,6 +14,7 @@ const { taskCommands } = await import('../cli/commands/tasks.js');
 const { sessionCommands } = await import('../cli/commands/sessions.js');
 const { ledgerCommands } = await import('../cli/commands/ledger.js');
 const { gitCommands } = await import('../cli/commands/git.js');
+const { handoverCommands } = await import('../cli/commands/handover.js');
 
 // ──────────────────────────────────────────────────────────
 // Per-group exports — shape matches the v4.7.5 split plan
@@ -21,7 +22,8 @@ const { gitCommands } = await import('../cli/commands/git.js');
 
 describe('cli/commands/tasks.js', () => {
   it('exports the expected commands', () => {
-    expect(Object.keys(taskCommands).sort()).toEqual(['done', 'quick', 'task', 'tasks']);
+    // v4.9.1 #740 — added 'update-task' and 'delete-task' CLI mirrors.
+    expect(Object.keys(taskCommands).sort()).toEqual(['delete-task', 'done', 'quick', 'task', 'tasks', 'update-task']);
   });
   it('every export is an async function', () => {
     for (const [name, fn] of Object.entries(taskCommands)) {
@@ -33,8 +35,9 @@ describe('cli/commands/tasks.js', () => {
 
 describe('cli/commands/sessions.js', () => {
   it('exports the expected commands', () => {
+    // v4.9.1 #740 — added 'list-sessions' CLI mirror.
     expect(Object.keys(sessionCommands).sort()).toEqual(
-      ['activity', 'context', 'digest', 'handoff', 'log', 'note', 'session', 'summarize'].sort(),
+      ['activity', 'context', 'digest', 'handoff', 'list-sessions', 'log', 'note', 'session', 'summarize'].sort(),
     );
   });
   it('every export is an async function', () => {
@@ -47,12 +50,25 @@ describe('cli/commands/sessions.js', () => {
 
 describe('cli/commands/ledger.js', () => {
   it('exports the expected commands', () => {
+    // v4.9.1 #740 — added 'update-decision' CLI mirror.
     expect(Object.keys(ledgerCommands).sort()).toEqual(
-      ['decisions', 'find', 'graph', 'impact', 'link', 'record', 'search', 'seek'].sort(),
+      ['decisions', 'find', 'graph', 'impact', 'link', 'record', 'search', 'seek', 'update-decision'].sort(),
     );
   });
   it('every export is an async function', () => {
     for (const [, fn] of Object.entries(ledgerCommands)) {
+      expect(typeof fn).toBe('function');
+      expect(fn.constructor.name).toBe('AsyncFunction');
+    }
+  });
+});
+
+describe('cli/commands/handover.js', () => {
+  it('exports the expected commands (v4.9.1 #740)', () => {
+    expect(Object.keys(handoverCommands).sort()).toEqual(['list-handovers', 'read-handover', 'update-handover']);
+  });
+  it('every export is an async function', () => {
+    for (const [, fn] of Object.entries(handoverCommands)) {
       expect(typeof fn).toBe('function');
       expect(fn.constructor.name).toBe('AsyncFunction');
     }
@@ -77,7 +93,7 @@ describe('cli/commands/git.js', () => {
 
 describe('cross-group registry', () => {
   it('no command name appears in two groups', () => {
-    const groups = { taskCommands, sessionCommands, ledgerCommands, gitCommands };
+    const groups = { taskCommands, sessionCommands, ledgerCommands, gitCommands, handoverCommands };
     const seen = new Map(); // name → group
     for (const [groupName, group] of Object.entries(groups)) {
       for (const cmd of Object.keys(group)) {
@@ -92,7 +108,8 @@ describe('cross-group registry', () => {
       Object.keys(taskCommands).length +
       Object.keys(sessionCommands).length +
       Object.keys(ledgerCommands).length +
-      Object.keys(gitCommands).length,
+      Object.keys(gitCommands).length +
+      Object.keys(handoverCommands).length,
     );
   });
 });

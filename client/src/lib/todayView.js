@@ -18,26 +18,16 @@
  * Output is a normalized {fuel, now, pulse, signal} block ready to render.
  */
 
+// v4.9.1 #751 — formatTimeAgo lives in lib/time.js as part of the unified
+// relative-time helpers. Re-exported here for backwards-compat with the
+// existing tests/todayView.test.js + the TodayView module's existing import.
+// Imported locally too so the deriveTodayState() body below can keep calling it.
+import { formatTimeAgo } from './time.js';
+export { formatTimeAgo };
+
 const ONE_MINUTE = 60_000;
 const ONE_HOUR = 60 * ONE_MINUTE;
 const ONE_DAY = 24 * ONE_HOUR;
-
-/**
- * Compact relative-time label. "just now" / "Nm" / "Nh" / "Nd".
- * Tighter than the existing minutesAgo() in Command.jsx because the Today
- * view needs to fit a lot in a small horizontal space.
- */
-export function formatTimeAgo(iso, now = Date.now()) {
-  if (!iso) return '—';
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return '—';
-  const diff = now - t;
-  if (diff < 0) return 'just now';
-  if (diff < ONE_MINUTE) return 'just now';
-  if (diff < ONE_HOUR) return `${Math.round(diff / ONE_MINUTE)}m`;
-  if (diff < ONE_DAY) return `${Math.round(diff / ONE_HOUR)}h`;
-  return `${Math.round(diff / ONE_DAY)}d`;
-}
 
 /**
  * Color/severity bucket for a fuel percentage.

@@ -17,6 +17,7 @@ import { useState, useEffect } from 'react';
 import { AlertTriangle, Sparkles, Check, X, Loader2 } from 'lucide-react';
 import { api } from '../../hooks/useApi.js';
 import DecisionPicker from '../../components/DecisionPicker.jsx';
+import ConfirmDialog from '../../components/ConfirmDialog.jsx';
 
 // v4.6.5 #311 — Structured resolution card for an active rel='contradicts' edge.
 // Three actions: Deprecate (mark one side deprecated), Mark as evolution
@@ -51,8 +52,11 @@ function ResolveConflictCard({ conflict, onResolved }) {
       if (onResolved) onResolved();
     } catch (e) { setErr(e.message); } finally { setBusy(null); }
   };
-  const keepBoth = async () => {
-    if (!window.confirm('Delete this conflict edge? Both decisions stay active.')) return;
+  // v4.9.1 #760 — was window.confirm, now a real modal.
+  const [confirmingKeepBoth, setConfirmingKeepBoth] = useState(false);
+  const keepBoth = () => setConfirmingKeepBoth(true);
+  const performKeepBoth = async () => {
+    setConfirmingKeepBoth(false);
     setBusy('keep'); setErr(null);
     try {
       await api.removeEdge(edgeId);
@@ -110,6 +114,15 @@ function ResolveConflictCard({ conflict, onResolved }) {
         </button>
         {err && <span className="text-[9px] font-mono text-nexus-red ml-2">{err}</span>}
       </div>
+      <ConfirmDialog
+        open={confirmingKeepBoth}
+        title="Delete conflict edge?"
+        message="Both decisions will stay active. The conflict edge is removed permanently — use this when the Overseer's contradiction call was a false positive."
+        confirmLabel="Delete edge"
+        danger
+        onConfirm={performKeepBoth}
+        onCancel={() => setConfirmingKeepBoth(false)}
+      />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { BarChart3, GitCommit, CheckCircle2, FileEdit, BookOpen, Flame, AlertTriangle, Calendar, RefreshCw } from 'lucide-react';
 import { api } from '../hooks/useApi.js';
+// v4.9.1 #751 — shared relative-time helper (was inline ageStr).
+import { relativeAge } from '../lib/time.js';
 
 export default function DigestWidget({ ws, onNavigate }) {
   const [digest, setDigest] = useState(null);
@@ -40,9 +42,8 @@ export default function DigestWidget({ ws, onNavigate }) {
 
   if (!digest) return null;
 
-  // Freshness age for display
-  const ageSec = fetchedAt ? Math.floor((Date.now() - fetchedAt) / 1000) : 0;
-  const ageStr = ageSec < 60 ? `${ageSec}s` : ageSec < 3600 ? `${Math.floor(ageSec / 60)}m` : `${Math.floor(ageSec / 3600)}h`;
+  // v4.9.1 #751 — freshness age via the shared helper. "Ns" / "Nm" / "Nh" (no suffix).
+  const ageStr = fetchedAt ? relativeAge(fetchedAt, { suffix: '', justNow: '0s', includeSeconds: true }) : '0s';
 
   const { stats, projectRanking, busiestDay, activeBlockers, summary } = digest;
 

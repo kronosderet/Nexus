@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../hooks/useApi.js';
 import { useNexusFleet } from '../context/useNexus.js';
 import { BookMarked, Pencil, Save, X, RefreshCw, FileText, Trash2 } from 'lucide-react';
+import ConfirmDialog from '../components/ConfirmDialog.jsx';
 
 /**
  * v4.6.0 #398 — Continuous Handover module.
@@ -16,14 +17,8 @@ import { BookMarked, Pencil, Save, X, RefreshCw, FileText, Trash2 } from 'lucide
  * additional projects from fleet data so cards exist even before a first write.
  */
 
-function relativeAge(isoStr) {
-  if (!isoStr) return '';
-  const ms = Date.now() - new Date(isoStr).getTime();
-  if (ms < 60000) return 'just now';
-  if (ms < 3600000) return `${Math.round(ms / 60000)}m ago`;
-  if (ms < 86400000) return `${Math.round(ms / 3600000)}h ago`;
-  return `${Math.round(ms / 86400000)}d ago`;
-}
+// v4.9.1 #751 — relativeAge lives in lib/time.js now.
+import { relativeAge } from '../lib/time.js';
 
 function HandoverCard({ project, entry, onSave, onDelete }) {
   const [editing, setEditing] = useState(false);
@@ -48,8 +43,12 @@ function HandoverCard({ project, entry, onSave, onDelete }) {
       setBusy(false);
     }
   };
-  const remove = async () => {
-    if (!window.confirm(`Delete the handover card for ${project}? This cannot be undone.`)) return;
+  // v4.9.1 #760 — was window.confirm, now a real modal so the destructive
+  // action has a focus trap + ESC handling + Win11-native-styled buttons.
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const remove = () => setConfirmingDelete(true);
+  const performRemove = async () => {
+    setConfirmingDelete(false);
     setBusy(true); setErr(null);
     try { await onDelete(project); } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
@@ -145,6 +144,15 @@ function HandoverCard({ project, entry, onSave, onDelete }) {
           </button>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete handover card?"
+        message={`Delete the handover card for ${project}? This cannot be undone.`}
+        confirmLabel="Delete"
+        danger
+        onConfirm={performRemove}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

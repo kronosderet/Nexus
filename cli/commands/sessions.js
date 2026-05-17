@@ -15,6 +15,35 @@ import { api } from '../lib/api.js';
 import { dim, amber, green, red, formatTask, progressBar } from '../lib/format.js';
 
 export const sessionCommands = {
+  // v4.9.1 #740 — CLI mirror of nexus_list_sessions. Pre-fix the closest verb
+  // was `nexus context [project]` which hit a different endpoint and returned
+  // a different shape (sessions + active tasks for ONE project). This one is
+  // straight pagination over the global session log.
+  async ['list-sessions'](args) {
+    let project;
+    let limit = 10;
+    for (let i = 0; i < args.length; i++) {
+      const k = args[i];
+      const v = args[i + 1];
+      if ((k === '-p' || k === '--project') && v) { project = v; i++; }
+      else if ((k === '-n' || k === '--limit') && v) { limit = parseInt(v); i++; }
+    }
+    const qs = new URLSearchParams();
+    if (project) qs.set('project', project);
+    qs.set('limit', String(limit));
+    const sessions = await api(`/sessions?${qs.toString()}`);
+    if (!Array.isArray(sessions) || sessions.length === 0) {
+      console.log('  ◈ No session entries yet.');
+      return;
+    }
+    console.log(`  ${amber('◈ Sessions')} (${sessions.length}${project ? ` · ${project}` : ''}):\n`);
+    for (const s of sessions) {
+      const date = new Date(s.created_at).toLocaleDateString();
+      const tags = (s.tags && s.tags.length) ? ` ${dim(`[${s.tags.join(', ')}]`)}` : '';
+      console.log(`  ${dim(`#${s.id} ${date}`)} ${amber(`[${s.project}]`)} ${s.summary.slice(0, 100)}${tags}`);
+    }
+  },
+
   async log(args) {
     const message = args.join(' ');
     if (!message) { console.error('  Usage: nexus log "your message"'); return; }

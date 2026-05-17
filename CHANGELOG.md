@@ -9,6 +9,127 @@ hook layer (v4.4.0 alpha/beta/final), nine post-v4.4.0 patch releases closing
 the **entire** UI-audit backlog, and the v4.5.0 theme-wide "Animated
 Instruments" microanimation pass.
 
+## v4.9.1 — v4.9.0 backlog closeout
+
+Closes all 10 items that v4.9.0 deferred. Three new client lib helpers
+(`lib/time.js`, `components/ProgressBar.jsx`, `components/EmptyState.jsx`,
+`components/ConfirmDialog.jsx`), a new server lib (`lib/path.ts`'s sibling
+`lib/constants.ts` from v4.9.0 gets a companion), 10 new CLI verbs that close
+the MCP/CLI asymmetry the v4.8.2 audit flagged, two store-side hot-path wins
+(`withBatchedFlush` coalescing + per-decision word-set cache), and three test
+files (1 new, 2 extended) lifting integration coverage from 13/38 → 16/38
+routes and bundle smoke-test from 13/34 → 30/34 tools.
+
+**477 tests (+22 net) · 34 MCP tools · no migrations · no breaking changes.**
+The audit-driven backlog from v4.9.0 is empty.
+
+### Performance (Q3 + Q4)
+
+- **`_flush()` coalescing.** `recordDecision → _autoLinkDecision → addEdge × N`
+  previously chained `1 + min(5, N)` full-store JSON serialisations per call.
+  The auto-link cascade is now wrapped in `withBatchedFlush(() => …)` so only
+  the outermost call writes to disk. New `_realFlushCount` counter exposed for
+  test instrumentation; `tests/flushCoalescing.test.ts` pins the behaviour
+  (3 specs).
+- **`_significantWords` per-decision cache.** Keyword auto-link's inner loop
+  re-tokenised every candidate decision on every `recordDecision`. A
+  `_wordSetCache: Map<number, Set<string>>` survives across calls; invalidated
+  by `updateDecision` when the text or context changes.
+
+### Standalone awareness (Q5)
+
+`nexus_brief` now prints a one-line footer when running in standalone (MCPB)
+mode, reminding the operator that the 5-min risk poller, 6-h digest, 24-h
+contradiction auto-scan, and GPU/file watchers are dashboard-only. Pre-fix
+standalone-only users saw a "healthy" brief while their auto-scans were
+silently off (visible in the v4.9.0 diagnosis session as "missing automatic
+suggestions"). Cross-process mutex deferred — the visibility fix is cheaper
+and lower-risk.
+
+### CLI surface symmetry (Q6)
+
+Ten new verbs close the asymmetry against the MCP tool surface that v4.8.2
+introduced:
+
+- **Tasks:** `update-task <id> [-s status] [-p priority] [-t title] [-d desc]`
+  and `delete-task <id>` (mirrors `nexus_update_task` + `nexus_delete_task`).
+- **Handover:** new `cli/commands/handover.js` with `read-handover <project>`,
+  `update-handover <project> [content | -f file] [--by label]`, and
+  `list-handovers` — the v4.6.0 Continuous Handover protocol is finally
+  reachable from the shell.
+- **Sessions:** `list-sessions [-p project] [-n limit]`.
+- **Ledger:** `update-decision <id> [-d text] [-c context] [-p project]
+  [-t tags] [--lifecycle X] [--confidence N]`.
+- **Misc:** `fleet` (cross-project priority matrix), `import-cc-memories`
+  (dry-run by default; `--commit` to write), `propose-edges <id>`,
+  `bridge-session [project] [--commit] [--thought "…"] [--context "…"]`.
+
+`tests/cliCommands.test.js` extended +4 specs (handover group + extended
+counts on tasks/sessions/ledger groups).
+
+### Test coverage (Q8 + Q9)
+
+- **`tests/routesDeferred.test.ts` (NEW, 15 specs)** covers
+  `routes/handover.ts` (the Captain's flagship v4.6.0 protocol, previously
+  zero tests), `routes/usage.ts` (every fuel call), and
+  `routes/estimator.ts`. 13/38 → 16/38 routes with integration specs.
+  `plan.ts` and `autoSummary.ts` deferred — they require mocking `detectAI()`.
+- **`mcpb/smoke-test-bundle.mjs` expanded 13 → 30 tools.** New coverage:
+  `nexus_get_plan`, `nexus_read_handover`, `nexus_list_tasks`, `nexus_list_decisions`,
+  `nexus_list_thoughts`, `nexus_list_sessions`, `nexus_fleet_overview`,
+  `nexus_get_blast_radius`, `nexus_update_task` (round-trip), `nexus_push_thought` +
+  `nexus_pop_thought` (self-cleaning pair), `nexus_record_decision` +
+  `nexus_update_decision` + `nexus_link_decisions` (smoke-tagged chain),
+  `nexus_log_session`, `nexus_update_handover`, `nexus_import_cc_memories`
+  (dry-run). Cleanup extended to scrub ledger / graph_edges / sessions /
+  thoughts / `_handovers` by deterministic markers ("safe to delete" suffix
+  + `project='smoke-test'`). Only the four AI / side-effect tools remain
+  skipped (`ask_overseer`, `ask_overseer_start`, `get_overseer_result`,
+  `bridge_session`).
+
+### Polish (E_*)
+
+- **`lib/time.js` (NEW).** `relativeAge(iso, opts)` + `elapsedDuration(iso)`
+  replace six near-identical implementations across Command, Fleet,
+  Handover, ProjectHealth, DigestWidget, and the older `lib/todayView.js`.
+  `formatTimeAgo` re-exported for backwards-compat with the existing
+  `tests/todayView.test.js`.
+- **`components/ProgressBar.jsx` + `components/EmptyState.jsx` (NEW).**
+  Replace the Fuel `Bar`, Pulse `GaugeBar`, and Command `EmptyState` private
+  helpers plus 5+ inline copies. `colorClass` accepts a function for
+  dynamic-threshold fills so Fuel's burn-rate coloring still works through
+  a thin wrapper.
+- **`deleteSession()` + accessor pass.** Five `store.data.*` reads/writes
+  in `routes/{sessions,plan,init,autoSummary,advice}.ts` routed through
+  typed accessors. `sessions.ts` DELETE now calls `store.deleteSession(id)`
+  instead of splicing the array in place.
+- **`<ConfirmDialog>` (NEW).** Replaces `window.confirm` / `window.prompt`
+  in four spots (Fleet commit, Overseer InlineCommitRow commit, Handover
+  delete-card, ContradictionsView "Keep both"). Real modal with focus
+  trap, ESC handling, optional text input for prompt-style use, and
+  `danger` styling for destructive ops.
+
+### Patterns codified
+
+- **Coalesce with a counter, not a timer.** Counter-based batched flush
+  preserves synchronous "everything on disk when the entry-point returns"
+  semantics without crash-window exposure from deferred writes.
+- **Test against observable disk state, not call-site spies.** A function
+  that early-returns under a flag still appears "called" to `vi.spyOn`;
+  the counter on the actual write block is the honest signal.
+- **Surface the silent.** Standalone mode silently disabled four pollers;
+  one line in the brief output is cheaper insurance than building the
+  cross-process mutex that would let them run safely.
+- **Smoke tests deserve cleanup.** Extended `cleanupSmokeTraces` now scrubs
+  ledger / graph_edges / sessions / thoughts / `_handovers` so the bundle
+  smoke test can exercise write tools without polluting the user's store.
+
+### Files touched
+
+24 modified + 4 new (3 client components + 1 CLI commands file + 1 server
+lib + 2 server type fields). See `git diff --stat v4.9.0..HEAD` for the
+full surface.
+
 ## v4.9.0 — Hook & memory hardening
 
 Audit-driven release. Three parallel agents (server, client, CLI/packaging) and

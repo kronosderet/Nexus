@@ -5,6 +5,8 @@ import { Brain, RefreshCw, AlertTriangle, Shield, Send, Loader2, Play, CheckCirc
 import Chip from '../components/Chip.jsx';
 // v4.9.0 #759 — locale-aware date/time formatting honours the cs/en toggle.
 import { formatLocaleDate, formatLocaleTime, formatLocaleDateTime } from '../lib/locale.js';
+// v4.9.1 #760 — shared modal replacing window.prompt for commit-message capture.
+import ConfirmDialog from '../components/ConfirmDialog.jsx';
 
 // v4.4.5 #381 — Copy-as-Markdown button. Audit flagged that Overseer answers
 // require manual highlight-and-copy. Wraps navigator.clipboard.writeText with
@@ -230,12 +232,15 @@ function InlineCommitRow() {
   const dirty = projects.filter(p => (p.git?.uncommittedChanges || 0) > 0);
   const [busy, setBusy] = useState(null);
   const [results, setResults] = useState({});
+  // v4.9.1 #760 — was window.prompt for the commit message; now a real modal.
+  const [pendingProject, setPendingProject] = useState(null);
   if (dirty.length === 0) return null;
-  const commit = async (name) => {
+  const commit = (name) => setPendingProject(name);
+  const performCommit = async (msg) => {
+    const name = pendingProject;
+    setPendingProject(null);
     setBusy(name);
     try {
-      const msg = window.prompt(`Commit message for ${name}:`, 'Nexus auto-commit');
-      if (!msg) { setBusy(null); return; }
       const r = await api.commitProject(name, msg);
       setResults(prev => ({ ...prev, [name]: r }));
     } catch (e) {
@@ -268,6 +273,16 @@ function InlineCommitRow() {
           );
         })}
       </div>
+      <ConfirmDialog
+        open={!!pendingProject}
+        title={pendingProject ? `Commit ${pendingProject}` : ''}
+        message="Stages all changes and creates a commit. Push is separate."
+        inputLabel="Commit message"
+        inputDefault="Nexus auto-commit"
+        confirmLabel="Commit"
+        onConfirm={performCommit}
+        onCancel={() => setPendingProject(null)}
+      />
     </div>
   );
 }

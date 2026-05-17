@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FolderOpen, GitBranch, Flame, Clock, CheckCircle2, BookOpen } from 'lucide-react';
+import { relativeAge } from '../lib/time.js';
 
 const HEAT_CONFIG = {
   hot: { color: 'text-nexus-red', bg: 'bg-nexus-red/10 border-nexus-red/20', label: 'Hot' },
@@ -7,16 +8,8 @@ const HEAT_CONFIG = {
   cold: { color: 'text-nexus-text-faint', bg: 'bg-nexus-surface border-nexus-border', label: 'Cold' },
 };
 
-function timeAgo(dateStr) {
-  if (!dateStr) return 'never';
-  const ms = Date.now() - new Date(dateStr).getTime();
-  const m = Math.floor(ms / 60000);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
-}
+// v4.9.1 #751 — timeAgo collapsed into the shared relativeAge helper.
+const timeAgo = (dateStr) => relativeAge(dateStr, { empty: 'never' });
 
 function ProjectCard({ project }) {
   const heat = HEAT_CONFIG[project.heat];

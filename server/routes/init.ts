@@ -57,8 +57,9 @@ async function runHealthChecks(store: NexusStore): Promise<HealthResults> {
   try {
     const tasks = store.getAllTasks();
     const allSessions = store.getSessions({ limit: 200 });
-    const decisions = store.data.ledger?.length || 0;
-    const graphEdges = store.data.graph_edges?.length || 0;
+    // v4.9.1 #758 — accessors instead of direct store.data.*
+    const decisions = store.getAllDecisions().length;
+    const graphEdges = store.getAllEdges().length;
     results.checks.database = { ok: true, tasks: tasks.length, sessions: allSessions.length, decisions, graphEdges };
   } catch (err) {
     results.checks.database = { ok: false, error: (err as Error).message };

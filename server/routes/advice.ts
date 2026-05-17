@@ -27,7 +27,8 @@ export function createAdviceRoutes(store: NexusStore) {
   // Get a single advice entry
   router.get('/:id', (req: Request, res: Response) => {
     const id = parseInt(String(req.params.id));
-    const entry = (store.data.advice || []).find(a => a.id === id);
+    // v4.9.1 #758 — accessor instead of direct store.data.advice.
+    const entry = store.getAdvice({ limit: Infinity }).find(a => a.id === id);
     if (!entry) return res.status(404).json({ error: 'Nothing on the charts.' });
     res.json(entry);
   });

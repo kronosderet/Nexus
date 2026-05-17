@@ -47,6 +47,39 @@ export const taskCommands = {
     console.log(`  ◈ Landmark reached: ${task.title}`);
   },
 
+  // v4.9.1 #740 — CLI mirror of nexus_update_task. Moves a task through the
+  // backlog → in_progress → review → done state machine without going through
+  // the dashboard. Also takes --priority and --title for inline edits.
+  async ['update-task'](args) {
+    const id = parseInt(args[0]);
+    if (!id || isNaN(id)) { console.error('  Usage: nexus update-task <id> [-s status] [-p priority] [-t title] [-d description]'); return; }
+    const body = {};
+    for (let i = 1; i < args.length; i++) {
+      const k = args[i];
+      const v = args[i + 1];
+      if ((k === '-s' || k === '--status') && v) { body.status = v; i++; }
+      else if ((k === '-p' || k === '--priority') && v) { body.priority = parseInt(v); i++; }
+      else if ((k === '-t' || k === '--title') && v) { body.title = v; i++; }
+      else if ((k === '-d' || k === '--description') && v) { body.description = v; i++; }
+    }
+    if (Object.keys(body).length === 0) {
+      console.error('  Provide at least one field: -s/-p/-t/-d');
+      return;
+    }
+    const task = await api(`/tasks/${id}`, { method: 'PATCH', body });
+    console.log(`  ◈ Course adjusted: ${formatTask(task)}`);
+  },
+
+  // v4.9.1 #740 — CLI mirror of nexus_delete_task. Purges a task from the
+  // ledger (not just status=done). Use sparingly — for smoke-test / duplicate
+  // cleanup, not real work (nexus done is the canonical "completed" path).
+  async ['delete-task'](args) {
+    const id = parseInt(args[0]);
+    if (!id || isNaN(id)) { console.error('  Usage: nexus delete-task <id>'); return; }
+    await api(`/tasks/${id}`, { method: 'DELETE' });
+    console.log(`  ◈ Task #${id} purged.`);
+  },
+
   async quick() {
     // Fuel
     try {

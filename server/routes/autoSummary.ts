@@ -130,7 +130,8 @@ async function generateSummary(store: NexusStore, project: string) {
   });
 
   // Decisions recorded in this window
-  const recentDecisions = (store.data.ledger || []).filter(d => {
+  // v4.9.1 #758 — accessor instead of direct store.data.ledger.
+  const recentDecisions = store.getAllDecisions().filter(d => {
     const t = new Date(d.created_at).getTime();
     return t > lastSessionTime;
   });

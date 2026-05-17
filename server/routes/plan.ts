@@ -138,7 +138,8 @@ async function buildSessionPlan(store: NexusStore, projectFilter?: string) {
   const weeklyFuel = usage?.weekly_percent ?? 100;
 
   // Get timing info
-  const sessionTiming = store.data._sessionTiming;
+  // v4.9.1 #758 — accessor instead of direct store.data._sessionTiming.
+  const sessionTiming = store.getSessionTiming();
   let minutesUntilReset: number | null = null;
   if (sessionTiming?.resetTime) {
     minutesUntilReset = Math.max(0, (new Date(sessionTiming.resetTime).getTime() - Date.now()) / 60000);
@@ -180,8 +181,9 @@ async function buildSessionPlan(store: NexusStore, projectFilter?: string) {
   const criticalRisks = risks.filter((r: RiskItem) => r.level === 'critical');
 
   // ── 5. Graph intelligence: most-connected pending areas ─
-  const ledger = store.data.ledger || [];
-  const edges = store.data.graph_edges || [];
+  // v4.9.1 #758 — accessors instead of direct store.data.*
+  const ledger = store.getAllDecisions();
+  const edges = store.getAllEdges();
   const recentDecisions = [...ledger]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 10);

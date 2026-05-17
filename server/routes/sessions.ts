@@ -65,10 +65,10 @@ export function createSessionRoutes(store: NexusStore, broadcast: BroadcastFn) {
   });
 
   router.delete('/:id', (req: Request, res: Response) => {
-    const idx = store.data.sessions.findIndex(s => s.id === Number(req.params.id));
-    if (idx === -1) return res.status(404).json({ error: 'Nothing on the charts.' });
-    store.data.sessions.splice(idx, 1);
-    store._flush();
+    // v4.9.1 #758 — goes through the typed accessor instead of splicing
+    // store.data.sessions in-place.
+    const ok = store.deleteSession(Number(req.params.id));
+    if (!ok) return res.status(404).json({ error: 'Nothing on the charts.' });
     res.json({ success: true });
   });
 

@@ -96,7 +96,26 @@
 - Project name normalization: cleaned 29 decisions + 19 sessions
 - Megatested: 153 tests, 24/24 API endpoints, full data integrity audit
 
-## Current — v4.9.0 (Hook & memory hardening · shipped 2026-05-16)
+## Current — v4.9.1 (v4.9.0 backlog closeout · shipped 2026-05-17)
+
+Closes all 10 items that v4.9.0 deferred. Performance: flush coalescing via
+`withBatchedFlush` (recordDecision → auto-link cascade now produces one write
+instead of N+1) plus a per-decision `_significantWords` cache. CLI surface
+symmetry: 10 new verbs (`update-task`, `delete-task`, `read-handover`,
+`update-handover`, `list-sessions`, `update-decision`, `fleet`,
+`import-cc-memories`, `propose-edges`, `bridge-session`) close the asymmetry
+against the MCP tool surface. Test coverage: route specs for handover / usage
+/ estimator (+15 specs); MCPB smoke test 13/34 → 30/34 tools. Polish:
+`lib/time.js` consolidates 6 relative-time formatters, `<ProgressBar>` +
+`<EmptyState>` + `<ConfirmDialog>` extracted as shared components, the last
+five `store.data.*` reads/writes routed through typed accessors,
+`window.confirm`/`window.prompt` replaced with a real modal in 4 spots.
+Standalone-mode brief footer now warns when running without the dashboard
+that risk/digest/contradiction pollers are off.
+
+**477 tests (+22) · 34 MCP tools · no migrations · no breaking changes.**
+
+## Previous — v4.9.0 (Hook & memory hardening · shipped 2026-05-16)
 
 Audit-driven release. Three parallel agents (server / client / CLI+packaging)
 surfaced 36 findings across the codebase post-v4.8.2 — none of them overlapping

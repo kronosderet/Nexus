@@ -150,6 +150,24 @@ export function formatBrief(data: BriefData, project: string): string {
     lines.push(`  → review in the Conflicts tab (accept → flag, dismiss → hide)`);
   }
 
+  // v4.9.1 #739 — standalone-mode auto-scan note. The MCPB process has no
+  // long-lived loop, so risk / digest / contradiction pollers never fire when
+  // the dashboard isn't running. Without this footer the brief looks healthy
+  // but in-flight automation (auto-scans, GPU history, ambient telemetry) is
+  // silently off. One line at the bottom makes the trade-off visible.
+  if (STANDALONE) {
+    lines.push('');
+    lines.push(
+      '◈ Standalone mode — risk / digest / contradiction auto-scans are off.',
+    );
+    lines.push(
+      '  Run `npm run dashboard` to enable the 5-min risk poller, 6-h digest,',
+    );
+    lines.push(
+      '  24-h auto contradiction scan, and GPU/file watchers.',
+    );
+  }
+
   return lines.join('\n');
 }
 

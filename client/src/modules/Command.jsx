@@ -10,6 +10,9 @@ import { api } from '../hooks/useApi.js';
 import FuelFreshnessStamp from '../components/FuelFreshnessStamp.jsx';
 // v4.9.0 #759 — honour the cs/en locale toggle for time formatting.
 import { formatLocaleTime } from '../lib/locale.js';
+// v4.9.1 #751 — shared relative-time helpers (was duplicated 6× across the client).
+import { relativeAge, elapsedDuration } from '../lib/time.js';
+import EmptyState from '../components/EmptyState.jsx';
 import TodayView from './command/TodayView.jsx';
 
 // ── Shared helpers ──────────────────────────────────────
@@ -36,17 +39,8 @@ function planFocus(aiPlan) {
   return match ? match[1].trim().split('\n')[0] : '';
 }
 
-function minutesAgo(iso) {
-  if (!iso) return 'unknown';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return 'unknown';
-  const diff = (Date.now() - d.getTime()) / 60000;
-  if (diff < 0 || diff < 1) return 'just now';
-  if (diff < 60) return `${Math.round(diff)}m ago`;
-  const h = diff / 60;
-  if (h < 24) return `${Math.round(h)}h ago`;
-  return `${Math.round(h / 24)}d ago`;
-}
+// v4.9.1 #751 — minutesAgo collapsed into the shared relativeAge helper.
+const minutesAgo = (iso) => relativeAge(iso, { empty: 'unknown' });
 
 function groupByProject(tasks) {
   const groups = {};
@@ -507,9 +501,9 @@ function Panel({ title, icon: Icon, count, accent = 'text-nexus-amber', children
   );
 }
 
-function EmptyState({ icon: Icon, message }) {
-  return <div className="text-center py-4 text-nexus-text-faint"><Icon size={14} className="mx-auto mb-1.5 opacity-40" /><p className="text-[10px] font-mono">{message}</p></div>;
-}
+// v4.9.1 #752 — EmptyState extracted to client/src/components/EmptyState.jsx
+// (was previously duplicated as inline `text-center py-12` blocks across Log,
+// Overseer, Fuel, Handover, Graph). Imported at the top of this file.
 
 function estimateMinutes(title, globalAvg = 35) {
   const t = (title || '').toLowerCase();
@@ -521,14 +515,8 @@ function estimateMinutes(title, globalAvg = 35) {
   return globalAvg;
 }
 
-function elapsedSince(iso) {
-  if (!iso) return '';
-  const ms = Date.now() - new Date(iso).getTime();
-  if (ms < 0) return '';
-  const m = Math.floor(ms / 60000);
-  if (m < 60) return `${m}m`;
-  return `${Math.floor(m / 60)}h ${m % 60}m`;
-}
+// v4.9.1 #751 — elapsedSince now lives in lib/time.js as elapsedDuration.
+const elapsedSince = elapsedDuration;
 
 function LaterPanel({ backlog, onUpdate, onStart }) {
   const [expanded, setExpanded] = useState({});

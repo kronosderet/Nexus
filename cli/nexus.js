@@ -469,12 +469,14 @@ nexus handoff ${project}               # Generate context capsule for next agent
 \`\`\`
 CONTEXT:    nexus brief | quick | handoff | context | onboard
 FUEL:       nexus usage | fuel | intel | workload | plan
-TASKS:      nexus task | tasks | done | predict
-MEMORY:     nexus session | summarize | log | note | record | decisions
+TASKS:      nexus task | tasks | done | update-task | delete-task | predict
+MEMORY:     nexus session | list-sessions | summarize | log | note | record | decisions | update-decision
+HANDOVER:   nexus read-handover | update-handover | list-handovers
 SEARCH:     nexus search | seek | find
 INTEL:      nexus overseer | advice | impact blast|forecast|centrality|holes | graph
-GIT:        nexus sync | commit-all | repos | focus
-TOOLS:      nexus ai | notify | digest | gpu | bookmarks
+FLEET:      nexus fleet | sync | commit-all | repos | focus
+BRIDGE:     nexus bridge-session | propose-edges | import-cc-memories
+TOOLS:      nexus digest | gpu | bookmarks
 \`\`\`
 
 ### Dashboard Modules (http://localhost:5173)
@@ -1066,6 +1068,120 @@ ${JSON.stringify(config, null, 2).split('\n').map(l => '    ' + l).join('\n')}
 `);
   },
 
+  // v4.9.1 #740 — CLI mirror of nexus_fleet_overview. Cross-project priority
+  // matrix: top tasks ranked by priority × age × project_staleness, plus a
+  // staleness map (project → days since last session).
+  async fleet() {
+    const f = await api('/fleet');
+    if (!f || !Array.isArray(f.topTasks) || f.topTasks.length === 0) {
+      console.log('  ◈ Fleet is calm. No open tasks across projects.');
+      return;
+    }
+    console.log(`  ${amber('◈ Fleet Overview')} (top ${f.topTasks.length}):\n`);
+    for (const t of f.topTasks) {
+      const tag = String(t.priority) === '2' ? red('!!') : String(t.priority) === '1' ? amber('! ') : '  ';
+      console.log(`  ${tag} ${dim(`#${t.id}`)} ${dim(`[${t.status}]`)} ${t.title.slice(0, 70)} ${dim(`(${t.ageDays}d · ${t.score})`)}`);
+    }
+    if (f.staleness && Object.keys(f.staleness).length > 0) {
+      console.log(`\n  ${amber('Project staleness:')}`);
+      for (const [proj, days] of Object.entries(f.staleness).sort((a, b) => a[1] - b[1])) {
+        const c = days >= 14 ? red : days >= 7 ? amber : green;
+        console.log(`    ${proj}: ${c(`${days}d`)}`);
+      }
+    }
+  },
+
+  // v4.9.1 #740 — trigger nexus_import_cc_memories from the shell. Defaults
+  // to dry_run=true so the user can preview what would be imported before
+  // committing. Pass --commit to actually write.
+  async ['import-cc-memories'](args) {
+    const dry = !args.includes('--commit');
+    const force = args.includes('--force');
+    const sourceIdx = args.findIndex((a) => a === '--source' || a === '-s');
+    const projectIdx = args.findIndex((a) => a === '--project' || a === '-p');
+    const body = {
+      dry_run: dry,
+      force,
+      ...(sourceIdx >= 0 && args[sourceIdx + 1] ? { source_filter: args[sourceIdx + 1] } : {}),
+      ...(projectIdx >= 0 && args[projectIdx + 1] ? { project: args[projectIdx + 1] } : {}),
+    };
+    const res = await api('/cc-memory/import', { method: 'POST', body });
+    if (dry) console.log(`  ${amber('◈ Dry run')} ${dim('(pass --commit to actually write)')}\n`);
+    else console.log(`  ${green('◈ Imported')}\n`);
+    console.log(`  scanned: ${res.scanned ?? '?'} · imported: ${res.imported ?? 0} · skipped: ${res.skipped ?? 0} · errors: ${res.errors ?? 0}`);
+    if (Array.isArray(res.samples) && res.samples.length > 0) {
+      console.log(`\n  ${dim('Sample paths:')}`);
+      for (const p of res.samples.slice(0, 5)) console.log(`    ${dim(p)}`);
+    }
+  },
+
+  // v4.9.1 #740 — CLI trigger for nexus_propose_edges. Async Overseer call;
+  // requires the dashboard's async-task infrastructure. Standalone callers
+  // get a friendly "unavailable" message from the route.
+  async ['propose-edges'](args) {
+    const decisionId = parseInt(args[0]);
+    if (!decisionId || isNaN(decisionId)) {
+      console.error('  Usage: nexus propose-edges <decision-id> [--pool N] [--project name]');
+      return;
+    }
+    const body = { decision_id: decisionId };
+    for (let i = 1; i < args.length; i++) {
+      const k = args[i];
+      const v = args[i + 1];
+      if (k === '--pool' && v) { body.candidate_pool_size = parseInt(v); i++; }
+      else if (k === '--project' && v) { body.project_scope = v; i++; }
+    }
+    const res = await api('/overseer/propose-edges', { method: 'POST', body });
+    if (res.taskId) {
+      console.log(`  ${amber('◈ Edge proposal started')} ${dim(`(taskId ${res.taskId})`)}\n`);
+      console.log(`  ${dim('Poll via the dashboard or wait for nexus_get_overseer_result.')}`);
+    } else if (res.error) {
+      console.log(`  ${dim(`◈ ${res.error}`)}`);
+    } else {
+      console.log(`  ${dim(JSON.stringify(res).slice(0, 200))}`);
+    }
+  },
+
+  // v4.9.1 #740 — CLI mirror of nexus_bridge_session. Composite end-of-work
+  // ritual: auto-summary + optional handoff thought push. Defaults to preview
+  // (commit_summary=false); pass --commit to record the session.
+  async ['bridge-session'](args) {
+    const project = (args.find((a) => !a.startsWith('-')) || 'Nexus');
+    const commit = args.includes('--commit');
+    const thoughtIdx = args.findIndex((a) => a === '--thought');
+    const contextIdx = args.findIndex((a) => a === '--context');
+    const body = {
+      project,
+      commit_summary: commit,
+      ...(thoughtIdx >= 0 && args[thoughtIdx + 1] ? { handoff_thought: args[thoughtIdx + 1] } : {}),
+      ...(contextIdx >= 0 && args[contextIdx + 1] ? { handoff_context: args[contextIdx + 1] } : {}),
+    };
+    // The Nexus dashboard exposes the bridge through /autoSummary + /thoughts;
+    // there's no single "bridge-session" route. Mirror the MCP composite's
+    // behavior client-side: fetch a summary preview, then optionally commit
+    // + push the thought.
+    const preview = await api(`/auto-summary?project=${encodeURIComponent(project)}`);
+    if (preview.error) {
+      console.log(`  ${red('◈')} ${preview.error}`);
+      return;
+    }
+    console.log(`  ${amber('◈ Session summary preview')} ${dim(`(${project})`)}\n`);
+    console.log(preview.summary || '(empty)');
+    if (preview.decisions?.length) console.log(`\n  Decisions: ${preview.decisions.length}`);
+    if (preview.blockers?.length) console.log(`  Blockers: ${preview.blockers.length}`);
+    if (commit) {
+      await api('/auto-summary', { method: 'POST', body: { project, ...preview } });
+      console.log(`\n  ${green('◈ Session committed.')}`);
+    }
+    if (body.handoff_thought) {
+      await api('/thoughts', { method: 'POST', body: { text: body.handoff_thought, context: body.handoff_context || '', project } });
+      console.log(`  ${green('◈ Thought pushed.')}`);
+    }
+    if (!commit && !body.handoff_thought) {
+      console.log(`\n  ${dim('Preview only. Pass --commit to record, --thought "..." to push a handoff.')}`);
+    }
+  },
+
   // v4.7.2 #592 — inspect the multi-source memory bridge configuration.
   // Reads ~/.nexus/nexus.json directly (no server hop) so it works when the
   // dashboard is offline. Listed in the v4.7.0-M1 spec; deferred at v4.7.0.
@@ -1334,12 +1450,17 @@ ${JSON.stringify(config, null, 2).split('\n').map(l => '    ' + l).join('\n')}
 
 // ── Main ───────────────────────────────────────────────
 // ── Combined registry ───────────────────────
+// v4.9.1 #740 — handoverCommands added (read-handover, update-handover,
+// list-handovers). The four inline misc commands (fleet, import-cc-memories,
+// propose-edges, bridge-session) live in inlineCommands above.
+import { handoverCommands } from './commands/handover.js';
 const commands = {
   ...inlineCommands,
   ...taskCommands,
   ...sessionCommands,
   ...ledgerCommands,
   ...gitCommands,
+  ...handoverCommands,
 };
 
 const [cmd, ...args] = process.argv.slice(2);
